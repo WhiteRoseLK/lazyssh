@@ -1,44 +1,50 @@
-name: 💡Feature Request
-description: Suggest an idea for the project
-labels: [ "kind/enhancement", "priority/needs-triage" ]
+name: "💡 Feature Request"
+description: Suggest an idea or improvement for neossh
+title: "feat: "
+labels: ["enhancement"]
 body:
   - type: markdown
     attributes:
       value: |
-        # Feature Request
-        
-        Thanks for helping make the NeoSSH project better!
+        Thanks for helping make neossh better! Please describe the feature you'd like to see.
 
   - type: checkboxes
     attributes:
-      label: Checks
+      label: Pre-flight checks
       options:
-        - label: I have searched the [existing issues](https://github.com/WhiteRoseLK/neossh/issues).
+        - label: I have searched the [existing issues](https://github.com/WhiteRoseLK/neossh/issues) to ensure this feature has not already been requested.
           required: true
 
   - type: textarea
-    id: motivation
+    id: problem
     attributes:
-      label: Motivation
-      description: What has motivated your request?
-      placeholder: |
-        * This is the most important part of the request *
-        
-        * Help us understand what you are trying to achieve, try to separate it from any implementation you may have in mind *
+      label: Is your feature request related to a problem?
+      description: A clear and concise description of what the problem is (e.g. "I'm always frustrated when...").
+      placeholder: Describe the pain point or problem...
+    validations:
+      required: false
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Describe the Solution You'd Like
+      description: A clear and concise description of what you want to happen and how you envision it working.
+      placeholder: I would like neossh to...
     validations:
       required: true
 
   - type: textarea
-    id: implementation
+    id: alternatives
     attributes:
-      label: Implementation
-      description: What is your proposed implementation?
-      placeholder: |
-        * It's fine to leave this blank if you don't have an implementation already in mind *
+      label: Alternatives Considered
+      description: Any alternative solutions or features you've considered.
+    validations:
+      required: false
 
-  - type: checkboxes
+  - type: textarea
+    id: additional-context
     attributes:
-      label: Are you willing & able to help?
-      options:
-        - label: I am able to submit a PR!
-        - label: I can help test the feature!
+      label: Additional Context
+      description: Add any other context, CLI examples, mockups, or screenshots about the feature request here.
+    validations:
+      required: false
