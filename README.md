@@ -97,7 +97,9 @@ The original [lazyssh](https://github.com/Adembc/lazyssh) repository had not see
 
 ## 🚀 Installation
 
-### Option 1: Homebrew (macOS & Linux) — Recommended
+### Option 1: Homebrew (macOS & Linux) — Official Tap
+
+Install `neossh` using the official Homebrew tap:
 
 ```bash
 brew tap WhiteRoseLK/tap
@@ -105,7 +107,15 @@ brew trust WhiteRoseLK/tap
 brew install neossh
 ```
 
-*(Note: On recent Homebrew versions, `brew trust WhiteRoseLK/tap` is required by Homebrew for third-party taps. If you previously had `lazyssh` installed, Homebrew will automatically prompt to replace it while preserving your server configs).*
+*(If you previously had `lazyssh` installed, Homebrew will seamlessly prompt to replace it while preserving your server configs and metadata).*
+
+> [!NOTE]
+> **Why an external tap instead of `brew install neossh` directly?**  
+> Homebrew Core requires new packages to meet a community adoption threshold (typically 50–75 GitHub stars) before being accepted into the central registry.
+> 
+> Because `neossh` was recently established as an independent continuation of `lazyssh`, it is currently distributed via this official tap. Once the project meets Homebrew's notoriety criteria, we will submit a formula to `homebrew/core` so everyone can simply run `brew install neossh`.
+> 
+> ⭐ **[Star the repository](https://github.com/WhiteRoseLK/neossh)** to help us reach the threshold for Homebrew Core inclusion!
 
 ---
 
