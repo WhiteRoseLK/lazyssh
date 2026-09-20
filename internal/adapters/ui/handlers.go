@@ -20,7 +20,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Adembc/lazyssh/internal/core/domain"
+	"github.com/WhiteRoseLK/neossh/internal/core/domain"
 	"github.com/atotto/clipboard"
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"

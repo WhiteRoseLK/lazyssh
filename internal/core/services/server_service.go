@@ -29,8 +29,8 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/Adembc/lazyssh/internal/core/domain"
-	"github.com/Adembc/lazyssh/internal/core/ports"
+	"github.com/WhiteRoseLK/neossh/internal/core/domain"
+	"github.com/WhiteRoseLK/neossh/internal/core/ports"
 	"go.uber.org/zap"
 )
 
@@ -335,7 +335,8 @@ func (s *serverService) SetPinned(alias string, pinned bool) error {
 // SSH starts an interactive SSH session to the given alias using the system's ssh client.
 func (s *serverService) SSH(alias string) error {
 	s.logger.Infow("ssh start", "alias", alias)
-	cmd := exec.Command("ssh", "-F", s.serverRepository.GetConfigFile(), alias) //nolint:gosec // G204: intentional SSH command
+	//nolint:gosec // G204: intentional SSH command
+	cmd := exec.Command("ssh", "-F", s.serverRepository.GetConfigFile(), alias)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr

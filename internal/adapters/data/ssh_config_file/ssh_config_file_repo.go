@@ -17,8 +17,8 @@ package ssh_config_file
 import (
 	"fmt"
 
-	"github.com/Adembc/lazyssh/internal/core/domain"
-	"github.com/Adembc/lazyssh/internal/core/ports"
+	"github.com/WhiteRoseLK/neossh/internal/core/domain"
+	"github.com/WhiteRoseLK/neossh/internal/core/ports"
 	"github.com/kevinburke/ssh_config"
 	"go.uber.org/zap"
 )

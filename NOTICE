@@ -1,6 +1,6 @@
-lazyssh
-Copyright 2024 Adembc (original author)
-Copyright 2025-2026 WhiteRoseLK (fork maintainer)
+neossh
+Copyright 2024 Adembc (original author of lazyssh)
+Copyright 2025-2026 WhiteRoseLK (neossh maintainer)
 
-This product includes software developed by Adembc
-(https://github.com/Adembc/lazyssh).
+This product includes software originally developed by Adembc
+as lazyssh (https://github.com/Adembc/lazyssh).

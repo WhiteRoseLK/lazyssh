@@ -1,5 +1,5 @@
 version: 2
-project_name: lazyssh
+project_name: neossh
 
 before:
   hooks:
@@ -49,18 +49,19 @@ brews:
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
     directory: Formula
-    homepage: "https://github.com/WhiteRoseLK/lazyssh"
-    description: "A terminal-based SSH manager inspired by lazydocker and k9s"
+    homepage: "https://github.com/WhiteRoseLK/neossh"
+    description: "A modern terminal-based SSH manager (successor to lazyssh)"
     license: "Apache-2.0"
     install: |-
-      bin.install "lazyssh"
+      bin.install "neossh"
     test: |-
-      assert_match version.to_s, shell_output("#{bin}/lazyssh --version")
+      assert_match version.to_s, shell_output("#{bin}/neossh --version")
     custom_block: |-
-      conflicts_with "adembc/tap/lazyssh", because: "this is the actively maintained fork of lazyssh"
+      conflicts_with "lazyssh", because: "neossh is the modern successor to lazyssh"
+      conflicts_with "adembc/tap/lazyssh", because: "neossh is the modern successor to lazyssh"
     caveats: |-
-      If you previously had adembc/tap/lazyssh installed, this formula
-      replaces it. Your SSH config and lazyssh metadata are unchanged.
+      If you previously used lazyssh, neossh automatically migrates your
+      metadata and settings from ~/.lazyssh to ~/.neossh. Your SSH config is unchanged.
 
 checksum:
   name_template: "checksums.txt"

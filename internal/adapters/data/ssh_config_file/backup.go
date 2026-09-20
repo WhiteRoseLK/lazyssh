@@ -117,7 +117,8 @@ func (r *Repository) findBackupFilesFor(dir, baseName string) ([]os.FileInfo, er
 
 	for _, entry := range entries {
 		name := entry.Name()
-		if !strings.HasPrefix(name, prefix) || !strings.HasSuffix(name, BackupSuffix) {
+		isBackup := strings.HasSuffix(name, BackupSuffix) || strings.HasSuffix(name, "lazyssh.backup")
+		if !strings.HasPrefix(name, prefix) || !isBackup {
 			continue
 		}
 		info, err := entry.Info()

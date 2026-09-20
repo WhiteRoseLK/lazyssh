@@ -39,8 +39,26 @@ func newSettingsManager(logger *zap.SugaredLogger) *settingsManager {
 		return nil
 	}
 
+	settingsDir := filepath.Join(home, ".neossh")
+	if xdgConfig := os.Getenv("XDG_CONFIG_HOME"); xdgConfig != "" {
+		settingsDir = filepath.Join(xdgConfig, "neossh")
+	}
+	settingsPath := filepath.Join(settingsDir, "settings.json")
+
+	// Migrate settings from legacy lazyssh if neossh settings don't exist yet
+	if _, err := os.Stat(settingsPath); os.IsNotExist(err) {
+		legacyPath := filepath.Join(home, ".lazyssh", "settings.json")
+		if xdgConfig := os.Getenv("XDG_CONFIG_HOME"); xdgConfig != "" {
+			legacyPath = filepath.Join(xdgConfig, "lazyssh", "settings.json")
+		}
+		if data, err := os.ReadFile(legacyPath); err == nil {
+			_ = os.MkdirAll(settingsDir, 0o750)
+			_ = os.WriteFile(settingsPath, data, 0o600)
+		}
+	}
+
 	return &settingsManager{
-		filePath: filepath.Join(home, ".lazyssh", "settings.json"),
+		filePath: settingsPath,
 		logger:   logger,
 	}
 }

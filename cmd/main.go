@@ -20,11 +20,11 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/Adembc/lazyssh/internal/adapters/data/ssh_config_file"
-	"github.com/Adembc/lazyssh/internal/logger"
+	"github.com/WhiteRoseLK/neossh/internal/adapters/data/ssh_config_file"
+	"github.com/WhiteRoseLK/neossh/internal/logger"
 
-	"github.com/Adembc/lazyssh/internal/adapters/ui"
-	"github.com/Adembc/lazyssh/internal/core/services"
+	"github.com/WhiteRoseLK/neossh/internal/adapters/ui"
+	"github.com/WhiteRoseLK/neossh/internal/core/services"
 	"github.com/spf13/cobra"
 )
 
@@ -35,9 +35,9 @@ var (
 
 	rootCmd = &cobra.Command{
 		Use:   ui.AppName,
-		Short: "Lazy SSH server picker TUI",
+		Short: "NeoSSH server picker TUI",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			log, err := logger.New("LAZYSSH")
+			log, err := logger.New("NEOSSH")
 			if err != nil {
 				fmt.Println(err)
 				os.Exit(1)
@@ -92,14 +92,25 @@ var (
 				}
 			}
 
-			metaDataFile := filepath.Join(home, ".lazyssh", "metadata.json")
+			configDir := filepath.Join(home, ".neossh")
 			if xdgConfig := os.Getenv("XDG_CONFIG_HOME"); xdgConfig != "" {
-				configDir := filepath.Join(xdgConfig, "lazyssh")
-				if err := os.MkdirAll(configDir, 0o750); err != nil {
-					log.Errorw("failed to create XDG config directory", "error", err)
-					os.Exit(1)
+				configDir = filepath.Join(xdgConfig, "neossh")
+			}
+			if err := os.MkdirAll(configDir, 0o750); err != nil {
+				log.Errorw("failed to create config directory", "error", err)
+				os.Exit(1)
+			}
+			metaDataFile := filepath.Join(configDir, "metadata.json")
+
+			// Migrate metadata from legacy lazyssh if neossh metadata doesn't exist yet
+			if _, err := os.Stat(metaDataFile); os.IsNotExist(err) {
+				legacyFile := filepath.Join(home, ".lazyssh", "metadata.json")
+				if xdgConfig := os.Getenv("XDG_CONFIG_HOME"); xdgConfig != "" {
+					legacyFile = filepath.Join(xdgConfig, "lazyssh", "metadata.json")
 				}
-				metaDataFile = filepath.Join(configDir, "metadata.json")
+				if data, err := os.ReadFile(legacyFile); err == nil {
+					_ = os.WriteFile(metaDataFile, data, 0o600)
+				}
 			}
 
 			serverRepo := ssh_config_file.NewRepository(log, sshConfigFile, metaDataFile)

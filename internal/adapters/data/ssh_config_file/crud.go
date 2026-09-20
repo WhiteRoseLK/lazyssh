@@ -19,14 +19,14 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/Adembc/lazyssh/internal/core/domain"
+	"github.com/WhiteRoseLK/neossh/internal/core/domain"
 	"github.com/kevinburke/ssh_config"
 )
 
 const (
 	MaxBackups         = 10
 	TempSuffix         = ".tmp"
-	BackupSuffix       = "lazyssh.backup"
+	BackupSuffix       = "neossh.backup"
 	SSHConfigPerms     = 0o600
 	OriginalBackupName = "config.original.backup"
 )
@@ -124,7 +124,7 @@ func (r *Repository) createHostFromServer(server domain.Server) *ssh_config.Host
 			{Str: server.Alias},
 		},
 		Nodes:              make([]ssh_config.Node, 0),
-		EOLComment:         "Added by lazyssh",
+		EOLComment:         "Added by neossh",
 		SpaceBeforeComment: strings.Repeat(" ", 4),
 	}
 
