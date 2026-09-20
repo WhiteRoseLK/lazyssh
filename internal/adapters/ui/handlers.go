@@ -327,10 +327,12 @@ func (t *tui) handleReturnToSearch() {
 
 func (t *tui) handleServerConnect() {
 	if server, ok := t.serverList.GetSelectedServer(); ok {
-
 		t.app.Suspend(func() {
-			_ = t.serverService.SSH(server.Alias)
+			if err := t.serverService.SSH(server.Alias); err != nil {
+				t.logger.Errorw("ssh session error", "alias", server.Alias, "error", err)
+			}
 		})
+		t.app.Sync()
 		t.refreshServerList()
 	}
 }
@@ -344,6 +346,7 @@ func (t *tui) handleInstallSSHKey() {
 				t.logger.Errorw("failed to install ssh key", "alias", alias, "error", err)
 			}
 		})
+		t.app.Sync()
 		t.refreshServerList()
 	}
 }
@@ -899,8 +902,11 @@ func (t *tui) showPortForwardForm(server domain.Server) {
 		}
 
 		t.app.Suspend(func() {
-			_ = t.serverService.SSHWithArgs(alias, args)
+			if err := t.serverService.SSHWithArgs(alias, args); err != nil {
+				t.logger.Errorw("ssh session error", "alias", alias, "error", err)
+			}
 		})
+		t.app.Sync()
 		t.returnToMain()
 	})
 	form.AddButton("Cancel", func() { t.returnToMain() })

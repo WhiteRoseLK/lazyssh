@@ -16,7 +16,10 @@ package services
 
 import (
 	"bufio"
+	"bytes"
+	"errors"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"os/exec"
@@ -40,6 +43,9 @@ type serverService struct {
 
 	fwMu     sync.Mutex
 	forwards map[string][]*os.Process
+
+	newSSHCommand         func(alias string) *exec.Cmd
+	newSSHCommandWithArgs func(alias string, extraArgs []string) *exec.Cmd
 }
 
 // NewServerService creates a new instance of serverService.
@@ -47,6 +53,16 @@ func NewServerService(logger *zap.SugaredLogger, sr ports.ServerRepository) port
 	return &serverService{
 		logger:           logger,
 		serverRepository: sr,
+		newSSHCommand: func(alias string) *exec.Cmd {
+			//nolint:gosec // G204: intentional SSH command
+			return exec.Command("ssh", "-F", sr.GetConfigFile(), alias)
+		},
+		newSSHCommandWithArgs: func(alias string, extraArgs []string) *exec.Cmd {
+			args := append([]string{}, extraArgs...)
+			args = append(args, "-F", sr.GetConfigFile(), alias)
+			//nolint:gosec // G204: intentional SSH command
+			return exec.Command("ssh", args...)
+		},
 	}
 }
 
@@ -335,14 +351,30 @@ func (s *serverService) SetPinned(alias string, pinned bool) error {
 // SSH starts an interactive SSH session to the given alias using the system's ssh client.
 func (s *serverService) SSH(alias string) error {
 	s.logger.Infow("ssh start", "alias", alias)
-	//nolint:gosec // G204: intentional SSH command
-	cmd := exec.Command("ssh", "-F", s.serverRepository.GetConfigFile(), alias)
+	cmdFactory := s.newSSHCommand
+	if cmdFactory == nil {
+		cmdFactory = func(a string) *exec.Cmd {
+			//nolint:gosec // G204: intentional SSH command
+			return exec.Command("ssh", "-F", s.serverRepository.GetConfigFile(), a)
+		}
+	}
+	cmd := cmdFactory(alias)
+	if cmd == nil {
+		err := fmt.Errorf("ssh command factory returned nil")
+		s.logger.Errorw("ssh command creation failed", "alias", alias, "error", err)
+		return err
+	}
+	stderrBuf := newLimitedBuffer(2048)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	cmd.Stderr = io.MultiWriter(os.Stderr, stderrBuf)
 	if err := cmd.Run(); err != nil {
-		s.logger.Errorw("ssh command failed", "alias", alias, "error", err)
-		return err
+		if isRemoteDisconnectError(err, stderrBuf.String()) {
+			s.logger.Infow("ssh session ended by remote", "alias", alias)
+		} else {
+			s.logger.Errorw("ssh command failed", "alias", alias, "error", err)
+			return err
+		}
 	}
 
 	if err := s.serverRepository.RecordSSH(alias); err != nil {
@@ -356,22 +388,101 @@ func (s *serverService) SSH(alias string) error {
 // SSHWithArgs runs system ssh with provided extra args (e.g., -L/-R/-D) for the given alias.
 func (s *serverService) SSHWithArgs(alias string, extraArgs []string) error {
 	s.logger.Infow("ssh start (with args)", "alias", alias, "args", extraArgs)
-	args := append([]string{}, extraArgs...)
-	args = append(args, "-F", s.serverRepository.GetConfigFile(), alias)
-	// #nosec G204
-	cmd := exec.Command("ssh", args...)
+	cmdFactory := s.newSSHCommandWithArgs
+	if cmdFactory == nil {
+		cmdFactory = func(a string, extra []string) *exec.Cmd {
+			args := append([]string{}, extra...)
+			args = append(args, "-F", s.serverRepository.GetConfigFile(), a)
+			//nolint:gosec // G204: intentional SSH command
+			return exec.Command("ssh", args...)
+		}
+	}
+	cmd := cmdFactory(alias, extraArgs)
+	if cmd == nil {
+		err := fmt.Errorf("ssh command factory returned nil")
+		s.logger.Errorw("ssh command creation failed", "alias", alias, "error", err)
+		return err
+	}
+	stderrBuf := newLimitedBuffer(2048)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	cmd.Stderr = io.MultiWriter(os.Stderr, stderrBuf)
 	if err := cmd.Run(); err != nil {
-		s.logger.Errorw("ssh (with args) failed", "alias", alias, "error", err)
-		return err
+		if isRemoteDisconnectError(err, stderrBuf.String()) {
+			s.logger.Infow("ssh session ended by remote", "alias", alias)
+		} else {
+			s.logger.Errorw("ssh (with args) failed", "alias", alias, "error", err)
+			return err
+		}
 	}
 	if err := s.serverRepository.RecordSSH(alias); err != nil {
 		s.logger.Errorw("failed to record ssh metadata", "alias", alias, "error", err)
 	}
 	s.logger.Infow("ssh end (with args)", "alias", alias)
 	return nil
+}
+
+func isRemoteDisconnectError(err error, stderr string) bool {
+	var exitErr *exec.ExitError
+	if !errors.As(err, &exitErr) {
+		return false
+	}
+
+	lower := strings.ToLower(stderr)
+	disconnectSignals := []string{
+		"connection closed by remote host",
+		"connection closed by foreign host",
+		"closed by remote host",
+		"closed by foreign host",
+		"connection reset by peer",
+		"connection to ",
+		"kex_exchange_identification",
+	}
+
+	for _, signal := range disconnectSignals {
+		if strings.Contains(lower, signal) {
+			return true
+		}
+	}
+
+	return false
+}
+
+type limitedBuffer struct {
+	buf   bytes.Buffer
+	limit int
+}
+
+func newLimitedBuffer(limit int) *limitedBuffer {
+	return &limitedBuffer{limit: limit}
+}
+
+func (b *limitedBuffer) Write(p []byte) (int, error) {
+	if b == nil || b.limit <= 0 {
+		return len(p), nil
+	}
+
+	remaining := b.limit - b.buf.Len()
+	if remaining <= 0 {
+		return len(p), nil
+	}
+
+	toWrite := p
+	if len(p) > remaining {
+		toWrite = p[:remaining]
+	}
+
+	if _, err := b.buf.Write(toWrite); err != nil {
+		return 0, err
+	}
+	return len(p), nil
+}
+
+func (b *limitedBuffer) String() string {
+	if b == nil {
+		return ""
+	}
+	return b.buf.String()
 }
 
 // CopySSHKey installs public SSH keys to the remote host using ssh-copy-id.
