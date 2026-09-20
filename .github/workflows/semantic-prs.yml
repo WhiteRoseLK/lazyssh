@@ -40,4 +40,8 @@ jobs:
             cli
             config
             parser
+            core
+            deps
+            build
+            release
           requireScope: false
