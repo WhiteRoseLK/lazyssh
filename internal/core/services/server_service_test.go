@@ -108,10 +108,57 @@ func TestServerServiceSSH_PermissionDenied(t *testing.T) {
 
 	if err := svc.SSH("example"); err == nil {
 		t.Fatalf("expected error on permission denied, got nil")
+	} else if err.Error() != "Permission denied (publickey)." {
+		t.Fatalf("expected error 'Permission denied (publickey).', got %q", err.Error())
 	}
 
 	if repo.recordCalls != 0 {
 		t.Fatalf("expected RecordSSH not to be called on permission denied, got %d", repo.recordCalls)
+	}
+}
+
+func TestServerServiceSSH_ConnectionRefused(t *testing.T) {
+	repo := &mockServerRepository{}
+	svc := &serverService{
+		logger:           zap.NewNop().Sugar(),
+		serverRepository: repo,
+		newSSHCommand:    helperCommandFactory("refused"),
+	}
+
+	if err := svc.SSH("example"); err == nil {
+		t.Fatalf("expected error on connection refused, got nil")
+	} else if err.Error() != "ssh: connect to host example port 22: Connection refused" {
+		t.Fatalf("expected error 'ssh: connect to host example port 22: Connection refused', got %q", err.Error())
+	}
+
+	if repo.recordCalls != 0 {
+		t.Fatalf("expected RecordSSH not to be called on connection refused, got %d", repo.recordCalls)
+	}
+}
+
+func TestServerServiceSSHWithArgs_Error(t *testing.T) {
+	repo := &mockServerRepository{}
+	svc := &serverService{
+		logger:           zap.NewNop().Sugar(),
+		serverRepository: repo,
+		newSSHCommandWithArgs: func(alias string, extra []string) *exec.Cmd {
+			cs := []string{"-test.run=TestHelperProcess", "--", "refused", alias}
+			cmd := exec.Command(os.Args[0], cs...)
+			cmd.Env = append(os.Environ(), "GO_WANT_HELPER_PROCESS=1")
+			cmd.Stdout = io.Discard
+			cmd.Stderr = io.Discard
+			return cmd
+		},
+	}
+
+	if err := svc.SSHWithArgs("example", []string{"-L", "8080:localhost:80"}); err == nil {
+		t.Fatalf("expected error on connection refused, got nil")
+	} else if err.Error() != "ssh: connect to host example port 22: Connection refused" {
+		t.Fatalf("expected error 'ssh: connect to host example port 22: Connection refused', got %q", err.Error())
+	}
+
+	if repo.recordCalls != 0 {
+		t.Fatalf("expected RecordSSH not to be called on connection refused, got %d", repo.recordCalls)
 	}
 }
 
@@ -218,6 +265,9 @@ func TestHelperProcess(t *testing.T) {
 				os.Exit(255)
 			case "permission":
 				_, _ = os.Stderr.WriteString("Permission denied (publickey).\n")
+				os.Exit(255)
+			case "refused":
+				_, _ = os.Stderr.WriteString("ssh: connect to host " + alias + " port 22: Connection refused\n")
 				os.Exit(255)
 			case "success":
 				os.Exit(0)

@@ -327,13 +327,18 @@ func (t *tui) handleReturnToSearch() {
 
 func (t *tui) handleServerConnect() {
 	if server, ok := t.serverList.GetSelectedServer(); ok {
+		var sshErr error
 		t.app.Suspend(func() {
 			if err := t.serverService.SSH(server.Alias); err != nil {
+				sshErr = err
 				t.logger.Errorw("ssh session error", "alias", server.Alias, "error", err)
 			}
 		})
 		t.app.Sync()
 		t.refreshServerList()
+		if sshErr != nil {
+			t.showSSHErrorModal(server.Alias, sshErr.Error())
+		}
 	}
 }
 
@@ -341,13 +346,18 @@ func (t *tui) handleInstallSSHKey() {
 	if server, ok := t.serverList.GetSelectedServer(); ok {
 		alias := server.Alias
 		t.showStatusTemp(fmt.Sprintf("Installing key to %s…", alias))
+		var copyErr error
 		t.app.Suspend(func() {
 			if err := t.serverService.CopySSHKey(alias); err != nil {
+				copyErr = err
 				t.logger.Errorw("failed to install ssh key", "alias", alias, "error", err)
 			}
 		})
 		t.app.Sync()
 		t.refreshServerList()
+		if copyErr != nil {
+			t.showErrorModal(fmt.Sprintf("Failed to install SSH key to %q", alias), copyErr.Error())
+		}
 	}
 }
 
@@ -723,6 +733,22 @@ func (t *tui) showFileChoiceModal(alias string, candidates []string, action stri
 	t.app.SetRoot(modal, true)
 }
 
+func (t *tui) showErrorModal(title, errMsg string) {
+	text := fmt.Sprintf("[red]%s:[-]\n\n%s", tview.Escape(title), tview.Escape(errMsg))
+	modal := tview.NewModal().
+		SetText(text).
+		AddButtons([]string{"Close"}).
+		SetDoneFunc(func(buttonIndex int, buttonLabel string) {
+			t.handleModalClose()
+		})
+	t.app.SetRoot(modal, true)
+	t.app.SetFocus(modal)
+}
+
+func (t *tui) showSSHErrorModal(alias, errMsg string) {
+	t.showErrorModal(fmt.Sprintf("SSH connection to %q failed", alias), errMsg)
+}
+
 func (t *tui) showEditTagsForm(server domain.Server) {
 	form := tview.NewForm()
 	form.SetBorder(true).
@@ -901,13 +927,18 @@ func (t *tui) showPortForwardForm(server domain.Server) {
 			return
 		}
 
+		var sshErr error
 		t.app.Suspend(func() {
 			if err := t.serverService.SSHWithArgs(alias, args); err != nil {
+				sshErr = err
 				t.logger.Errorw("ssh session error", "alias", alias, "error", err)
 			}
 		})
 		t.app.Sync()
 		t.returnToMain()
+		if sshErr != nil {
+			t.showSSHErrorModal(alias, sshErr.Error())
+		}
 	})
 	form.AddButton("Cancel", func() { t.returnToMain() })
 	form.SetCancelFunc(func() { t.returnToMain() })
