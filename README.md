@@ -97,7 +97,7 @@ The original [lazyssh](https://github.com/Adembc/lazyssh) repository had not see
 
 ## 🚀 Installation
 
-### Homebrew (macOS & Linux)
+### Option 1: Homebrew (macOS & Linux) — Recommended
 
 ```bash
 brew install WhiteRoseLK/tap/neossh
@@ -105,15 +105,66 @@ brew install WhiteRoseLK/tap/neossh
 
 *(If you previously had `lazyssh` installed, Homebrew will seamlessly prompt to replace it while preserving your server configs).*
 
-### Go Install
+---
+
+### Option 2: Pre-compiled Binaries (Direct Download)
+
+Ready-to-run binaries are available for **macOS**, **Linux**, and **Windows** on the [Releases page](https://github.com/WhiteRoseLK/neossh/releases/latest).
+
+#### One-liner for macOS & Linux:
+
+```bash
+# Automatically downloads and extracts the latest binary for your OS and architecture:
+OS="$(uname -s)"
+ARCH="$(uname -m)"
+[ "$ARCH" = "x86_64" ] && ARCH="x86_64" || ARCH="arm64"
+
+curl -sL "https://github.com/WhiteRoseLK/neossh/releases/latest/download/neossh_${OS}_${ARCH}.tar.gz" | tar -xz
+
+# Move binary to PATH:
+sudo mv neossh /usr/local/bin/
+```
+
+#### Windows:
+1. Download the `.zip` archive from the [Releases page](https://github.com/WhiteRoseLK/neossh/releases/latest).
+2. Extract `neossh.exe` to a folder in your `PATH` (e.g. `C:\Windows\System32` or a dedicated tools directory).
+
+---
+
+### Option 3: Go Install
+
+If you have Go installed:
 
 ```bash
 go install github.com/WhiteRoseLK/neossh/cmd@latest
 ```
 
-### Pre-compiled Binaries
+*(Make sure `$GOPATH/bin` or `~/go/bin` is in your `$PATH`).*
 
-Download ready-to-run binaries for macOS, Linux, and Windows on the [Releases page](https://github.com/WhiteRoseLK/neossh/releases).
+---
+
+### Option 4: Build from Source
+
+**Prerequisites**: [Go](https://go.dev/) 1.22+ and `git` (and optionally `make`).
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/WhiteRoseLK/neossh.git
+cd neossh
+
+# 2. Build using Make
+make build
+
+# 3. Install the binary into your PATH
+sudo cp bin/neossh /usr/local/bin/
+```
+
+*Or build manually without Make:*
+
+```bash
+go build -ldflags "-X main.version=v1.0.0" -o neossh ./cmd/main.go
+sudo mv neossh /usr/local/bin/
+```
 
 ---
 
