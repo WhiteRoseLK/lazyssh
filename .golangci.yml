@@ -71,7 +71,9 @@ linters:
       ignore-tests: true
       match-constant: false
       min-occurrences: 25
-      ignore-string-values: '^(yes|no)$'
+      ignore-string-values:
+        - "yes"
+        - "no"
     staticcheck:
       checks: ["all", "-ST1000", "-ST1003", "-QF*"]
     gosec:
