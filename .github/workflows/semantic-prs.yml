@@ -44,4 +44,5 @@ jobs:
             deps
             build
             release
+            main
           requireScope: false
