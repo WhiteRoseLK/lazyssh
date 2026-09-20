@@ -16,7 +16,9 @@ package ssh_config_file
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -119,10 +121,19 @@ func (r *Repository) loadFileAndIncludes(path string, lc *loadedConfig, visited 
 		return fmt.Errorf("open %s: %w", abs, err)
 	}
 
-	cfg, decodeErr := ssh_config.Decode(file)
+	data, err := io.ReadAll(file)
 	if cerr := file.Close(); cerr != nil {
 		r.logger.Warnf("failed to close %s: %v", abs, cerr)
 	}
+	if err != nil {
+		return fmt.Errorf("read %s: %w", abs, err)
+	}
+
+	// Normalize CRLF to LF to prevent extraneous blank lines being parsed as empty nodes
+	normalized := bytes.ReplaceAll(data, []byte("\r\n"), []byte("\n"))
+	normalized = bytes.ReplaceAll(normalized, []byte("\r"), []byte("\n"))
+
+	cfg, decodeErr := ssh_config.Decode(bytes.NewReader(normalized))
 	if decodeErr != nil {
 		return fmt.Errorf("decode %s: %w", abs, decodeErr)
 	}
