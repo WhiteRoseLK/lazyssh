@@ -374,6 +374,36 @@ func (s *serverService) SSHWithArgs(alias string, extraArgs []string) error {
 	return nil
 }
 
+// CopySSHKey installs public SSH keys to the remote host using ssh-copy-id.
+func (s *serverService) CopySSHKey(alias string) error {
+	s.logger.Infow("ssh-copy-id start", "alias", alias)
+
+	if _, err := exec.LookPath("ssh-copy-id"); err != nil {
+		s.logger.Errorw("ssh-copy-id missing", "error", err)
+		return fmt.Errorf("ssh-copy-id not found; please install OpenSSH (e.g. brew install openssh)")
+	}
+
+	var args []string
+	if cfg := s.serverRepository.GetConfigFile(); cfg != "" {
+		args = append(args, "-F", cfg)
+	}
+	args = append(args, alias)
+
+	//nolint:gosec // G204: intentional ssh-copy-id command execution
+	cmd := exec.Command("ssh-copy-id", args...)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Run(); err != nil {
+		s.logger.Errorw("ssh-copy-id command failed", "alias", alias, "error", err)
+		return err
+	}
+
+	s.logger.Infow("ssh-copy-id end", "alias", alias)
+	return nil
+}
+
 // StartForward starts ssh port forwarding in the background and tracks the process.
 func (s *serverService) StartForward(alias string, extraArgs []string) (int, error) {
 	s.fwMu.Lock()

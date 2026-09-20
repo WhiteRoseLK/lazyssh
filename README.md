@@ -192,8 +192,10 @@ sudo mv neossh /usr/local/bin/
 | `p` | Pin / unpin server |
 | `t` | Edit tags |
 | `c` | Copy SSH connection command to clipboard |
+| `K` | Push SSH public key to server via `ssh-copy-id` |
 | `s` | Toggle sort mode (alias, last SSH, reverse) |
-| `P` | Ping selected server |
+| `g` | Ping selected server |
+| `G` | Ping all servers (parallel check with latency badges) |
 | `1` / `2` / `3` | Focus Search / Server List / Details |
 | `j` / `k` or `↓` / `↑` | Navigate server list |
 | `q` / `Ctrl+C` | Quit |

@@ -67,8 +67,10 @@ var (
 					}
 
 					// close and remove the temporary file at the end of the program
-					defer f.Close() //nolint:errcheck // best-effort cleanup
-					defer os.Remove(f.Name()) //nolint:errcheck // best-effort cleanup
+					defer func() {
+						_ = f.Close()
+						_ = os.Remove(f.Name())
+					}()
 
 					// write data to the temporary file
 					fd, err := os.Open(sshConfigFile) //nolint:gosec // G304: path comes from user flag, intentional
@@ -76,7 +78,9 @@ var (
 						fmt.Fprintf(os.Stderr, "Error opening file: %v\n", err)
 						os.Exit(1)
 					}
-					defer fd.Close() //nolint:errcheck // best-effort cleanup
+					defer func() {
+						_ = fd.Close()
+					}()
 
 					// Read the entire contents at once
 					content, err := io.ReadAll(fd)
