@@ -18,10 +18,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"time"
 
 	"github.com/kevinburke/ssh_config"
 )
+
+var reMultipleNewlines = regexp.MustCompile(`\n{3,}`)
 
 // loadConfig reads and parses the SSH config file plus every file pulled in
 // via top-level `Include` directives. Returns a loadedConfig containing all
@@ -106,6 +109,9 @@ func (r *Repository) writeConfigToFile(filePath string, cfg *ssh_config.Config) 
 	}()
 
 	configContent := cfg.String()
+	// Collapse 3 or more consecutive newlines to 2 (one blank line between blocks)
+	configContent = reMultipleNewlines.ReplaceAllString(configContent, "\n\n")
+
 	if _, err := file.WriteString(configContent); err != nil {
 		return fmt.Errorf("failed to write config content: %w", err)
 	}

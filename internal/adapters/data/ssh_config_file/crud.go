@@ -385,6 +385,37 @@ func (r *Repository) updateHostNodes(host *ssh_config.Host, oldServer, newServer
 	r.updateListField(host, "DynamicForward", oldServer.DynamicForward, newServer.DynamicForward, nil)
 	r.updateListField(host, "SendEnv", oldServer.SendEnv, newServer.SendEnv, nil)
 	r.updateListField(host, "SetEnv", oldServer.SetEnv, newServer.SetEnv, nil)
+	cleanHostEmptyNodes(host)
+}
+
+// cleanHostEmptyNodes removes extraneous blank lines inside a host's nodes:
+// 1. Removes blank lines directly after the 'Host' definition before any directives
+// 2. Collapses consecutive empty lines into a single blank line
+func cleanHostEmptyNodes(host *ssh_config.Host) {
+	// Remove leading empty lines before the first key-value or comment
+	for len(host.Nodes) > 0 {
+		if empty, ok := host.Nodes[0].(*ssh_config.Empty); ok && empty.Comment == "" {
+			host.Nodes = host.Nodes[1:]
+		} else {
+			break
+		}
+	}
+
+	// Collapse consecutive empty lines
+	cleaned := make([]ssh_config.Node, 0, len(host.Nodes))
+	prevWasEmpty := false
+	for _, node := range host.Nodes {
+		if empty, ok := node.(*ssh_config.Empty); ok && empty.Comment == "" {
+			if prevWasEmpty {
+				continue
+			}
+			prevWasEmpty = true
+		} else {
+			prevWasEmpty = false
+		}
+		cleaned = append(cleaned, node)
+	}
+	host.Nodes = cleaned
 }
 
 // updateListField rewrites a multi-valued KV (e.g. IdentityFile) only when
