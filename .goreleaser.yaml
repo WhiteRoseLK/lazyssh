@@ -50,15 +50,15 @@ brews:
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
     directory: Formula
     homepage: "https://github.com/WhiteRoseLK/neossh"
-    description: "A modern terminal-based SSH manager (successor to lazyssh)"
+    description: "An actively maintained fork and continuation of lazyssh"
     license: "Apache-2.0"
     install: |-
       bin.install "neossh"
     test: |-
       assert_match version.to_s, shell_output("#{bin}/neossh --version")
     custom_block: |-
-      conflicts_with "lazyssh", because: "neossh is the modern successor to lazyssh"
-      conflicts_with "adembc/tap/lazyssh", because: "neossh is the modern successor to lazyssh"
+      conflicts_with "lazyssh", because: "neossh is an actively maintained fork of lazyssh"
+      conflicts_with "adembc/tap/lazyssh", because: "neossh is an actively maintained fork of lazyssh"
     caveats: |-
       If you previously used lazyssh, neossh automatically migrates your
       metadata and settings from ~/.lazyssh to ~/.neossh. Your SSH config is unchanged.

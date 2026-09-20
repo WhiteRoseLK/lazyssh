@@ -1,7 +1,7 @@
 <div align="center">
   <h1>🚀 neossh</h1>
-  <p><b>A modern terminal-based SSH manager inspired by lazydocker and k9s</b></p>
-  <p><i>The actively maintained successor to lazyssh</i></p>
+  <p><b>An actively maintained fork and continuation of <a href="https://github.com/Adembc/lazyssh">lazyssh</a></b></p>
+  <p><i>Created by <a href="https://github.com/Adembc">Adembc</a> • Maintained & developed by <a href="https://github.com/WhiteRoseLK">WhiteRoseLK</a> & the community</i></p>
 </div>
 
 <div align="center">
@@ -9,23 +9,27 @@
 [![GitHub release](https://img.shields.io/github/v/release/WhiteRoseLK/neossh?style=flat-square)](https://github.com/WhiteRoseLK/neossh/releases)
 [![License](https://img.shields.io/github/license/WhiteRoseLK/neossh?style=flat-square)](LICENSE)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/WhiteRoseLK/neossh?style=flat-square)](go.mod)
+[![Fork of](https://img.shields.io/badge/fork%20of-Adembc%2Flazyssh-blue?style=flat-square)](https://github.com/Adembc/lazyssh)
 
 </div>
 
 ---
 
+> [!NOTE]
+> **neossh is a direct fork of [lazyssh](https://github.com/Adembc/lazyssh)**, originally created by [Adembc](https://github.com/Adembc).
+> All core credit for the foundational idea, design, and original implementation belongs to **Adembc**.
+> This project exists solely because the original repository became unmaintained while having numerous valuable open PRs and issues. Rather than letting that work gather dust, **neossh** continues development, integrates community contributions, and provides ongoing maintenance.
+
 ## 💡 About neossh
 
 **neossh** is an interactive, keyboard-driven SSH manager for your terminal. With neossh, you can quickly navigate, connect, manage, and configure servers defined in your `~/.ssh/config` without remembering IP addresses or dealing with complex SSH commands.
 
-### The lazyssh Lineage (Neovim & Vim style)
+### Why neossh?
 
-`neossh` is the independent, actively maintained successor to [Adembc/lazyssh](https://github.com/Adembc/lazyssh).
-
-When the original lazyssh project became inactive with a backlog of unmerged community contributions, `neossh` was created to carry the torch:
+The original [lazyssh](https://github.com/Adembc/lazyssh) repository had not seen merged changes in over a year despite dozens of open issues and a great backlog of community-contributed pull requests. `neossh` was born to pick up the torch and give these contributions a home:
 - 🔄 **Community PRs integrated**: Full SSH `Include` support, fuzzy search, XDG directory compliance, custom config flags, and critical UI/navigation bug fixes.
 - ⚡ **Zero friction migration**: `neossh` automatically detects and migrates your existing favorites, connection history, and tags from `~/.lazyssh` to `~/.neossh`.
-- 🛠️ **Active maintenance**: Regular releases, responsive issue triage, and continuous improvements.
+- 🛠️ **Active stewardship**: Regular releases, responsive issue triage, and continuous bug fixes.
 
 ---
 
@@ -170,11 +174,18 @@ Contributions are welcome! Feel free to open an [Issue](https://github.com/White
 
 ---
 
-## 📄 License
+## 📄 License & Attribution
 
 This project is licensed under the [Apache-2.0 License](LICENSE).
 
-### Acknowledgments
+### Credits & Acknowledgments
 
-- Originally created by [Adembc](https://github.com/Adembc) as [lazyssh](https://github.com/Adembc/lazyssh).
-- Huge thanks to all upstream community contributors whose PRs and feedback made `neossh` possible.
+- **[Adembc](https://github.com/Adembc)**: Original author and creator of [lazyssh](https://github.com/Adembc/lazyssh). Without his architectural work, `neossh` would not exist.
+- **Community contributors**: Full credit to all contributors from the upstream repository whose ideas and pull requests made this release possible:
+  - `@DelphicOkami`, `@malaiwah`, `@aabichou`, `@barthofu` — SSH `Include` support
+  - `@omani` — `--sshconfig` custom config flag
+  - `@gonsalvesc` — XDG base directory specification support
+  - `@levinion` — Copy SSH command shortcut
+  - `@gaoyifan` — Persistent sort mode
+  - `@k161196` — Panel focus shortcuts
+  - `@arniom`, `@leoncamel`, `@breakersun`, `@OlalalalaO`, `@manato-tajiri`, `@komapro` — Bug fixes & documentation improvements
