@@ -100,10 +100,12 @@ The original [lazyssh](https://github.com/Adembc/lazyssh) repository had not see
 ### Option 1: Homebrew (macOS & Linux) — Recommended
 
 ```bash
-brew install WhiteRoseLK/tap/neossh
+brew tap WhiteRoseLK/tap
+brew trust WhiteRoseLK/tap
+brew install neossh
 ```
 
-*(If you previously had `lazyssh` installed, Homebrew will seamlessly prompt to replace it while preserving your server configs).*
+*(Note: On recent Homebrew versions, `brew trust WhiteRoseLK/tap` is required by Homebrew for third-party taps. If you previously had `lazyssh` installed, Homebrew will automatically prompt to replace it while preserving your server configs).*
 
 ---
 
