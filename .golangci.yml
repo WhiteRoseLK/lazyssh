@@ -55,7 +55,6 @@ linters:
     - revive
     - goheader
     - staticcheck
-    - typecheck
     - unconvert
     - unparam
     - unused
