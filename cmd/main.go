@@ -108,6 +108,7 @@ var (
 				if xdgConfig := os.Getenv("XDG_CONFIG_HOME"); xdgConfig != "" {
 					legacyFile = filepath.Join(xdgConfig, "lazyssh", "metadata.json")
 				}
+				//nolint:gosec // G304: path constructed from user home directory
 				if data, err := os.ReadFile(legacyFile); err == nil {
 					_ = os.WriteFile(metaDataFile, data, 0o600)
 				}

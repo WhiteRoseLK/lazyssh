@@ -51,6 +51,7 @@ func newSettingsManager(logger *zap.SugaredLogger) *settingsManager {
 		if xdgConfig := os.Getenv("XDG_CONFIG_HOME"); xdgConfig != "" {
 			legacyPath = filepath.Join(xdgConfig, "lazyssh", "settings.json")
 		}
+		//nolint:gosec // G304: path constructed from user home directory
 		if data, err := os.ReadFile(legacyPath); err == nil {
 			_ = os.MkdirAll(settingsDir, 0o750)
 			_ = os.WriteFile(settingsPath, data, 0o600)
