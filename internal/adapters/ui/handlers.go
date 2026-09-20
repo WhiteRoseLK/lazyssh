@@ -84,6 +84,9 @@ func (t *tui) handleGlobalKeys(event *tcell.EventKey) *tcell.EventKey {
 	case 'v':
 		t.handlePasteCommand()
 		return nil
+	case 'y', 'C':
+		t.handleServerClone()
+		return nil
 	case 'h':
 		t.handleCopyHost()
 		return nil
@@ -369,6 +372,60 @@ func (t *tui) handleServerEdit() {
 			SetExistingAliases(t.getExistingAliases())
 		t.app.SetRoot(form, true)
 	}
+}
+
+func (t *tui) handleServerClone() {
+	if server, ok := t.serverList.GetSelectedServer(); ok {
+		cloned := cloneServer(server)
+		existingAliases := t.getExistingAliases()
+		cloned.Alias = GenerateUniqueAlias(server.Alias, existingAliases)
+		cloned.PinnedAt = time.Time{}
+		cloned.LastSeen = time.Time{}
+		cloned.PingStatus = ""
+		cloned.PingLatency = 0
+
+		form := NewServerForm(ServerFormAdd, nil).
+			SetInitialData(&cloned).
+			SetApp(t.app).
+			SetVersionInfo(t.version, t.commit).
+			OnSave(t.handleServerSave).
+			OnCancel(t.handleFormCancel).
+			SetExistingAliases(existingAliases)
+		t.app.SetRoot(form, true)
+	}
+}
+
+func cloneServer(s domain.Server) domain.Server {
+	cloned := s
+	if s.IdentityFiles != nil {
+		cloned.IdentityFiles = make([]string, len(s.IdentityFiles))
+		copy(cloned.IdentityFiles, s.IdentityFiles)
+	}
+	if s.Tags != nil {
+		cloned.Tags = make([]string, len(s.Tags))
+		copy(cloned.Tags, s.Tags)
+	}
+	if s.LocalForward != nil {
+		cloned.LocalForward = make([]string, len(s.LocalForward))
+		copy(cloned.LocalForward, s.LocalForward)
+	}
+	if s.RemoteForward != nil {
+		cloned.RemoteForward = make([]string, len(s.RemoteForward))
+		copy(cloned.RemoteForward, s.RemoteForward)
+	}
+	if s.DynamicForward != nil {
+		cloned.DynamicForward = make([]string, len(s.DynamicForward))
+		copy(cloned.DynamicForward, s.DynamicForward)
+	}
+	if s.SendEnv != nil {
+		cloned.SendEnv = make([]string, len(s.SendEnv))
+		copy(cloned.SendEnv, s.SendEnv)
+	}
+	if s.SetEnv != nil {
+		cloned.SetEnv = make([]string, len(s.SetEnv))
+		copy(cloned.SetEnv, s.SetEnv)
+	}
+	return cloned
 }
 
 func (t *tui) handleServerSave(server domain.Server, original *domain.Server) {
