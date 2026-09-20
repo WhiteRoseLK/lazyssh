@@ -49,7 +49,6 @@ var (
 			home, err := os.UserHomeDir()
 			if err != nil {
 				log.Errorw("failed to get user home directory", "error", err)
-				//nolint:gocritic // exitAfterDefer: ensure immediate exit on unrecoverable error
 				os.Exit(1)
 			}
 
