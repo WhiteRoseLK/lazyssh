@@ -81,7 +81,30 @@ func pinnedIcon(pinnedAt time.Time) string {
 	return "📌" // pinned
 }
 
-func formatServerLine(s domain.Server, maxAliasWidth int) (primary, secondary string) {
+const (
+	StatusUp       = "up"
+	StatusDown     = "down"
+	StatusChecking = "checking"
+)
+
+// stripSimpleColors removes tview color codes like [#FFFFFF] or [-] for length calculation.
+func stripSimpleColors(s string) string {
+	result := s
+	for {
+		start := strings.Index(result, "[")
+		if start == -1 {
+			break
+		}
+		end := strings.Index(result[start:], "]")
+		if end == -1 {
+			break
+		}
+		result = result[:start] + result[start+end+1:]
+	}
+	return result
+}
+
+func formatServerLine(s domain.Server, maxAliasWidth int, width int) (primary, secondary string) {
 	icon := cellPad(pinnedIcon(s.PinnedAt), 2)
 	// forwarding column after Host/IP
 	fGlyph := ""
@@ -101,7 +124,66 @@ func formatServerLine(s domain.Server, maxAliasWidth int) (primary, secondary st
 		paddedAlias = s.Alias + strings.Repeat(" ", maxAliasWidth-aliasWidth)
 	}
 	// Use a consistent color for alias; host/IP fixed width; then forwarding column
-	primary = fmt.Sprintf("%s [white::b]%s[-] [#AAAAAA]%-18s[-] %s [#888888]Last SSH: %-8s[-]  %s", icon, paddedAlias, s.Host, fCol, humanizeDuration(s.LastSeen), renderTagBadgesForList(s.Tags))
+	mainText := fmt.Sprintf("%s [white::b]%s[-] [#AAAAAA]%-18s[-] %s [#888888]Last SSH: %-8s[-]  %s", icon, paddedAlias, s.Host, fCol, humanizeDuration(s.LastSeen), renderTagBadgesForList(s.Tags))
+
+	// Format ping status
+	pingIndicator := ""
+	if s.PingStatus != "" {
+		switch s.PingStatus {
+		case StatusUp:
+			if s.PingLatency > 0 {
+				ms := s.PingLatency.Milliseconds()
+				var statusText string
+				if ms < 100 {
+					statusText = fmt.Sprintf("%dms", ms)
+				} else {
+					seconds := float64(ms) / 1000.0
+					statusText = fmt.Sprintf("%.1fs", seconds)
+				}
+				statusText = fmt.Sprintf("%-4s", statusText)
+				pingIndicator = fmt.Sprintf("[#4AF626]● %s[-]", statusText)
+			} else {
+				pingIndicator = "[#4AF626]● UP  [-]"
+			}
+		case StatusDown:
+			pingIndicator = "[#FF6B6B]● DOWN[-]"
+		case StatusChecking:
+			pingIndicator = "[#FFB86C]● ... [-]"
+		}
+	}
+
+	if pingIndicator != "" && width > 0 {
+		mainTextLen := runewidth.StringWidth(stripSimpleColors(mainText))
+		indicatorLen := 6 // "● XXXX" is 6 display cells
+		switch {
+		case width > 80:
+			paddingLen := width - mainTextLen - indicatorLen
+			if paddingLen < 1 {
+				paddingLen = 1
+			}
+			primary = fmt.Sprintf("%s%s%s", mainText, strings.Repeat(" ", paddingLen), pingIndicator)
+		case width > 60:
+			simpleIndicator := ""
+			switch s.PingStatus {
+			case StatusUp:
+				simpleIndicator = "[#4AF626]●[-]"
+			case StatusDown:
+				simpleIndicator = "[#FF6B6B]●[-]"
+			case StatusChecking:
+				simpleIndicator = "[#FFB86C]●[-]"
+			}
+			paddingLen := width - mainTextLen - 1
+			if paddingLen < 1 {
+				paddingLen = 1
+			}
+			primary = fmt.Sprintf("%s%s%s", mainText, strings.Repeat(" ", paddingLen), simpleIndicator)
+		default:
+			primary = mainText
+		}
+	} else {
+		primary = mainText
+	}
+
 	secondary = ""
 	return
 }

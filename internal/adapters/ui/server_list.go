@@ -24,6 +24,7 @@ import (
 type ServerList struct {
 	*tview.List
 	servers           []domain.Server
+	currentWidth      int
 	onSelection       func(domain.Server)
 	onSelectionChange func(domain.Server)
 	onReturnToSearch  func()
@@ -86,8 +87,11 @@ func (sl *ServerList) UpdateServers(servers []domain.Server) {
 		}
 	}
 
+	_, _, listWidth, _ := sl.List.GetInnerRect()
+	sl.currentWidth = listWidth
+
 	for i := range servers {
-		primary, secondary := formatServerLine(servers[i], maxAliasWidth)
+		primary, secondary := formatServerLine(servers[i], maxAliasWidth, listWidth)
 		idx := i
 		sl.List.AddItem(primary, secondary, 0, func() {
 			if sl.onSelection != nil {
@@ -110,6 +114,19 @@ func (sl *ServerList) UpdateServers(servers []domain.Server) {
 		sl.List.SetCurrentItem(restoreIdx)
 		if sl.onSelectionChange != nil {
 			sl.onSelectionChange(sl.servers[restoreIdx])
+		}
+	}
+}
+
+// RefreshDisplay re-renders the list if the component width has changed
+func (sl *ServerList) RefreshDisplay() {
+	_, _, width, _ := sl.List.GetInnerRect()
+	if width != sl.currentWidth && width > 0 {
+		sl.currentWidth = width
+		currentIdx := sl.List.GetCurrentItem()
+		sl.UpdateServers(sl.servers)
+		if currentIdx >= 0 && currentIdx < sl.List.GetItemCount() {
+			sl.List.SetCurrentItem(currentIdx)
 		}
 	}
 }

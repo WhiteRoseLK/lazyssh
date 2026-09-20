@@ -27,6 +27,8 @@ type Server struct {
 	LastSeen      time.Time
 	PinnedAt      time.Time
 	SSHCount      int
+	PingStatus    string        // "up", "down", "checking", or ""
+	PingLatency   time.Duration // ping latency
 
 	// Additional SSH config fields
 	// Connection and proxy settings
