@@ -28,6 +28,7 @@ type ServerService interface {
 	SetPinned(alias string, pinned bool) error
 	SSH(alias string) error
 	SSHWithArgs(alias string, extraArgs []string) error
+	CopySSHKey(alias string) error
 	StartForward(alias string, extraArgs []string) (int, error)
 	StopForwarding(alias string) error
 	IsForwarding(alias string) bool
