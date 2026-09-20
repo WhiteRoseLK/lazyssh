@@ -554,6 +554,7 @@ func resolveSSHDestination(alias string) (string, int, bool) {
 	if alias == "" {
 		return "", 0, false
 	}
+	//nolint:gosec // G204: alias is passed as an SSH config host argument to resolve destination
 	cmd := exec.Command("ssh", "-G", alias)
 	out, err := cmd.Output()
 	if err != nil {

@@ -48,7 +48,7 @@ var SSHFieldDefaults = map[string]string{
 	"GatewayPorts":         "no",
 
 	// Authentication fields
-	"PubkeyAuthentication":         "yes",
+	"PubkeyAuthentication":         sshYes,
 	"PasswordAuthentication":       "yes",
 	"PreferredAuthentications":     "gssapi-with-mic,hostbased,publickey,keyboard-interactive,password",
 	"IdentitiesOnly":               "no",
@@ -182,7 +182,7 @@ func GetFieldPlaceholder(fieldName string) string {
 		return "e.g., ~/.ssh/id_rsa, ~/.ssh/id_ed25519"
 	case "Tags":
 		return "comma-separated tags"
-	case "ProxyJump": //nolint:goconst // Field name used in switch case
+	case "ProxyJump":
 		return "e.g., bastion.example.com"
 	case "ProxyCommand":
 		return "e.g., ssh -W %h:%p jump.example.com"
