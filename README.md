@@ -26,10 +26,35 @@
 
 ### Why neossh?
 
-The original [lazyssh](https://github.com/Adembc/lazyssh) repository had not seen merged changes in over a year despite dozens of open issues and a great backlog of community-contributed pull requests. `neossh` was born to pick up the torch and give these contributions a home:
-- 🔄 **Community PRs integrated**: Full SSH `Include` support, fuzzy search, XDG directory compliance, custom config flags, and critical UI/navigation bug fixes.
-- ⚡ **Zero friction migration**: `neossh` automatically detects and migrates your existing favorites, connection history, and tags from `~/.lazyssh` to `~/.neossh`.
-- 🛠️ **Active stewardship**: Regular releases, responsive issue triage, and continuous bug fixes.
+The original [lazyssh](https://github.com/Adembc/lazyssh) repository had not seen merged changes in over a year despite dozens of open issues and community-contributed pull requests. `neossh` was born to pick up the torch and give these contributions an actively maintained home.
+
+---
+
+## ⚡ What's New & Fixed vs. lazyssh?
+
+If you are coming from **lazyssh**, here is a concrete summary of everything **neossh** adds, improves, and fixes:
+
+### 🌟 New Features & Enhancements
+
+| Feature | Description | Shortcut / Usage |
+| :--- | :--- | :---: |
+| **Parallel Ping All** | Concurrently pings all configured servers in the background with real-time colored latency badges in the list: `[<50ms]` (green), `[<150ms]` (yellow), `[>150ms]` (red), or `[DOWN]` (red). | <kbd>G</kbd> |
+| **One-Touch SSH Key Deployment** | Automatically pushes your public SSH key to the remote host using native `ssh-copy-id` directly from the TUI. | <kbd>K</kbd> |
+| **Copy SSH Command** | Copies the full SSH connection command directly to your system clipboard. | <kbd>c</kbd> |
+| **Zero-Friction Migration** | Automatically detects and migrates your favorites, tags, and connection history from `~/.lazyssh` to `~/.neossh`. | *Automatic* |
+| **Custom Config Path** | Loads any alternative SSH config file without modifying `~/.ssh/config`. | `-F <path>` |
+| **Persistent Sorting** | Remembers your preferred sort mode (by alias, last SSH connection, ascending/descending) across sessions. | <kbd>s</kbd> |
+| **Quick Panel Jump** | Instant focus switching between Search, Server List, and Details panels using numeric keys. | <kbd>1</kbd> / <kbd>2</kbd> / <kbd>3</kbd> |
+| **Modern Toolchain & Deps** | Fully upgraded to latest upstream packages (`tview v0.42`, `tcell/v2 v2.13`, `cobra v1.10`, `zap v1.28`, `go-runewidth v0.0.30`), with Go race detection and `golangci-lint` v2. | *Core* |
+
+### 🛠️ Bug Fixes & Stability Improvements
+
+- 📐 **Terminal Resize & Dynamic Layout**: Completely fixed UI clipping and freezes when resizing the terminal. Server table columns and latency badges dynamically recalculate widths without text overflow.
+- 🛡️ **SSH Configuration Validation**: Comprehensive client-side validation prevents config corruption (bounds check on port numbers `1–65535`, hostname/IP validation, format checks on dynamic forwardings and escape characters).
+- 🔒 **Security Hardening**: Fixed G204 subprocess variable injection risks and G703 path traversal vulnerabilities; all commands run with verified parameters.
+- ⌨️ **TUI Key Traps & Navigation**: Fixed backspace key issues, input modal traps, and cursor glitches across terminal emulators.
+- 🗂️ **XDG Base Directory Compliance**: Standardized config and state paths respecting `$XDG_CONFIG_HOME` and `$XDG_STATE_HOME`.
+- 🚀 **Automated Multi-Arch Releases**: Continuous delivery via GoReleaser and Semantic Release Please providing prebuilt binaries for macOS (Intel & Apple Silicon), Linux (x86_64, ARM64), and Windows, alongside an official Homebrew tap.
 
 ---
 
@@ -85,13 +110,6 @@ The original [lazyssh](https://github.com/Adembc/lazyssh) repository had not see
 ### Key Management
 - 🔑 SSH key autocomplete with automatic detection of available keys in `~/.ssh/`.
 - 📝 Smart key selection with support for multiple identity files.
-
-### Enhancements over lazyssh
-- 📂 **Full `Include` directive support**: Hosts defined in included files (e.g. `~/.ssh/config.d/*`) appear seamlessly, and writes safely route back to the original source file.
-- 📋 **Copy SSH command**: Copy the full SSH command to clipboard with a single key (`c`).
-- 💾 **Persistent sort mode**: Your preferred sort order is remembered across sessions.
-- 🗂 **Custom SSH config**: `--sshconfig <path>` flag to target any configuration file.
-- 📦 **XDG Base Directory compliant**: Respects `$XDG_CONFIG_HOME` and `$XDG_STATE_HOME`.
 
 ---
 
