@@ -2210,7 +2210,7 @@ func (sf *ServerForm) dataToServer(data ServerFormData) domain.Server {
 		parts := strings.Split(data.Key, ",")
 		for _, p := range parts {
 			if k := strings.TrimSpace(p); k != "" {
-				keys = append(keys, k)
+				keys = append(keys, domain.ToTildePath(k))
 			}
 		}
 	}
@@ -2275,7 +2275,7 @@ func (sf *ServerForm) dataToServer(data ServerFormData) domain.Server {
 		TCPKeepAlive:                data.TCPKeepAlive,
 		BatchMode:                   data.BatchMode,
 		StrictHostKeyChecking:       data.StrictHostKeyChecking,
-		UserKnownHostsFile:          data.UserKnownHostsFile,
+		UserKnownHostsFile:          domain.ToTildePath(data.UserKnownHostsFile),
 		HostKeyAlgorithms:           data.HostKeyAlgorithms,
 		PubkeyAcceptedAlgorithms:    data.PubkeyAcceptedAlgorithms,
 		HostbasedAcceptedAlgorithms: data.HostbasedAcceptedAlgorithms,

@@ -452,7 +452,7 @@ func parseAuthenticationFlag(server *domain.Server, parts []string, i int) (int,
 		if server.IdentityFiles == nil {
 			server.IdentityFiles = []string{}
 		}
-		server.IdentityFiles = append(server.IdentityFiles, parts[i+1])
+		server.IdentityFiles = append(server.IdentityFiles, domain.ToTildePath(parts[i+1]))
 		return 2, nil
 
 	case "-A":
@@ -758,7 +758,7 @@ func parseAuthOption(server *domain.Server, key, value string) error {
 		if server.IdentityFiles == nil {
 			server.IdentityFiles = []string{}
 		}
-		server.IdentityFiles = append(server.IdentityFiles, value)
+		server.IdentityFiles = append(server.IdentityFiles, domain.ToTildePath(value))
 	case "passwordauthentication":
 		server.PasswordAuthentication = value
 	case "pubkeyauthentication":
@@ -827,7 +827,7 @@ func parseSecurityOption(server *domain.Server, key, value string) error {
 	case "stricthostkeychecking":
 		server.StrictHostKeyChecking = value
 	case "userknownhostsfile":
-		server.UserKnownHostsFile = value
+		server.UserKnownHostsFile = domain.ToTildePath(value)
 	case "checkhostip":
 		server.CheckHostIP = value
 	case "fingerprinthash":
