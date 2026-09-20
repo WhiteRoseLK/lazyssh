@@ -373,6 +373,10 @@ func (s *serverService) SSH(alias string) error {
 			s.logger.Infow("ssh session ended by remote", "alias", alias)
 		} else {
 			s.logger.Errorw("ssh command failed", "alias", alias, "error", err)
+			msg := strings.TrimSpace(stderrBuf.String())
+			if msg != "" {
+				return fmt.Errorf("%s", msg)
+			}
 			return err
 		}
 	}
@@ -412,6 +416,10 @@ func (s *serverService) SSHWithArgs(alias string, extraArgs []string) error {
 			s.logger.Infow("ssh session ended by remote", "alias", alias)
 		} else {
 			s.logger.Errorw("ssh (with args) failed", "alias", alias, "error", err)
+			msg := strings.TrimSpace(stderrBuf.String())
+			if msg != "" {
+				return fmt.Errorf("%s", msg)
+			}
 			return err
 		}
 	}
@@ -502,12 +510,17 @@ func (s *serverService) CopySSHKey(alias string) error {
 
 	//nolint:gosec // G204: intentional ssh-copy-id command execution
 	cmd := exec.Command("ssh-copy-id", args...)
+	stderrBuf := newLimitedBuffer(2048)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	cmd.Stderr = io.MultiWriter(os.Stderr, stderrBuf)
 
 	if err := cmd.Run(); err != nil {
 		s.logger.Errorw("ssh-copy-id command failed", "alias", alias, "error", err)
+		msg := strings.TrimSpace(stderrBuf.String())
+		if msg != "" {
+			return fmt.Errorf("%s", msg)
+		}
 		return err
 	}
 
