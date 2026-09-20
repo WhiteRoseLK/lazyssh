@@ -43,6 +43,20 @@ archives:
       - goos: windows
         formats: [ zip ]
 
+brews:
+  - repository:
+      owner: WhiteRoseLK
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    directory: Formula
+    homepage: "https://github.com/WhiteRoseLK/lazyssh"
+    description: "A terminal-based SSH manager inspired by lazydocker and k9s"
+    license: "Apache-2.0"
+    install: |-
+      bin.install "lazyssh"
+    test: |-
+      assert_match version.to_s, shell_output("#{bin}/lazyssh --version")
+
 checksum:
   name_template: "checksums.txt"
 
