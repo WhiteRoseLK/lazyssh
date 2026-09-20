@@ -123,6 +123,10 @@ func ParseSSHCommand(cmd string) (*domain.Server, error) {
 		server.Port = 22
 	}
 
+	if server.Alias != "" && len(server.Aliases) == 0 {
+		server.Aliases = []string{server.Alias}
+	}
+
 	return server, nil
 }
 

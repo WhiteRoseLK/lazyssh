@@ -85,6 +85,11 @@ func (r *Repository) AddServer(server domain.Server) error {
 	if r.serverExists(lc, server.Alias) {
 		return fmt.Errorf("server with alias '%s' already exists", server.Alias)
 	}
+	for _, alias := range server.Aliases {
+		if alias != server.Alias && r.serverExists(lc, alias) {
+			return fmt.Errorf("server with alias '%s' already exists", alias)
+		}
+	}
 
 	target := lc.findFile(server.SourceFile)
 	if target == nil {
@@ -113,6 +118,14 @@ func (r *Repository) UpdateServer(server domain.Server, newServer domain.Server)
 
 	matches := r.findHostMatches(lc, server.Alias)
 	if len(matches) == 0 {
+		for _, a := range server.Aliases {
+			matches = r.findHostMatches(lc, a)
+			if len(matches) > 0 {
+				break
+			}
+		}
+	}
+	if len(matches) == 0 {
 		return fmt.Errorf("server with alias '%s' not found", server.Alias)
 	}
 	if len(matches) > 1 && !preferenceResolves(matches, server.SourceFile) {
@@ -123,10 +136,44 @@ func (r *Repository) UpdateServer(server domain.Server, newServer domain.Server)
 	host := picked.host
 
 	if server.Alias != newServer.Alias {
-		if r.serverExists(lc, newServer.Alias) {
-			return fmt.Errorf("server with alias '%s' already exists", newServer.Alias)
+		newMatches := r.findHostMatches(lc, newServer.Alias)
+		for _, m := range newMatches {
+			if m.host != host {
+				return fmt.Errorf("server with alias '%s' already exists", newServer.Alias)
+			}
 		}
+	}
+	for _, a := range newServer.Aliases {
+		if a == server.Alias || a == newServer.Alias {
+			continue
+		}
+		newMatches := r.findHostMatches(lc, a)
+		for _, m := range newMatches {
+			if m.host != host {
+				return fmt.Errorf("server with alias '%s' already exists", a)
+			}
+		}
+	}
 
+	if len(newServer.Aliases) > 0 {
+		aliases := make([]string, 0, len(newServer.Aliases)+1)
+		seen := make(map[string]bool)
+		if newServer.Alias != "" {
+			aliases = append(aliases, newServer.Alias)
+			seen[newServer.Alias] = true
+		}
+		for _, a := range newServer.Aliases {
+			if a != "" && !seen[a] {
+				aliases = append(aliases, a)
+				seen[a] = true
+			}
+		}
+		newPatterns := make([]*ssh_config.Pattern, 0, len(aliases))
+		for _, a := range aliases {
+			newPatterns = append(newPatterns, &ssh_config.Pattern{Str: a})
+		}
+		host.Patterns = newPatterns
+	} else if server.Alias != newServer.Alias {
 		newPatterns := make([]*ssh_config.Pattern, 0, len(host.Patterns))
 		for _, pattern := range host.Patterns {
 			if pattern.Str == server.Alias {
@@ -160,6 +207,14 @@ func (r *Repository) DeleteServer(server domain.Server) error {
 
 	matches := r.findHostMatches(lc, server.Alias)
 	if len(matches) == 0 {
+		for _, a := range server.Aliases {
+			matches = r.findHostMatches(lc, a)
+			if len(matches) > 0 {
+				break
+			}
+		}
+	}
+	if len(matches) == 0 {
 		return fmt.Errorf("server with alias '%s' not found", server.Alias)
 	}
 	if len(matches) > 1 && !preferenceResolves(matches, server.SourceFile) {
@@ -167,7 +222,16 @@ func (r *Repository) DeleteServer(server domain.Server) error {
 	}
 
 	picked := pickWritableMatch(matches, server.SourceFile)
-	picked.cfg.Hosts = r.removeHostByAlias(picked.cfg.Hosts, server.Alias)
+	lookupAlias := server.Alias
+	if !r.hostContainsPattern(picked.host, lookupAlias) {
+		for _, a := range server.Aliases {
+			if r.hostContainsPattern(picked.host, a) {
+				lookupAlias = a
+				break
+			}
+		}
+	}
+	picked.cfg.Hosts = r.removeHostByAlias(picked.cfg.Hosts, lookupAlias)
 
 	if err := r.saveFiles(lc, []string{picked.path}); err != nil {
 		r.logger.Warnf("Failed to save config while deleting server: %v", err)

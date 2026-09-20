@@ -35,7 +35,7 @@ import (
 // already seen for that alias.
 func (r *Repository) toDomainServer(lc *loadedConfig) []domain.Server {
 	byAlias := make(map[string]int)
-	seenKeys := make(map[string]map[string]bool)
+	seenKeys := make(map[int]map[string]bool)
 	servers := make([]domain.Server, 0)
 
 	for _, cf := range lc.files {
@@ -52,9 +52,16 @@ func (r *Repository) toDomainServer(lc *loadedConfig) []domain.Server {
 				continue
 			}
 
-			primaryAlias := aliases[0]
-			idx, exists := byAlias[primaryAlias]
-			if !exists {
+			idx := -1
+			for _, a := range aliases {
+				if i, exists := byAlias[a]; exists {
+					idx = i
+					break
+				}
+			}
+
+			if idx == -1 {
+				primaryAlias := aliases[0]
 				servers = append(servers, domain.Server{
 					Alias:         primaryAlias,
 					Aliases:       aliases,
@@ -64,13 +71,23 @@ func (r *Repository) toDomainServer(lc *loadedConfig) []domain.Server {
 					SourceFiles:   []string{cf.path},
 				})
 				idx = len(servers) - 1
-				byAlias[primaryAlias] = idx
-				seenKeys[primaryAlias] = make(map[string]bool)
-			} else if !slices.Contains(servers[idx].SourceFiles, cf.path) {
-				servers[idx].SourceFiles = append(servers[idx].SourceFiles, cf.path)
+				seenKeys[idx] = make(map[string]bool)
+				for _, a := range aliases {
+					byAlias[a] = idx
+				}
+			} else {
+				if !slices.Contains(servers[idx].SourceFiles, cf.path) {
+					servers[idx].SourceFiles = append(servers[idx].SourceFiles, cf.path)
+				}
+				for _, a := range aliases {
+					if !slices.Contains(servers[idx].Aliases, a) {
+						servers[idx].Aliases = append(servers[idx].Aliases, a)
+					}
+					byAlias[a] = idx
+				}
 			}
 
-			seen := seenKeys[primaryAlias]
+			seen := seenKeys[idx]
 			for _, node := range host.Nodes {
 				kvNode, ok := node.(*ssh_config.KV)
 				if !ok {
@@ -347,7 +364,22 @@ func (r *Repository) mergeMetadata(servers []domain.Server, metadata map[string]
 	for i, server := range servers {
 		servers[i].LastSeen = time.Time{}
 
-		if meta, exists := metadata[server.Alias]; exists {
+		var meta ServerMetadata
+		var exists bool
+		if m, ok := metadata[server.Alias]; ok {
+			meta = m
+			exists = true
+		} else {
+			for _, a := range server.Aliases {
+				if m, ok := metadata[a]; ok {
+					meta = m
+					exists = true
+					break
+				}
+			}
+		}
+
+		if exists {
 			servers[i].Tags = meta.Tags
 			servers[i].SSHCount = meta.SSHCount
 			if meta.File != "" {

@@ -2300,7 +2300,29 @@ func (sf *ServerForm) dataToServer(data ServerFormData) domain.Server {
 		server.LastSeen = sf.original.LastSeen
 		server.SSHCount = sf.original.SSHCount
 		// Also preserve Aliases (computed field)
-		server.Aliases = sf.original.Aliases
+		if len(sf.original.Aliases) > 0 {
+			server.Aliases = make([]string, len(sf.original.Aliases))
+			copy(server.Aliases, sf.original.Aliases)
+			if server.Alias != sf.original.Alias {
+				replaced := false
+				for i, a := range server.Aliases {
+					if a == sf.original.Alias {
+						server.Aliases[i] = server.Alias
+						replaced = true
+						break
+					}
+				}
+				if !replaced {
+					server.Aliases = append([]string{server.Alias}, server.Aliases...)
+				}
+			}
+		} else if server.Alias != "" {
+			server.Aliases = []string{server.Alias}
+		}
+	} else if sf.mode == ServerFormAdd {
+		if len(server.Aliases) == 0 && server.Alias != "" {
+			server.Aliases = []string{server.Alias}
+		}
 	}
 
 	return server
