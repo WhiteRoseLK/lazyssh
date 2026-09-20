@@ -94,6 +94,15 @@ var (
 			}
 
 			metaDataFile := filepath.Join(home, ".lazyssh", "metadata.json")
+			if xdgConfig := os.Getenv("XDG_CONFIG_HOME"); xdgConfig != "" {
+				configDir := filepath.Join(xdgConfig, "lazyssh")
+				if err := os.MkdirAll(configDir, 0o750); err != nil {
+					log.Errorw("failed to create XDG config directory", "error", err)
+					os.Exit(1)
+				}
+				metaDataFile = filepath.Join(configDir, "metadata.json")
+			}
+
 			serverRepo := ssh_config_file.NewRepository(log, sshConfigFile, metaDataFile)
 			serverService := services.NewServerService(log, serverRepo)
 			tui := ui.NewTUI(log, serverService, version, gitCommit)
