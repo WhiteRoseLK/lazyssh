@@ -49,7 +49,7 @@ var (
 			home, err := os.UserHomeDir()
 			if err != nil {
 				log.Errorw("failed to get user home directory", "error", err)
-				// nolint:gocritic // exitAfterDefer: ensure immediate exit on unrecoverable error
+				//nolint:gocritic // exitAfterDefer: ensure immediate exit on unrecoverable error
 				os.Exit(1)
 			}
 
@@ -68,16 +68,16 @@ var (
 					}
 
 					// close and remove the temporary file at the end of the program
-					defer f.Close()
-					defer os.Remove(f.Name())
+					defer f.Close() //nolint:errcheck // best-effort cleanup
+					defer os.Remove(f.Name()) //nolint:errcheck // best-effort cleanup
 
 					// write data to the temporary file
-					fd, err := os.Open(sshConfigFile)
+					fd, err := os.Open(sshConfigFile) //nolint:gosec // G304: path comes from user flag, intentional
 					if err != nil {
 						fmt.Fprintf(os.Stderr, "Error opening file: %v\n", err)
 						os.Exit(1)
 					}
-					defer fd.Close()
+					defer fd.Close() //nolint:errcheck // best-effort cleanup
 
 					// Read the entire contents at once
 					content, err := io.ReadAll(fd)
@@ -120,7 +120,9 @@ func main() {
 }
 
 func init() {
-	rootCmd.PersistentFlags().StringVar(&sshConfigFile, "sshconfig", "", "path to ssh config file (default: ~/.ssh/config)")
+	rootCmd.PersistentFlags().StringVar(
+		&sshConfigFile, "sshconfig", "", "path to ssh config file (default: ~/.ssh/config)",
+	)
 
 	rootCmd.SilenceUsage = true
 }
