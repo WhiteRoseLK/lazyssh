@@ -18,11 +18,12 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/WhiteRoseLK/neossh/internal/core/domain"
 )
 
 // fieldValidator contains validation rules for SSH configuration fields
@@ -344,20 +345,8 @@ func validateIPQoS(value string) error {
 
 // validateFilePath validates a single file path for existence and readability
 func validateFilePath(path string) (exists bool, accessible bool, isDir bool) {
-	// Get home directory for tilde expansion
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		homeDir = ""
-	}
-
 	// Expand tilde notation
-	expandedPath := path
-	if strings.HasPrefix(path, "~/") && homeDir != "" {
-		expandedPath = filepath.Join(homeDir, path[2:])
-	} else if strings.HasPrefix(path, "~") && homeDir != "" {
-		// Handle ~ alone
-		expandedPath = homeDir
-	}
+	expandedPath := domain.ExpandTilde(path)
 
 	// Check if file exists
 	info, err := os.Stat(expandedPath)

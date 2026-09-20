@@ -136,7 +136,7 @@ func (r *Repository) createHostFromServer(server domain.Server) *ssh_config.Host
 		r.addKVNodeIfNotEmpty(host, "Port", fmt.Sprintf("%d", server.Port))
 	}
 	for _, identityFile := range server.IdentityFiles {
-		r.addKVNodeIfNotEmpty(host, "IdentityFile", identityFile)
+		r.addKVNodeIfNotEmpty(host, "IdentityFile", domain.ToTildePath(identityFile))
 	}
 
 	// Connection and proxy settings
@@ -189,7 +189,7 @@ func (r *Repository) createHostFromServer(server domain.Server) *ssh_config.Host
 
 	// Security
 	r.addKVNodeIfNotEmpty(host, "StrictHostKeyChecking", server.StrictHostKeyChecking)
-	r.addKVNodeIfNotEmpty(host, "UserKnownHostsFile", server.UserKnownHostsFile)
+	r.addKVNodeIfNotEmpty(host, "UserKnownHostsFile", domain.ToTildePath(server.UserKnownHostsFile))
 	r.addKVNodeIfNotEmpty(host, "HostKeyAlgorithms", server.HostKeyAlgorithms)
 	r.addKVNodeIfNotEmpty(host, "VerifyHostKeyDNS", server.VerifyHostKeyDNS)
 	r.addKVNodeIfNotEmpty(host, "UpdateHostKeys", server.UpdateHostKeys)
@@ -345,7 +345,7 @@ func scalarFieldMap(s domain.Server) map[string]string {
 		"stricthostkeychecking":           s.StrictHostKeyChecking,
 		"checkhostip":                     s.CheckHostIP,
 		"fingerprinthash":                 s.FingerprintHash,
-		"userknownhostsfile":              s.UserKnownHostsFile,
+		"userknownhostsfile":              domain.ToTildePath(s.UserKnownHostsFile),
 		"hostkeyalgorithms":               s.HostKeyAlgorithms,
 		"macs":                            s.MACs,
 		"ciphers":                         s.Ciphers,
@@ -379,7 +379,7 @@ func (r *Repository) updateHostNodes(host *ssh_config.Host, oldServer, newServer
 		}
 	}
 
-	r.updateListField(host, "IdentityFile", oldServer.IdentityFiles, newServer.IdentityFiles, nil)
+	r.updateListField(host, "IdentityFile", oldServer.IdentityFiles, newServer.IdentityFiles, domain.ToTildePath)
 	r.updateListField(host, "LocalForward", oldServer.LocalForward, newServer.LocalForward, r.convertCLIForwardToConfigFormat)
 	r.updateListField(host, "RemoteForward", oldServer.RemoteForward, newServer.RemoteForward, r.convertCLIForwardToConfigFormat)
 	r.updateListField(host, "DynamicForward", oldServer.DynamicForward, newServer.DynamicForward, nil)

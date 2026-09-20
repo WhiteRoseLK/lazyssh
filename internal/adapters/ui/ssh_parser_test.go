@@ -15,6 +15,8 @@
 package ui
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/WhiteRoseLK/neossh/internal/core/domain"
@@ -117,6 +119,19 @@ func TestParseSSHCommand(t *testing.T) {
 				server := s.(*domain.Server)
 				if len(server.IdentityFiles) != 2 {
 					t.Errorf("expected 2 identity files, got %d", len(server.IdentityFiles))
+				}
+			},
+		},
+		{
+			name: "ssh with absolute identity file converted to tilde",
+			cmd: func() string {
+				home, _ := os.UserHomeDir()
+				return "ssh -i " + filepath.Join(home, ".ssh", "id_rsa") + " user@example.com"
+			}(),
+			check: func(t *testing.T, s interface{}) {
+				server := s.(*domain.Server)
+				if len(server.IdentityFiles) != 1 || server.IdentityFiles[0] != "~/.ssh/id_rsa" {
+					t.Errorf("expected identity file '~/.ssh/id_rsa', got %v", server.IdentityFiles)
 				}
 			},
 		},

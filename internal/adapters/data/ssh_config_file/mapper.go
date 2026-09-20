@@ -154,7 +154,7 @@ func (r *Repository) mapBasicConfig(server *domain.Server, key, value string) bo
 			server.Port = port
 		}
 	case "identityfile":
-		server.IdentityFiles = append(server.IdentityFiles, value)
+		server.IdentityFiles = append(server.IdentityFiles, domain.ToTildePath(value))
 	default:
 		return false
 	}
@@ -289,7 +289,7 @@ func (r *Repository) mapSecurityConfig(server *domain.Server, key, value string)
 	case "fingerprinthash":
 		server.FingerprintHash = value
 	case "userknownhostsfile":
-		server.UserKnownHostsFile = value
+		server.UserKnownHostsFile = domain.ToTildePath(value)
 	case "hostkeyalgorithms":
 		server.HostKeyAlgorithms = value
 	case "macs":
