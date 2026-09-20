@@ -185,7 +185,7 @@ func formatServerLine(s domain.Server, maxAliasWidth int, width int) (primary, s
 	}
 
 	secondary = ""
-	return
+	return primary, secondary
 }
 
 func humanizeDuration(t time.Time) string {

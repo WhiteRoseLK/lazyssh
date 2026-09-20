@@ -87,7 +87,7 @@ func (sl *ServerList) UpdateServers(servers []domain.Server) {
 		}
 	}
 
-	_, _, listWidth, _ := sl.List.GetInnerRect()
+	_, _, listWidth, _ := sl.List.GetInnerRect() //nolint:dogsled // only width is needed
 	sl.currentWidth = listWidth
 
 	for i := range servers {
@@ -120,7 +120,7 @@ func (sl *ServerList) UpdateServers(servers []domain.Server) {
 
 // RefreshDisplay re-renders the list if the component width has changed
 func (sl *ServerList) RefreshDisplay() {
-	_, _, width, _ := sl.List.GetInnerRect()
+	_, _, width, _ := sl.List.GetInnerRect() //nolint:dogsled // only width is needed
 	if width != sl.currentWidth && width > 0 {
 		sl.currentWidth = width
 		currentIdx := sl.List.GetCurrentItem()
