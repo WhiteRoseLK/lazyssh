@@ -27,6 +27,11 @@ type App interface {
 	Run() error
 }
 
+// Config holds configuration options for the TUI application.
+type Config struct {
+	ExitOnDisconnect bool
+}
+
 type tui struct {
 	logger *zap.SugaredLogger
 
@@ -47,20 +52,30 @@ type tui struct {
 	left    *tview.Flex
 	content *tview.Flex
 
-	sortMode     SortMode
-	pingStatuses map[string]domain.Server
+	sortMode         SortMode
+	pingStatuses     map[string]domain.Server
+	exitOnDisconnect bool
 }
 
-func NewTUI(logger *zap.SugaredLogger, ss ports.ServerService, version, commit string) App {
-	return &tui{
-		logger:        logger,
-		app:           tview.NewApplication(),
-		serverService: ss,
-		version:       version,
-		commit:        commit,
-		settings:      newSettingsManager(logger),
-		pingStatuses:  make(map[string]domain.Server),
+func NewTUI(logger *zap.SugaredLogger, ss ports.ServerService, version, commit string, cfg ...Config) App {
+	var exitOnDisconnect bool
+	if len(cfg) > 0 {
+		exitOnDisconnect = cfg[0].ExitOnDisconnect
 	}
+	return &tui{
+		logger:           logger,
+		app:              tview.NewApplication(),
+		serverService:    ss,
+		version:          version,
+		commit:           commit,
+		settings:         newSettingsManager(logger),
+		pingStatuses:     make(map[string]domain.Server),
+		exitOnDisconnect: exitOnDisconnect,
+	}
+}
+
+func (t *tui) ExitOnDisconnect() bool {
+	return t.exitOnDisconnect
 }
 
 func (t *tui) Run() error {

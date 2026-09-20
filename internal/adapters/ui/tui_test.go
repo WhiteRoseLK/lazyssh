@@ -1,0 +1,231 @@
+// Copyright 2025.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package ui
+
+import (
+	"testing"
+	"time"
+
+	"github.com/WhiteRoseLK/neossh/internal/core/domain"
+	"github.com/WhiteRoseLK/neossh/internal/core/ports"
+	"github.com/gdamore/tcell/v2"
+	"github.com/rivo/tview"
+	"go.uber.org/zap"
+)
+
+type mockServerService struct {
+	ports.ServerService
+	servers           []domain.Server
+	sshCalled         bool
+	sshAlias          string
+	sshWithArgsCalled bool
+	sshWithArgsAlias  string
+	sshWithArgsArgs   []string
+	listServersCalled bool
+}
+
+func (m *mockServerService) SSH(alias string) error {
+	m.sshCalled = true
+	m.sshAlias = alias
+	return nil
+}
+
+func (m *mockServerService) SSHWithArgs(alias string, extraArgs []string) error {
+	m.sshWithArgsCalled = true
+	m.sshWithArgsAlias = alias
+	m.sshWithArgsArgs = extraArgs
+	return nil
+}
+
+func (m *mockServerService) ListServers(query string) ([]domain.Server, error) {
+	m.listServersCalled = true
+	return m.servers, nil
+}
+
+func (m *mockServerService) IsForwarding(alias string) bool {
+	return false
+}
+
+func TestNewTUI_ExitOnDisconnectConfig(t *testing.T) {
+	logger := zap.NewNop().Sugar()
+	svc := &mockServerService{}
+
+	// Case 1: Default when no Config argument is provided
+	appDef := NewTUI(logger, svc, "v1.0.0", "abc1234").(*tui)
+	if appDef.ExitOnDisconnect() {
+		t.Errorf("expected exitOnDisconnect to be false by default, got true")
+	}
+
+	// Case 2: Explicit false
+	appFalse := NewTUI(logger, svc, "v1.0.0", "abc1234", Config{ExitOnDisconnect: false}).(*tui)
+	if appFalse.ExitOnDisconnect() {
+		t.Errorf("expected exitOnDisconnect to be false, got true")
+	}
+
+	// Case 3: Explicit true
+	appTrue := NewTUI(logger, svc, "v1.0.0", "abc1234", Config{ExitOnDisconnect: true}).(*tui)
+	if !appTrue.ExitOnDisconnect() {
+		t.Errorf("expected exitOnDisconnect to be true, got false")
+	}
+}
+
+func setupTestTUI(exitOnDisconnect bool) (*tui, *mockServerService, chan error) {
+	logger := zap.NewNop().Sugar()
+	srv := domain.Server{Alias: "srv1", Host: "1.2.3.4", Port: 22, User: "root"}
+	svc := &mockServerService{servers: []domain.Server{srv}}
+
+	appInstance := NewTUI(logger, svc, "v1.0.0", "abc", Config{ExitOnDisconnect: exitOnDisconnect}).(*tui)
+
+	simScreen := tcell.NewSimulationScreen("UTF-8")
+	_ = simScreen.Init()
+	appInstance.app.SetScreen(simScreen)
+
+	// Build the minimal components needed for handler execution
+	appInstance.buildComponents()
+	appInstance.serverList.UpdateServers(svc.servers)
+	appInstance.root = tview.NewFlex()
+	appInstance.app.SetRoot(appInstance.root, true)
+
+	runDone := make(chan error, 1)
+	go func() {
+		runDone <- appInstance.app.Run()
+	}()
+
+	// Wait briefly for the application loop to be running
+	time.Sleep(50 * time.Millisecond)
+
+	// Reset listServersCalled flag since setup might have called it
+	svc.listServersCalled = false
+
+	return appInstance, svc, runDone
+}
+
+func TestHandleServerConnect_ExitOnDisconnectTrue(t *testing.T) {
+	appInstance, svc, runDone := setupTestTUI(true)
+
+	appInstance.handleServerConnect()
+
+	if !svc.sshCalled {
+		t.Fatalf("expected SSH to be called")
+	}
+	if svc.sshAlias != "srv1" {
+		t.Fatalf("expected SSH alias 'srv1', got %q", svc.sshAlias)
+	}
+
+	// Application should have stopped and runDone should receive within 1 second
+	select {
+	case err := <-runDone:
+		if err != nil {
+			t.Fatalf("unexpected app.Run error: %v", err)
+		}
+	case <-time.After(1 * time.Second):
+		t.Fatalf("timed out waiting for app.Run to stop when ExitOnDisconnect is true")
+	}
+
+	// RefreshServerList should NOT have been called when exiting on disconnect
+	if svc.listServersCalled {
+		t.Errorf("expected ListServers not to be called after exit on disconnect")
+	}
+}
+
+func TestHandleServerConnect_ExitOnDisconnectFalse(t *testing.T) {
+	appInstance, svc, runDone := setupTestTUI(false)
+	defer func() {
+		appInstance.app.Stop()
+		<-runDone
+	}()
+
+	appInstance.handleServerConnect()
+
+	if !svc.sshCalled {
+		t.Fatalf("expected SSH to be called")
+	}
+
+	// Application should NOT have stopped
+	select {
+	case err := <-runDone:
+		t.Fatalf("app.Run stopped unexpectedly when ExitOnDisconnect is false: %v", err)
+	case <-time.After(100 * time.Millisecond):
+		// Expected: app is still running
+	}
+
+	// RefreshServerList SHOULD have been called
+	if !svc.listServersCalled {
+		t.Errorf("expected ListServers to be called after disconnect when ExitOnDisconnect is false")
+	}
+}
+
+func TestShowPortForwardForm_ForwardSSH_ExitOnDisconnectTrue(t *testing.T) {
+	appInstance, svc, runDone := setupTestTUI(true)
+	srv := svc.servers[0]
+
+	form := appInstance.showPortForwardForm(srv)
+
+	form.GetFormItem(1).(*tview.InputField).SetText("8080")
+	form.GetFormItem(3).(*tview.InputField).SetText("80")
+	form.GetFormItem(5).(*tview.DropDown).SetCurrentOption(1) // ForwardModeForwardSSH
+
+	// Trigger "Start" button
+	startBtn := form.GetButton(0)
+	startBtn.InputHandler()(tcell.NewEventKey(tcell.KeyEnter, 0, tcell.ModNone), nil)
+
+	if !svc.sshWithArgsCalled {
+		t.Fatalf("expected SSHWithArgs to be called")
+	}
+	if svc.sshWithArgsAlias != "srv1" {
+		t.Fatalf("expected alias 'srv1', got %q", svc.sshWithArgsAlias)
+	}
+
+	// Application should have stopped
+	select {
+	case err := <-runDone:
+		if err != nil {
+			t.Fatalf("unexpected app.Run error: %v", err)
+		}
+	case <-time.After(1 * time.Second):
+		t.Fatalf("timed out waiting for app.Run to stop when ExitOnDisconnect is true")
+	}
+}
+
+func TestShowPortForwardForm_ForwardSSH_ExitOnDisconnectFalse(t *testing.T) {
+	appInstance, svc, runDone := setupTestTUI(false)
+	defer func() {
+		appInstance.app.Stop()
+		<-runDone
+	}()
+
+	srv := svc.servers[0]
+	form := appInstance.showPortForwardForm(srv)
+
+	form.GetFormItem(1).(*tview.InputField).SetText("8080")
+	form.GetFormItem(3).(*tview.InputField).SetText("80")
+	form.GetFormItem(5).(*tview.DropDown).SetCurrentOption(1) // ForwardModeForwardSSH
+
+	// Trigger "Start" button
+	startBtn := form.GetButton(0)
+	startBtn.InputHandler()(tcell.NewEventKey(tcell.KeyEnter, 0, tcell.ModNone), nil)
+
+	if !svc.sshWithArgsCalled {
+		t.Fatalf("expected SSHWithArgs to be called")
+	}
+
+	// Application should NOT have stopped
+	select {
+	case err := <-runDone:
+		t.Fatalf("app.Run stopped unexpectedly when ExitOnDisconnect is false: %v", err)
+	case <-time.After(100 * time.Millisecond):
+		// Expected: app is still running
+	}
+}
