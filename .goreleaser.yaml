@@ -58,7 +58,6 @@ brews:
       assert_match version.to_s, shell_output("#{bin}/neossh --version")
     custom_block: |-
       conflicts_with "lazyssh", because: "neossh is an actively maintained fork of lazyssh"
-      conflicts_with "adembc/tap/lazyssh", because: "neossh is an actively maintained fork of lazyssh"
     caveats: |-
       If you previously used lazyssh, neossh automatically migrates your
       metadata and settings from ~/.lazyssh to ~/.neossh. Your SSH config is unchanged.
