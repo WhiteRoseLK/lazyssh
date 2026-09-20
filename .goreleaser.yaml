@@ -56,6 +56,11 @@ brews:
       bin.install "lazyssh"
     test: |-
       assert_match version.to_s, shell_output("#{bin}/lazyssh --version")
+    custom_block: |-
+      conflicts_with "adembc/tap/lazyssh", because: "this is the actively maintained fork of lazyssh"
+    caveats: |-
+      If you previously had adembc/tap/lazyssh installed, this formula
+      replaces it. Your SSH config and lazyssh metadata are unchanged.
 
 checksum:
   name_template: "checksums.txt"
