@@ -17,7 +17,7 @@ package ui
 import (
 	"testing"
 
-	"github.com/Adembc/lazyssh/internal/core/domain"
+	"github.com/WhiteRoseLK/neossh/internal/core/domain"
 )
 
 const (
@@ -413,6 +413,41 @@ func TestParseSSHCommand(t *testing.T) {
 			name:    "ssh with invalid port",
 			cmd:     "ssh -p abc user@example.com",
 			wantErr: true,
+		},
+		{
+			name: "ssh with neossh alias comment",
+			cmd: `# neossh-alias:myserver
+ssh -p 2222 user@example.com`,
+			check: func(t *testing.T, s interface{}) {
+				server := s.(*domain.Server)
+				if server.Alias != "myserver" {
+					t.Errorf("expected alias 'myserver', got %s", server.Alias)
+				}
+				if server.Host != testHost {
+					t.Errorf("expected host '%s', got %s", testHost, server.Host)
+				}
+				if server.User != testUser {
+					t.Errorf("expected user '%s', got %s", testUser, server.User)
+				}
+				if server.Port != 2222 {
+					t.Errorf("expected port 2222, got %d", server.Port)
+				}
+			},
+		},
+		{
+			name: "ssh with neossh alias and tags comment",
+			cmd: `# neossh-alias:prod-server tags:production,web,critical
+ssh -p 443 admin@api.example.com`,
+			check: func(t *testing.T, s interface{}) {
+				server := s.(*domain.Server)
+				if server.Alias != "prod-server" {
+					t.Errorf("expected alias 'prod-server', got %s", server.Alias)
+				}
+				expectedTags := []string{"production", "web", "critical"}
+				if len(server.Tags) != len(expectedTags) {
+					t.Errorf("expected %d tags, got %d", len(expectedTags), len(server.Tags))
+				}
+			},
 		},
 		{
 			name: "ssh with lazyssh alias comment",

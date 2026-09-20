@@ -18,7 +18,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Adembc/lazyssh/internal/core/domain"
+	"github.com/WhiteRoseLK/neossh/internal/core/domain"
 )
 
 func TestBuildSSHCommand_AliasAndTags(t *testing.T) {
@@ -35,9 +35,9 @@ func TestBuildSSHCommand_AliasAndTags(t *testing.T) {
 				Host:  "example.com",
 				User:  "user",
 			},
-			wantPrefix: "# lazyssh-alias:myserver",
+			wantPrefix: "# neossh-alias:myserver",
 			wantContains: []string{
-				"# lazyssh-alias:myserver",
+				"# neossh-alias:myserver",
 				"\nssh ",
 				"user@example.com",
 			},
@@ -50,9 +50,9 @@ func TestBuildSSHCommand_AliasAndTags(t *testing.T) {
 				User:  "admin",
 				Tags:  []string{"production", "critical", "web"},
 			},
-			wantPrefix: "# lazyssh-alias:prod-server tags:production,critical,web",
+			wantPrefix: "# neossh-alias:prod-server tags:production,critical,web",
 			wantContains: []string{
-				"# lazyssh-alias:prod-server tags:production,critical,web",
+				"# neossh-alias:prod-server tags:production,critical,web",
 				"\nssh ",
 				"admin@prod.example.com",
 			},
@@ -65,9 +65,9 @@ func TestBuildSSHCommand_AliasAndTags(t *testing.T) {
 				User:  "developer",
 				Tags:  []string{"development"},
 			},
-			wantPrefix: "# lazyssh-alias:dev-server tags:development",
+			wantPrefix: "# neossh-alias:dev-server tags:development",
 			wantContains: []string{
-				"# lazyssh-alias:dev-server tags:development",
+				"# neossh-alias:dev-server tags:development",
 				"\nssh ",
 				"developer@dev.example.com",
 			},

@@ -41,6 +41,7 @@ If you are coming from **lazyssh**, here is a concrete summary of everything **n
 | **Parallel Ping All** | Concurrently pings all configured servers in the background with real-time colored latency badges in the list: `[<50ms]` (green), `[<150ms]` (yellow), `[>150ms]` (red), or `[DOWN]` (red). | <kbd>G</kbd> |
 | **One-Touch SSH Key Deployment** | Automatically pushes your public SSH key to the remote host using native `ssh-copy-id` directly from the TUI. | <kbd>K</kbd> |
 | **Copy SSH Command** | Copies the full SSH connection command directly to your system clipboard. | <kbd>c</kbd> |
+| **Paste SSH Command** | Parses any SSH command from system clipboard (flags, identity keys, ports, jump hosts) into an add-server modal with intelligent alias deduction and deduplication. | <kbd>v</kbd> |
 | **Zero-Friction Migration** | Automatically detects and migrates your favorites, tags, and connection history from `~/.lazyssh` to `~/.neossh`. | *Automatic* |
 | **Custom Config Path** | Loads any alternative SSH config file without modifying `~/.ssh/config`. | `-F <path>` |
 | **Persistent Sorting** | Remembers your preferred sort mode (by alias, last SSH connection, ascending/descending) across sessions. | <kbd>s</kbd> |
@@ -210,6 +211,7 @@ sudo mv neossh /usr/local/bin/
 | `p` | Pin / unpin server |
 | `t` | Edit tags |
 | `c` | Copy SSH connection command to clipboard |
+| `v` | Paste SSH command from clipboard (creates server entry) |
 | `K` | Push SSH public key to server via `ssh-copy-id` |
 | `s` | Toggle sort mode (alias, last SSH, reverse) |
 | `g` | Ping selected server |

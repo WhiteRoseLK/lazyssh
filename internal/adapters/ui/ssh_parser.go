@@ -19,7 +19,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/Adembc/lazyssh/internal/core/domain"
+	"github.com/WhiteRoseLK/neossh/internal/core/domain"
 )
 
 // Log level constants
@@ -47,10 +47,16 @@ func ParseSSHCommand(cmd string) (*domain.Server, error) {
 		trimmed := strings.TrimSpace(line)
 		// Check for any comment line
 		if strings.HasPrefix(trimmed, "#") {
-			// Check if it's a lazyssh metadata comment
-			if strings.Contains(trimmed, "lazyssh-alias:") {
+			// Check if it's a neossh or lazyssh metadata comment
+			prefix := ""
+			if strings.Contains(trimmed, "neossh-alias:") {
+				prefix = "neossh-alias:"
+			} else if strings.Contains(trimmed, "lazyssh-alias:") {
+				prefix = "lazyssh-alias:"
+			}
+			if prefix != "" {
 				// Parse alias
-				parts := strings.Split(trimmed, "lazyssh-alias:")
+				parts := strings.Split(trimmed, prefix)
 				if len(parts) >= 2 {
 					aliasAndTags := strings.TrimSpace(parts[1])
 					// Check if tags are included
