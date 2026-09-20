@@ -105,6 +105,9 @@ func (t *tui) handleGlobalKeys(event *tcell.EventKey) *tcell.EventKey {
 	case 'k':
 		t.handleNavigateUp()
 		return nil
+	case 'K':
+		t.handleInstallSSHKey()
+		return nil
 	}
 
 	if event.Key() == tcell.KeyEnter {
@@ -273,6 +276,19 @@ func (t *tui) handleServerConnect() {
 
 		t.app.Suspend(func() {
 			_ = t.serverService.SSH(server.Alias)
+		})
+		t.refreshServerList()
+	}
+}
+
+func (t *tui) handleInstallSSHKey() {
+	if server, ok := t.serverList.GetSelectedServer(); ok {
+		alias := server.Alias
+		t.showStatusTemp(fmt.Sprintf("Installing key to %s…", alias))
+		t.app.Suspend(func() {
+			if err := t.serverService.CopySSHKey(alias); err != nil {
+				t.logger.Errorw("failed to install ssh key", "alias", alias, "error", err)
+			}
 		})
 		t.refreshServerList()
 	}
