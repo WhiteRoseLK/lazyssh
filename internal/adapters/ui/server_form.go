@@ -918,7 +918,7 @@ func (sf *ServerForm) createAlgorithmAutocomplete(suggestions []string) func(str
 		for _, s := range suggestions {
 			if searchTerm == "" || matchesSequence(strings.ToLower(s), strings.ToLower(searchTerm)) {
 				// Build the complete text with the suggestion
-				newWords := make([]string, len(words)-1)
+				newWords := make([]string, len(words)-1, len(words))
 				copy(newWords, words[:len(words)-1])
 				newWords = append(newWords, prefix+s)
 				filtered = append(filtered, strings.Join(newWords, ","))
@@ -1306,7 +1306,7 @@ func (sf *ServerForm) createConnectionForm() {
 	sf.addInputFieldWithHelp(form, "RemoteCommand:", "RemoteCommand", defaultValues.RemoteCommand, 40, GetFieldPlaceholder("RemoteCommand"))
 
 	// RequestTTY dropdown
-	requestTTYOptions := createOptionsWithDefault("RequestTTY", []string{"", "yes", "no", "force", "auto"})
+	requestTTYOptions := createOptionsWithDefault("RequestTTY", []string{"", sshYes, "no", "force", "auto"})
 	requestTTYIndex := sf.findOptionIndex(requestTTYOptions, defaultValues.RequestTTY)
 	sf.addDropDownWithHelp(form, "RequestTTY:", "RequestTTY", requestTTYOptions, requestTTYIndex)
 
@@ -2120,7 +2120,7 @@ func (sf *ServerForm) serversDiffer(a, b domain.Server) bool {
 				differs = true
 			}
 		case reflect.Array, reflect.Chan, reflect.Func, reflect.Interface,
-			reflect.Map, reflect.Ptr, reflect.Struct, reflect.UnsafePointer, reflect.Invalid:
+			reflect.Map, reflect.Pointer, reflect.Struct, reflect.UnsafePointer, reflect.Invalid:
 			// For these types, use reflect.DeepEqual
 			if !reflect.DeepEqual(fieldA.Interface(), fieldB.Interface()) {
 				differs = true

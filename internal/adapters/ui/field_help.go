@@ -69,7 +69,7 @@ func formatDefaultValue(fieldName, value string) string {
 		"PubkeyAcceptedAlgorithms", "HostbasedAcceptedAlgorithms",
 		"HostKeyAlgorithms", "Ciphers", "MACs", "KexAlgorithms":
 		if value == "" {
-			return "none" //nolint:goconst // "none" here means empty/not configured, different from sessionTypeNone
+			return "none"
 		}
 		return value
 	case "PreferredAuthentications":
@@ -192,7 +192,7 @@ var fieldHelpData = map[string]FieldHelp{
 		Field:       "RequestTTY",
 		Description: "Request a pseudo-terminal for the session. Required for interactive programs.",
 		Syntax:      "yes | no | force | auto",
-		Examples:    []string{"yes", "force", "auto"},
+		Examples:    []string{sshYes, "force", "auto"},
 		Default:     "auto",
 		Category:    "Connection",
 	},

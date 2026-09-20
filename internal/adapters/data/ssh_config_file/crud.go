@@ -47,10 +47,11 @@ func (r *Repository) filterServers(servers []domain.Server, query string) []doma
 
 // matchesQuery checks if any field of the server matches the query string.
 func (r *Repository) matchesQuery(server domain.Server, query string) bool {
-	fields := []string{
+	fields := make([]string, 0, 2+len(server.Tags)+len(server.Aliases))
+	fields = append(fields,
 		strings.ToLower(server.Host),
 		strings.ToLower(server.User),
-	}
+	)
 	for _, tag := range server.Tags {
 		fields = append(fields, strings.ToLower(tag))
 	}
