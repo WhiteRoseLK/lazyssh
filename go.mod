@@ -11,7 +11,7 @@ require (
 	github.com/mattn/go-runewidth v0.0.30
 	github.com/rivo/tview v0.42.0
 	github.com/spf13/cobra v1.10.2
-	go.uber.org/zap v1.27.0
+	go.uber.org/zap v1.28.0
 )
 
 require (
