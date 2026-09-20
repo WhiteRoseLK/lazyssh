@@ -42,6 +42,7 @@ If you are coming from **lazyssh**, here is a concrete summary of everything **n
 | **One-Touch SSH Key Deployment** | Automatically pushes your public SSH key to the remote host using native `ssh-copy-id` directly from the TUI. | <kbd>K</kbd> |
 | **Copy SSH Command** | Copies the full SSH connection command directly to your system clipboard. | <kbd>c</kbd> |
 | **Paste SSH Command** | Parses any SSH command from system clipboard (flags, identity keys, ports, jump hosts) into an add-server modal with intelligent alias deduction and deduplication. | <kbd>v</kbd> |
+| **Duplicate / Clone Server** | Instantly clones any existing server configuration into the Add form with automatic alias deduplication (`srv_1`, `srv_2`), eliminating manual re-typing. | <kbd>y</kbd> / <kbd>C</kbd> |
 | **Zero-Friction Migration** | Automatically detects and migrates your favorites, tags, and connection history from `~/.lazyssh` to `~/.neossh`. | *Automatic* |
 | **Custom Config Path** | Loads any alternative SSH config file without modifying `~/.ssh/config`. | `-F <path>` |
 | **Persistent Sorting** | Remembers your preferred sort mode (by alias, last SSH connection, ascending/descending) across sessions. | <kbd>s</kbd> |
@@ -212,6 +213,7 @@ sudo mv neossh /usr/local/bin/
 | `t` | Edit tags |
 | `c` | Copy SSH connection command to clipboard |
 | `v` | Paste SSH command from clipboard (creates server entry) |
+| `y` / `C` | Duplicate / clone selected server entry |
 | `K` | Push SSH public key to server via `ssh-copy-id` |
 | `s` | Toggle sort mode (alias, last SSH, reverse) |
 | `g` | Ping selected server |
