@@ -30,7 +30,7 @@ type ServerMetadata struct {
 	LastSeen string   `json:"last_seen,omitempty"`
 	PinnedAt string   `json:"pinned_at,omitempty"`
 	SSHCount int      `json:"ssh_count,omitempty"`
-	// File is the absolute path of the SSH config file lazyssh should
+	// File is the absolute path of the SSH config file neossh should
 	// write to when editing or deleting this host. Populated lazily on
 	// the first successful write and used to suppress the ambiguity
 	// prompt on subsequent edits.
@@ -125,7 +125,7 @@ func (m *metadataManager) updateServer(server domain.Server, oldAlias string) er
 	return m.saveAll(metadata)
 }
 
-// setFile records the config file lazyssh should write to next time the
+// setFile records the config file neossh should write to next time the
 // alias is edited or deleted. Empty path clears the memory.
 func (m *metadataManager) setFile(alias, path string) error {
 	metadata, err := m.loadAll()

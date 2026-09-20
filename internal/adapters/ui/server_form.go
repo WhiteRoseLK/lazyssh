@@ -2069,7 +2069,7 @@ func (sf *ServerForm) serversDiffer(a, b domain.Server) bool {
 	valB := reflect.ValueOf(b)
 	typeA := valA.Type()
 
-	// Fields to skip during comparison (lazyssh metadata fields)
+	// Fields to skip during comparison (neossh metadata fields)
 	skipFields := map[string]bool{
 		"Aliases":  true, // Computed field
 		"LastSeen": true, // Metadata field

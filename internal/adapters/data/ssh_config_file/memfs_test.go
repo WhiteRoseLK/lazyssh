@@ -42,7 +42,7 @@ func newMemFS(t interface {
 },
 ) *memFS {
 	t.Helper()
-	dir, err := os.MkdirTemp("", "lazyssh-memfs-")
+	dir, err := os.MkdirTemp("", "neossh-memfs-")
 	if err != nil {
 		t.Fatalf("mkdir temp: %v", err)
 	}
