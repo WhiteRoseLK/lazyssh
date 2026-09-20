@@ -1,45 +1,71 @@
-name: 🐞 Bug Report
-description: Tell us about something not working properly
-labels: [ "kind/bug", "priority/needs-triage" ]
+name: "🐞 Bug Report"
+description: File a bug report to help us improve neossh
+title: "bug: "
+labels: ["bug"]
 body:
   - type: markdown
     attributes:
       value: |
-        # Bug Report
-        
-        Thanks for helping make the NeoSSH project better!
+        Thanks for taking the time to fill out this bug report!
 
   - type: checkboxes
     attributes:
-      label: Checks
+      label: Pre-flight checks
       options:
-        - label: I have searched the [existing issues](https://github.com/WhiteRoseLK/neossh/issues).
+        - label: I have searched the [existing issues](https://github.com/WhiteRoseLK/neossh/issues) and confirmed this hasn't been reported yet.
+          required: true
+        - label: I am using the latest version of neossh.
           required: true
 
-
   - type: input
-    id: neossh-version
+    id: version
     attributes:
-      label: NeoSSH Version
-      placeholder: X.X.X
+      label: neossh Version
+      placeholder: e.g. 1.0.0 (run `neossh --version` or check binary release)
     validations:
       required: true
 
   - type: input
     id: os
     attributes:
-      label: Operating System
-      description: What is the OS/ARCH you are using to run NeoSSH ?
-      placeholder: macOS (darwin/amd64), macOS (darwin/arm64), Linux (linux/arm64), etc...
+      label: Operating System & Architecture
+      placeholder: e.g. macOS 15.0 arm64 / Ubuntu 24.04 amd64 / Windows 11
     validations:
       required: true
-
 
   - type: textarea
     id: description
     attributes:
-      label: Description
-      description: The __context__ the problem occurred in, and an __overview__ of what went wrong.
-      placeholder: I was trying to... but then...
+      label: Bug Description
+      description: A clear and concise description of what the bug is.
+      placeholder: Describe the problem clearly...
     validations:
       required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: Steps to reproduce the behavior.
+      placeholder: |
+        1. Open neossh
+        2. Press '...'
+        3. See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What did you expect to happen instead?
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / Screenshots / Error Output
+      description: Attach logs (from `~/.neossh/neossh.log` or terminal output) or screenshots if applicable.
+    validations:
+      required: false
