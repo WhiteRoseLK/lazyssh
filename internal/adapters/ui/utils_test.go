@@ -171,3 +171,47 @@ func TestBuildSSHCommand_CompleteCommand(t *testing.T) {
 		t.Errorf("Command should contain 'admin@example.com', got: %q", result)
 	}
 }
+
+func TestFormatServerLine_PingIndicators(t *testing.T) {
+	srvUp := domain.Server{
+		Alias:       "prod-srv",
+		Host:        "192.168.1.10",
+		PingStatus:  StatusUp,
+		PingLatency: 45 * 1000 * 1000, // 45ms
+	}
+
+	primary, _ := formatServerLine(srvUp, 10, 100)
+	if !strings.Contains(primary, "● 45ms") {
+		t.Errorf("expected latency badge '● 45ms' in primary line, got: %q", primary)
+	}
+
+	srvDown := domain.Server{
+		Alias:      "down-srv",
+		Host:       "192.168.1.20",
+		PingStatus: StatusDown,
+	}
+
+	primaryDown, _ := formatServerLine(srvDown, 10, 100)
+	if !strings.Contains(primaryDown, "● DOWN") {
+		t.Errorf("expected '● DOWN' in primary line, got: %q", primaryDown)
+	}
+
+	srvChecking := domain.Server{
+		Alias:      "check-srv",
+		Host:       "192.168.1.30",
+		PingStatus: StatusChecking,
+	}
+
+	primaryCheck, _ := formatServerLine(srvChecking, 10, 100)
+	if !strings.Contains(primaryCheck, "● ... ") {
+		t.Errorf("expected '● ... ' in primary line, got: %q", primaryCheck)
+	}
+}
+
+func TestStripSimpleColors(t *testing.T) {
+	colored := "[white::b]hello[-] [#AAAAAA]world[-]"
+	stripped := stripSimpleColors(colored)
+	if stripped != "hello world" {
+		t.Errorf("expected 'hello world', got: %q", stripped)
+	}
+}

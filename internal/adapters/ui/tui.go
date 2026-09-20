@@ -18,6 +18,7 @@ import (
 	"github.com/gdamore/tcell/v2"
 	"go.uber.org/zap"
 
+	"github.com/WhiteRoseLK/neossh/internal/core/domain"
 	"github.com/WhiteRoseLK/neossh/internal/core/ports"
 	"github.com/rivo/tview"
 )
@@ -46,7 +47,8 @@ type tui struct {
 	left    *tview.Flex
 	content *tview.Flex
 
-	sortMode SortMode
+	sortMode     SortMode
+	pingStatuses map[string]domain.Server
 }
 
 func NewTUI(logger *zap.SugaredLogger, ss ports.ServerService, version, commit string) App {
@@ -57,6 +59,7 @@ func NewTUI(logger *zap.SugaredLogger, ss ports.ServerService, version, commit s
 		version:       version,
 		commit:        commit,
 		settings:      newSettingsManager(logger),
+		pingStatuses:  make(map[string]domain.Server),
 	}
 }
 
@@ -144,6 +147,12 @@ func (t *tui) buildLayout() *tui {
 
 func (t *tui) bindEvents() *tui {
 	t.root.SetInputCapture(t.handleGlobalKeys)
+	t.app.SetBeforeDrawFunc(func(screen tcell.Screen) bool {
+		if t.serverList != nil {
+			t.serverList.RefreshDisplay()
+		}
+		return false
+	})
 	return t
 }
 
