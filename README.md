@@ -108,6 +108,11 @@ If you are coming from **lazyssh**, here is a concrete summary of everything **n
 - 📌 Pin / unpin servers to keep favorites at the top.
 - 🏓 Ping server to check reachability.
 
+### Server Folders & Groups
+- 📁 Organize servers into collapsible folders/groups with nested hierarchies (e.g. `prod/database`, `infra/k8s`).
+- 📂 Expand or collapse groups with `Space` or `Enter` for a tidy, clutter-free server list.
+- 🪟 Tmux multi-pane integration: Launch and connect to all servers in a group simultaneously using tmux panes (<kbd>m</kbd> context menu).
+
 ### Quick Server Navigation
 - 🔍 Fuzzy search by alias, IP, or tags (`/`).
 - 🖥 One‑keypress SSH into the selected server (`Enter`).
@@ -291,7 +296,8 @@ neossh --sshconfig ~/.ssh/config_work -r
 | `e` | Edit selected server *(disabled in read-only mode)* |
 | `d` | Delete selected server *(disabled in read-only mode)* |
 | `i` | Import discovered hosts from `known_hosts` *(disabled in read-only mode)* |
-| `m` | Mark selected server as hidden / visible *(disabled in read-only mode)* |
+| `Space` | Toggle collapse / expand group *(when on group header)* |
+| `m` | Mark server hidden/visible *(on server)* / Group menu: Tmux connect all, collapse/expand all *(on group header)* |
 | `H` | Toggle displaying hidden servers in the list |
 | `p` | Pin / unpin server |
 | `t` | Edit tags *(disabled in read-only mode)* |
@@ -387,6 +393,7 @@ This project is licensed under the [Apache-2.0 License](LICENSE).
   - `@yaronuliel` — `--ssh-config-readonly` mode
   - `@natefabian18` — `--exit-on-disconnect` session behavior
   - `@Ferdyverse` — Multi-alias `Host` lines support & SSH config tags comments
+  - `@Q0`, `@Midas-sudo` — Server folders, nested grouping, and tmux session integration
   - `@Midas-sudo` — Wildcard pattern blocks
   - `@Mehrdad-Farshi` — SSH error diagnostics display
   - `@leleobhz` — CLI filter and direct connect options

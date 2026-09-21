@@ -232,7 +232,8 @@ func (t *tui) buildComponents() {
 		OnSelectionChange(t.handleServerSelectionChange).
 		OnReturnToSearch(t.handleReturnToSearch).
 		OnTab(t.handleActiveListFocus).
-		OnBacktab(t.handleSearchFocus)
+		OnBacktab(t.handleSearchFocus).
+		OnGroupAction(t.handleGroupAction)
 	t.activeList = NewServerList().
 		OnSelectionChange(t.handleServerSelectionChange).
 		OnReturnToSearch(t.handleReturnToSearch).
