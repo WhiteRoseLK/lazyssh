@@ -350,3 +350,133 @@ func TestEnsureMetadataFile(t *testing.T) {
 		}
 	})
 }
+
+func TestRootCmd_ImportKnownHostsFlags(t *testing.T) {
+	cmd := newRootCmd()
+
+	importFlag := cmd.PersistentFlags().Lookup("import-known-hosts")
+	if importFlag == nil {
+		t.Fatal("expected persistent flag --import-known-hosts to exist")
+	}
+
+	khFlag := cmd.PersistentFlags().Lookup("known-hosts")
+	if khFlag == nil {
+		t.Fatal("expected persistent flag --known-hosts to exist")
+	}
+}
+
+func TestRootCmd_ImportKnownHostsParsing(t *testing.T) {
+	tests := []struct {
+		name                   string
+		args                   []string
+		expectedImport         bool
+		expectedKnownHostsPath string
+	}{
+		{
+			name:                   "default without import flag",
+			args:                   []string{},
+			expectedImport:         false,
+			expectedKnownHostsPath: "",
+		},
+		{
+			name:                   "flag --import-known-hosts",
+			args:                   []string{"--import-known-hosts"},
+			expectedImport:         true,
+			expectedKnownHostsPath: "",
+		},
+		{
+			name:                   "flag --import-known-hosts with --known-hosts",
+			args:                   []string{"--import-known-hosts", "--known-hosts", "/custom/known_hosts"},
+			expectedImport:         true,
+			expectedKnownHostsPath: "/custom/known_hosts",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			importKnownHosts = false
+			knownHostsFile = ""
+			cmd := newRootCmd()
+			if err := cmd.ParseFlags(tt.args); err != nil {
+				t.Fatalf("unexpected error parsing flags %v: %v", tt.args, err)
+			}
+			if importKnownHosts != tt.expectedImport {
+				t.Errorf("importKnownHosts = %v, want %v", importKnownHosts, tt.expectedImport)
+			}
+			if knownHostsFile != tt.expectedKnownHostsPath {
+				t.Errorf("knownHostsFile = %q, want %q", knownHostsFile, tt.expectedKnownHostsPath)
+			}
+		})
+	}
+}
+
+func TestRootCmd_ImportKnownHosts_ReadOnlyError(t *testing.T) {
+	importKnownHosts = false
+	knownHostsFile = ""
+	sshConfigReadonly = false
+	sshConfigFile = ""
+
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
+	cmd := newRootCmd()
+	cmd.SetArgs([]string{"--import-known-hosts", "-r"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error running --import-known-hosts in readonly mode, got nil")
+	}
+	if !strings.Contains(err.Error(), "cannot import known_hosts in read-only mode") {
+		t.Errorf("unexpected error message: %v", err)
+	}
+}
+
+func TestRootCmd_ImportKnownHosts_Execution(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+
+	cfgPath := filepath.Join(tmpDir, "config")
+	if err := os.WriteFile(cfgPath, []byte("Host existing\n    HostName 10.0.0.1\n"), 0o600); err != nil {
+		t.Fatalf("failed to write initial config: %v", err)
+	}
+
+	khPath := filepath.Join(tmpDir, "known_hosts")
+	khContent := "10.0.0.1 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQW6\n" +
+		"discovered-server.org ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLzapDVsvYX+28VUvxGhRNO3\n" +
+		"[discovered-port.org]:2222 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQW6\n"
+	if err := os.WriteFile(khPath, []byte(khContent), 0o600); err != nil {
+		t.Fatalf("failed to write known_hosts: %v", err)
+	}
+
+	importKnownHosts = false
+	knownHostsFile = ""
+	sshConfigReadonly = false
+	sshConfigFile = ""
+
+	cmd := newRootCmd()
+	cmd.SetArgs([]string{
+		"--sshconfig", cfgPath,
+		"--import-known-hosts",
+		"--known-hosts", khPath,
+	})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error executing import command: %v", err)
+	}
+
+	updatedConfig, err := os.ReadFile(cfgPath)
+	if err != nil {
+		t.Fatalf("failed to read updated config: %v", err)
+	}
+	cfgStr := string(updatedConfig)
+
+	if !strings.Contains(cfgStr, "Host discovered-server.org") {
+		t.Errorf("expected config to contain 'Host discovered-server.org', got:\n%s", cfgStr)
+	}
+	if !strings.Contains(cfgStr, "Host discovered-port.org-2222") {
+		t.Errorf("expected config to contain 'Host discovered-port.org-2222', got:\n%s", cfgStr)
+	}
+	if !strings.Contains(cfgStr, "Port 2222") {
+		t.Errorf("expected config to contain 'Port 2222', got:\n%s", cfgStr)
+	}
+}

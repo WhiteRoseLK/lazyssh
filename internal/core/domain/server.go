@@ -141,3 +141,10 @@ func IsWildcardPattern(pattern string) bool {
 func (s Server) IsWildcardServer() bool {
 	return s.IsWildcard || strings.ContainsAny(s.Alias, "*?") || strings.ContainsAny(s.Host, "*?")
 }
+
+// ImportResult summarizes the outcome of discovering or importing hosts from known_hosts.
+type ImportResult struct {
+	Discovered int // total unique valid hosts parsed from known_hosts
+	Imported   int // newly imported into SSH config
+	Skipped    int // already exist in SSH config or skipped
+}

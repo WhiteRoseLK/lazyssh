@@ -58,6 +58,14 @@ func (m *mockServerService) IsForwarding(alias string) bool {
 	return false
 }
 
+func (m *mockServerService) DiscoverKnownHosts(string) ([]domain.Server, domain.ImportResult, error) {
+	return nil, domain.ImportResult{}, nil
+}
+
+func (m *mockServerService) ImportKnownHosts(string) (domain.ImportResult, error) {
+	return domain.ImportResult{}, nil
+}
+
 func TestNewTUI_ExitOnDisconnectConfig(t *testing.T) {
 	logger := zap.NewNop().Sugar()
 	svc := &mockServerService{}

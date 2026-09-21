@@ -17,6 +17,8 @@ package ui
 import (
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"time"
@@ -49,7 +51,7 @@ func (t *tui) handleGlobalKeys(event *tcell.EventKey) *tcell.EventKey {
 
 	if t.readonly {
 		switch event.Rune() {
-		case 'a', 'e', 'd', 'c', 'C', 'y', 'p', 'v', 'K', 't':
+		case 'a', 'e', 'd', 'c', 'C', 'y', 'p', 'v', 'K', 't', 'i', 'I':
 			t.showReadonlyModal()
 			return nil
 		}
@@ -127,6 +129,9 @@ func (t *tui) handleGlobalKeys(event *tcell.EventKey) *tcell.EventKey {
 		return nil
 	case 'K':
 		t.handleInstallSSHKey()
+		return nil
+	case 'i', 'I':
+		t.handleImportKnownHosts()
 		return nil
 	}
 
@@ -424,6 +429,71 @@ func (t *tui) handleInstallSSHKey() {
 
 func (t *tui) handleServerSelectionChange(server domain.Server) {
 	t.details.UpdateServer(server)
+}
+
+func (t *tui) handleImportKnownHosts() {
+	if t.readonly {
+		t.showReadonlyModal()
+		return
+	}
+
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.showErrorModal("Import Known Hosts Error", "Failed to determine user home directory: "+err.Error())
+		return
+	}
+	khPath := filepath.Join(home, ".ssh", "known_hosts")
+
+	candidates, result, err := t.serverService.DiscoverKnownHosts(khPath)
+	if err != nil {
+		t.showErrorModal("Import Known Hosts", err.Error())
+		return
+	}
+
+	if len(candidates) == 0 {
+		t.showStatusTemp(fmt.Sprintf("No new hosts in %s (%d already configured)", khPath, result.Skipped))
+		return
+	}
+
+	msg := fmt.Sprintf("Import %d new host(s) from %s into SSH config?\n\n(%d host(s) already configured and will be skipped)",
+		len(candidates), khPath, result.Skipped)
+
+	doImport := func() {
+		res, err := t.serverService.ImportKnownHosts(khPath)
+		if err != nil {
+			t.showStatusTempColor("Import failed: "+err.Error(), "#FF6B6B")
+			t.handleModalClose()
+			return
+		}
+		t.refreshServerList()
+		t.handleModalClose()
+		t.showStatusTemp(fmt.Sprintf("Imported %d new host(s) from %s", res.Imported, khPath))
+	}
+
+	modal := tview.NewModal().
+		SetText(msg).
+		AddButtons([]string{"[yellow]C[-]ancel", "[yellow]I[-]mport"}).
+		SetDoneFunc(func(buttonIndex int, buttonLabel string) {
+			if buttonIndex == 1 {
+				doImport()
+				return
+			}
+			t.handleModalClose()
+		})
+
+	modal.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		switch event.Rune() {
+		case 'c', 'C':
+			t.handleModalClose()
+			return nil
+		case 'i', 'I':
+			doImport()
+			return nil
+		}
+		return event
+	})
+
+	t.app.SetRoot(modal, true)
 }
 
 func (t *tui) handleServerAdd() {

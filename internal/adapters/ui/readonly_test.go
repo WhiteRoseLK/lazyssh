@@ -31,6 +31,7 @@ type mockReadOnlyService struct {
 	updateCalled  bool
 	deleteCalled  bool
 	copyKeyCalled bool
+	importCalled  bool
 }
 
 func (m *mockReadOnlyService) ListServers(query string) ([]domain.Server, error) {
@@ -83,6 +84,15 @@ func (m *mockReadOnlyService) IsForwarding(alias string) bool {
 
 func (m *mockReadOnlyService) Ping(server domain.Server) (bool, time.Duration, error) {
 	return true, 10 * time.Millisecond, nil
+}
+
+func (m *mockReadOnlyService) DiscoverKnownHosts(string) ([]domain.Server, domain.ImportResult, error) {
+	return nil, domain.ImportResult{}, nil
+}
+
+func (m *mockReadOnlyService) ImportKnownHosts(string) (domain.ImportResult, error) {
+	m.importCalled = true
+	return domain.ImportResult{}, nil
 }
 
 func TestTUI_ReadOnlyState(t *testing.T) {
@@ -222,7 +232,7 @@ func TestHandlers_ReadOnlyBlocking(t *testing.T) {
 	}
 
 	// Test handleGlobalKeys for modifying action keys in readonly mode
-	blockedKeys := []rune{'a', 'e', 'd', 'c', 'p', 'K', 'y', 'C', 'v', 't'}
+	blockedKeys := []rune{'a', 'e', 'd', 'c', 'p', 'K', 'y', 'C', 'v', 't', 'i', 'I'}
 	for _, k := range blockedKeys {
 		t.Run(string(k), func(t *testing.T) {
 			ev := tcell.NewEventKey(tcell.KeyRune, k, tcell.ModNone)
@@ -303,6 +313,13 @@ func TestHandlers_ReadOnlyBlocking(t *testing.T) {
 		uiApp.handleServerSave(srv, nil)
 		if mockSvc.addCalled || mockSvc.updateCalled {
 			t.Error("Server save modified service in readonly mode")
+		}
+	})
+
+	t.Run("DirectHandlerImportKnownHosts", func(t *testing.T) {
+		uiApp.handleImportKnownHosts()
+		if mockSvc.importCalled {
+			t.Error("ImportKnownHosts was called in readonly mode")
 		}
 	})
 }

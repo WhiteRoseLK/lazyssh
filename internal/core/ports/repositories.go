@@ -20,8 +20,11 @@ type ServerRepository interface {
 	ListServers(query string) ([]domain.Server, error)
 	UpdateServer(server domain.Server, newServer domain.Server) error
 	AddServer(server domain.Server) error
+	AddServers(servers []domain.Server) error
 	DeleteServer(server domain.Server) error
 	SetPinned(alias string, pinned bool) error
 	RecordSSH(alias string) error
 	GetConfigFile() string
+	DiscoverKnownHosts(knownHostsPath string) ([]domain.Server, domain.ImportResult, error)
+	ImportKnownHosts(knownHostsPath string) (domain.ImportResult, error)
 }
