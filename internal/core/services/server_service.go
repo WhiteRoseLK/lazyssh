@@ -759,3 +759,16 @@ func resolveSSHDestination(alias string) (string, int, bool) {
 	}
 	return host, port, true
 }
+
+// DiscoverKnownHosts discovers hosts from known_hosts without modifying the configuration.
+func (s *serverService) DiscoverKnownHosts(knownHostsPath string) ([]domain.Server, domain.ImportResult, error) {
+	return s.serverRepository.DiscoverKnownHosts(knownHostsPath)
+}
+
+// ImportKnownHosts imports unconfigured hosts from known_hosts into the SSH configuration.
+func (s *serverService) ImportKnownHosts(knownHostsPath string) (domain.ImportResult, error) {
+	if s.readonly {
+		return domain.ImportResult{}, ErrReadOnly
+	}
+	return s.serverRepository.ImportKnownHosts(knownHostsPath)
+}

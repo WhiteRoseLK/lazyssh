@@ -41,6 +41,16 @@ func (m *mockServerRepository) UpdateServer(domain.Server, domain.Server) error 
 
 func (m *mockServerRepository) AddServer(domain.Server) error { return nil }
 
+func (m *mockServerRepository) AddServers([]domain.Server) error { return nil }
+
+func (m *mockServerRepository) DiscoverKnownHosts(string) ([]domain.Server, domain.ImportResult, error) {
+	return []domain.Server{{Alias: "srv1", Host: "1.1.1.1", Port: 22}}, domain.ImportResult{Discovered: 2, Skipped: 1}, nil
+}
+
+func (m *mockServerRepository) ImportKnownHosts(string) (domain.ImportResult, error) {
+	return domain.ImportResult{Discovered: 2, Imported: 1, Skipped: 1}, nil
+}
+
 func (m *mockServerRepository) DeleteServer(domain.Server) error { return nil }
 
 func (m *mockServerRepository) SetPinned(string, bool) error { return nil }
@@ -389,6 +399,20 @@ func TestServerService_ReadOnlyMode(t *testing.T) {
 		t.Fatalf("CopySSHKey in readonly mode: expected ErrReadOnly, got %v", err)
 	}
 
+	// ImportKnownHosts should fail with ErrReadOnly
+	if _, err := svc.ImportKnownHosts("/dummy/known_hosts"); !errors.Is(err, ErrReadOnly) {
+		t.Fatalf("ImportKnownHosts in readonly mode: expected ErrReadOnly, got %v", err)
+	}
+
+	// DiscoverKnownHosts should succeed in readonly mode (non-modifying)
+	discovered, res, err := svc.DiscoverKnownHosts("/dummy/known_hosts")
+	if err != nil {
+		t.Fatalf("DiscoverKnownHosts in readonly mode failed: %v", err)
+	}
+	if len(discovered) != 1 || res.Discovered != 2 {
+		t.Fatalf("unexpected DiscoverKnownHosts result: %+v, %+v", discovered, res)
+	}
+
 	// Non-modifying operations should succeed
 	servers, err := svc.ListServers("")
 	if err != nil {
@@ -396,5 +420,19 @@ func TestServerService_ReadOnlyMode(t *testing.T) {
 	}
 	if servers != nil {
 		t.Fatalf("expected nil servers from mock, got %v", servers)
+	}
+}
+
+func TestServerService_ImportKnownHosts_NormalMode(t *testing.T) {
+	logger := zap.NewNop().Sugar()
+	mockRepo := &mockServerRepository{}
+	svc := NewServerService(logger, mockRepo, WithReadOnly(false))
+
+	res, err := svc.ImportKnownHosts("/dummy/known_hosts")
+	if err != nil {
+		t.Fatalf("ImportKnownHosts failed: %v", err)
+	}
+	if res.Discovered != 2 || res.Imported != 1 || res.Skipped != 1 {
+		t.Fatalf("unexpected ImportResult: %+v", res)
 	}
 }

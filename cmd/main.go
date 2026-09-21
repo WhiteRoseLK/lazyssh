@@ -40,6 +40,8 @@ var (
 	sshConfigReadonly bool
 	filterQuery       string
 	connectDirectly   bool
+	importKnownHosts  bool
+	knownHostsFile    string
 
 	rootCmd = newRootCmd()
 )
@@ -69,6 +71,14 @@ func newRootCmd() *cobra.Command {
 			isConnect := connectDirectly
 			if c, err := cmd.Flags().GetBool("connect"); err == nil && c {
 				isConnect = true
+			}
+
+			isImportKH := importKnownHosts
+			if ikh, err := cmd.Flags().GetBool("import-known-hosts"); err == nil && ikh {
+				isImportKH = true
+			}
+			if kh, err := cmd.Flags().GetString("known-hosts"); err == nil && kh != "" {
+				knownHostsFile = kh
 			}
 
 			log, err := logger.New("NEOSSH")
@@ -101,6 +111,29 @@ func newRootCmd() *cobra.Command {
 
 			serverRepo := ssh_config_file.NewRepository(log, resolvedConfig, metaDataFile)
 			serverService := services.NewServerService(log, serverRepo, services.WithReadOnly(isReadonly))
+
+			if isImportKH {
+				if isReadonly {
+					return fmt.Errorf("cannot import known_hosts in read-only mode")
+				}
+				khPath := knownHostsFile
+				if khPath == "" {
+					khPath = filepath.Join(home, ".ssh", "known_hosts")
+				}
+				result, err := serverService.ImportKnownHosts(khPath)
+				if err != nil {
+					return fmt.Errorf("failed to import known_hosts: %w", err)
+				}
+				if result.Imported == 0 {
+					fmt.Printf("No new hosts to import from %s (%d host(s) already configured or skipped).\n",
+						khPath, result.Skipped)
+				} else {
+					fmt.Printf("Successfully imported %d host(s) from %s (%d already configured or skipped).\n",
+						result.Imported, khPath, result.Skipped)
+				}
+				return nil
+
+			}
 
 			if isConnect {
 				connected, err := handleDirectConnect(filter, serverService)
@@ -143,6 +176,12 @@ func newRootCmd() *cobra.Command {
 	)
 	cmd.PersistentFlags().BoolVarP(
 		&connectDirectly, "connect", "c", false, "connect directly to matching server without launching full TUI picker",
+	)
+	cmd.PersistentFlags().BoolVar(
+		&importKnownHosts, "import-known-hosts", false, "import hosts from ~/.ssh/known_hosts into SSH config",
+	)
+	cmd.PersistentFlags().StringVar(
+		&knownHostsFile, "known-hosts", "", "path to known_hosts file (default: ~/.ssh/known_hosts)",
 	)
 
 	cmd.SilenceUsage = true

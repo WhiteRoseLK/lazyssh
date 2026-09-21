@@ -38,8 +38,11 @@ If you are coming from **lazyssh**, here is a concrete summary of everything **n
 
 | Feature | Description | Shortcut / Usage |
 | :--- | :--- | :---: |
+| **Import Known Hosts** | Quickly bootstrap your SSH config by discovering and importing unconfigured hosts from `~/.ssh/known_hosts` with automatic deduplication, standard port parsing (`[host]:port`), and safe skipping of hashed entries. | `--import-known-hosts` / <kbd>i</kbd> |
 | **CLI Pre-filtering & Direct Connect** | Launch pre-filtered (`neossh prod` or `-f prod`) to prevent exposing your entire server fleet during screen shares, or connect directly (`neossh -c <alias>`). | `neossh <filter>` / `-c` |
+
 | **Read-Only / Viewer Mode** | Protect production files with an immutable viewer mode. Blocks add, edit, delete, clone, paste, and key installs with an interactive indicator and notification. | `--readonly` / `-r` |
+
 | **Exit On Disconnect** | Automatically exits `neossh` when your SSH session terminates, providing a seamless one-shot terminal launcher experience. | `-x` / `--exit-on-disconnect` |
 | **Multi-Alias Directive Support** | Preserves and indexes all space-separated aliases on a single `Host` line (`Host web1 web2 staging`). Supports fuzzy search and connection by any defined alias without dropping them on writeback. | *Automatic* |
 | **Wildcard Pattern Blocks** | Accurately reads and preserves wildcard configurations (`Host *.corp`, `Host *`) across edits, displays `[wildcard]` badges, and guards against accidental direct connections. | *Automatic* |
@@ -222,6 +225,8 @@ neossh [filter] [flags]
 | `[filter]` | | Optional positional argument to pre-filter server list | `""` |
 | `--filter <pattern>` | `-f` | Pre-filter server list by alias, hostname, or tag | `""` |
 | `--connect` | `-c` | Connect directly to matching server without launching full TUI picker | `false` |
+| `--import-known-hosts` | | Import newly discovered hosts from `known_hosts` into SSH config | `false` |
+| `--known-hosts <path>` | | Specify custom path to `known_hosts` file | `~/.ssh/known_hosts` |
 | `--sshconfig <path>` | | Specify custom path to SSH config file | `~/.ssh/config` |
 | `--readonly`, `--ssh-config-readonly` | `-r` | Run in read-only / viewer mode (prevents writing or modifying SSH configuration) | `false` |
 | `--exit-on-disconnect`, `--auto-exit` | `-x` | Exit `neossh` immediately after SSH session terminates (one-shot launcher) | `false` |
@@ -231,6 +236,12 @@ neossh [filter] [flags]
 ```bash
 # Launch normal interactive TUI:
 neossh
+
+# Bootstrap SSH config by importing discovered hosts from ~/.ssh/known_hosts:
+neossh --import-known-hosts
+
+# Import from a custom known_hosts file into a specific SSH config:
+neossh --import-known-hosts --known-hosts ~/.ssh/known_hosts_work --sshconfig ~/.ssh/config_work
 
 # Launch pre-filtered to "prod" servers (avoids exposing other servers on screen shares):
 neossh prod
@@ -264,6 +275,7 @@ neossh --sshconfig ~/.ssh/config_work -r
 | `a` | Add new server *(disabled in read-only mode)* |
 | `e` | Edit selected server *(disabled in read-only mode)* |
 | `d` | Delete selected server *(disabled in read-only mode)* |
+| `i` | Import discovered hosts from `known_hosts` *(disabled in read-only mode)* |
 | `p` | Pin / unpin server |
 | `t` | Edit tags *(disabled in read-only mode)* |
 | `c` | Copy SSH connection command to clipboard |
@@ -279,7 +291,8 @@ neossh --sshconfig ~/.ssh/config_work -r
 | `q` / `Ctrl+C` | Quit |
 
 > [!NOTE]
-> When launched with `--readonly` / `-r`, all modifying operations (`a`, `e`, `d`, `y`, `C`, `v`, `t`, `K`) are locked with clear informational dialogs, making it completely safe for shared or production environments.
+> When launched with `--readonly` / `-r`, all modifying operations (`a`, `e`, `d`, `y`, `C`, `v`, `t`, `K`, `i`) are locked with clear informational dialogs, making it completely safe for shared or production environments.
+
 
 ---
 
@@ -336,6 +349,7 @@ This project is licensed under the [Apache-2.0 License](LICENSE).
   - `@Midas-sudo` — Wildcard pattern blocks
   - `@Mehrdad-Farshi` — SSH error diagnostics display
   - `@leleobhz` — CLI filter and direct connect options
+  - `@eznix86` — Import hosts from `~/.ssh/known_hosts` (CLI flag & bootstrap)
   - `@gonsalvesc` — XDG base directory specification support
   - `@levinion` — Copy SSH command shortcut
   - `@gaoyifan` — Persistent sort mode
