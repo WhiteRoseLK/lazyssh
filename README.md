@@ -55,6 +55,7 @@ If you are coming from **lazyssh**, here is a concrete summary of everything **n
 | **One-Touch SSH Key Deployment** | Automatically pushes your public SSH key to the remote host using native `ssh-copy-id` directly from the TUI. | <kbd>K</kbd> |
 | **Copy SSH Command** | Copies the full SSH connection command directly to your system clipboard. | <kbd>c</kbd> |
 | **Pre-Connect Command Hooks** | Run automated local scripts/hooks (VPN bring-up, Wake-on-LAN, bastion tunnels, token refresh) before connecting. Supports token expansions (`%h`, `%p`, `%r`, `%n`), environment variables, and config comment persistence (`# pre-connect: ...`). | `--pre-connect <cmd>` / UI form |
+| **Default SSH Identity Key** | Configure a global default private key (via CLI `--default-key <path>`, Git & SSH Keys Setup dialog, or `NEOSSH_DEFAULT_KEY`), automatically prefilling the identity file on new servers while allowing manual overrides. | `--default-key <path>` / UI form |
 | **SCP Command Generator** | Generates and copies ready-to-use `scp` upload and download command templates with port, identity key, and proxy jump arguments directly to your clipboard. | <kbd>o</kbd> / `--scp <alias>` |
 | **Paste SSH Command** | Parses any SSH command from system clipboard (flags, identity keys, ports, jump hosts) into an add-server modal with intelligent alias deduction and deduplication. | <kbd>v</kbd> |
 | **Duplicate / Clone Server** | Instantly clones any existing server configuration into the Add form with automatic alias deduplication (`srv_1`, `srv_2`), eliminating manual re-typing. | <kbd>y</kbd> / <kbd>C</kbd> |
@@ -138,6 +139,7 @@ If you are coming from **lazyssh**, here is a concrete summary of everything **n
 - 🐙 **Git SSH key configuration & profile switcher** (<kbd>P</kbd> or <kbd>Ctrl+G</kbd>): configure per-repository or global Git SSH keys via `core.sshCommand` for GitHub, GitLab, and Bitbucket.
 - 💬 **SSH key comment editor** (<kbd>C</kbd>): inspect and directly edit public/private key comments.
 - ⚡ **SSH Agent integration** (<kbd>l</kbd> / <kbd>u</kbd>): load or unload server identity keys directly into/from `ssh-agent`.
+- 🗝️ **Configurable Default Identity Key**: designate a default SSH private key (via CLI `--default-key <path>`, Git & SSH Keys Setup dialog, or `NEOSSH_DEFAULT_KEY`), automatically prefilling new servers.
 
 ### Internationalization & Localization (i18n)
 - 🌐 Multilingual user interface with native support for English (`en`), French (`fr`), and Simplified Chinese (`zh-CN`).
@@ -254,6 +256,7 @@ neossh [filter] [flags]
 | `--show-hidden` | `-H` | Display hidden servers in UI list | `false` |
 | `--scp <alias>` | | Generate SCP upload/download command templates for a server alias and copy to clipboard | `""` |
 | `--pre-connect <cmd>` | | Run local hook command before SSH connect (supports `%h`, `%p`, `%r`, `%n`) | `""` |
+| `--default-key <path>` | | Get or set default SSH identity key prefilled for new server entries | `""` |
 | `--sshconfig <path>` | | Specify custom path to SSH config file | `~/.ssh/config` |
 | `--readonly`, `--ssh-config-readonly` | `-r` | Run in read-only / viewer mode (prevents writing or modifying SSH configuration) | `false` |
 | `--exit-on-disconnect`, `--auto-exit` | `-x` | Exit `neossh` immediately after SSH session terminates (one-shot launcher) | `false` |
@@ -263,6 +266,12 @@ neossh [filter] [flags]
 ```bash
 # Launch normal interactive TUI:
 neossh
+
+# Set default SSH identity key for new servers:
+neossh --default-key ~/.ssh/id_ed25519
+
+# Check current default SSH identity key:
+neossh --default-key ""
 
 # Generate SCP command templates for a server alias:
 neossh --scp web-prod
@@ -481,4 +490,5 @@ This project is licensed under the [Apache-2.0 License](LICENSE).
   - `@mahyarmirrashed` — Numeric username validation support
   - `@vetash` — Automatic terminal and tab title integration
   - `@piRGoif` — SCP command generator modal and CLI helper
+  - `@pranav79` — Configurable default identity SSH key for new servers
   - `@arniom`, `@leoncamel`, `@breakersun`, `@OlalalalaO`, `@manato-tajiri`, `@komapro` — Bug fixes & documentation improvements

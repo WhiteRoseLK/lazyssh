@@ -32,4 +32,6 @@ type ServerRepository interface {
 	SaveTheme(theme string) error
 	GetPreConnectCommand() (string, error)
 	SavePreConnectCommand(cmd string) error
+	GetDefaultIdentityKey() (string, error)
+	SaveDefaultIdentityKey(key string) error
 }

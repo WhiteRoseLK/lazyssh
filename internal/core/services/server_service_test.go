@@ -34,6 +34,7 @@ type mockServerRepository struct {
 	recordCalls int
 	lastAlias   string
 	recordErr   error
+	defaultKey  string
 }
 
 func (m *mockServerRepository) ListServers(string) ([]domain.Server, error) {
@@ -69,6 +70,13 @@ func (m *mockServerRepository) SaveTheme(string) error { return nil }
 func (m *mockServerRepository) GetPreConnectCommand() (string, error) { return "", nil }
 
 func (m *mockServerRepository) SavePreConnectCommand(string) error { return nil }
+
+func (m *mockServerRepository) GetDefaultIdentityKey() (string, error) { return m.defaultKey, nil }
+
+func (m *mockServerRepository) SaveDefaultIdentityKey(k string) error {
+	m.defaultKey = k
+	return nil
+}
 
 func (m *mockServerRepository) RecordSSH(alias string) error {
 	m.recordCalls++
@@ -758,5 +766,51 @@ func TestServerService_GlobalPreConnectHook(t *testing.T) {
 	}
 	if executedCmd != "global-check.sh 10.0.0.5" {
 		t.Errorf("expected interpolated cmd 'global-check.sh 10.0.0.5', got %q", executedCmd)
+	}
+}
+
+func TestServerService_DefaultIdentityKey(t *testing.T) {
+	repo := &mockServerRepository{
+		defaultKey: "/home/user/.ssh/id_ed25519",
+	}
+	svc := NewServerService(zap.NewNop().Sugar(), repo)
+
+	// Test retrieval from repo
+	key, err := svc.GetDefaultIdentityKey()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if key != "/home/user/.ssh/id_ed25519" {
+		t.Errorf("expected '/home/user/.ssh/id_ed25519', got %q", key)
+	}
+
+	// Test saving to repo
+	newKey := "/home/user/.ssh/custom_rsa"
+	if err := svc.SaveDefaultIdentityKey(newKey); err != nil {
+		t.Fatalf("unexpected error saving key: %v", err)
+	}
+	if repo.defaultKey != newKey {
+		t.Errorf("expected repo key %q, got %q", newKey, repo.defaultKey)
+	}
+
+	// Test environment variable override NEOSSH_DEFAULT_KEY
+	t.Setenv("NEOSSH_DEFAULT_KEY", "/env/key1")
+	key, err = svc.GetDefaultIdentityKey()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if key != "/env/key1" {
+		t.Errorf("expected '/env/key1', got %q", key)
+	}
+
+	// Test environment variable override NEOSSH_DEFAULT_IDENTITY_KEY
+	t.Setenv("NEOSSH_DEFAULT_KEY", "")
+	t.Setenv("NEOSSH_DEFAULT_IDENTITY_KEY", "/env/key2")
+	key, err = svc.GetDefaultIdentityKey()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if key != "/env/key2" {
+		t.Errorf("expected '/env/key2', got %q", key)
 	}
 }

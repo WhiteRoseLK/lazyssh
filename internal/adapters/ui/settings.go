@@ -29,8 +29,9 @@ type settingsManager struct {
 }
 
 type uiSettings struct {
-	SortMode SortMode `json:"sort_mode,omitempty"`
-	Theme    string   `json:"theme,omitempty"`
+	SortMode           SortMode `json:"sort_mode,omitempty"`
+	Theme              string   `json:"theme,omitempty"`
+	DefaultIdentityKey string   `json:"default_identity_key,omitempty"`
 }
 
 func newSettingsManager(logger *zap.SugaredLogger) *settingsManager {
@@ -124,6 +125,33 @@ func (m *settingsManager) SaveTheme(theme string) error {
 	}
 
 	settings.Theme = theme
+	return m.save(settings)
+}
+
+func (m *settingsManager) LoadDefaultIdentityKey() (string, error) {
+	if m == nil {
+		return "", errors.New("nil settings manager")
+	}
+
+	settings, err := m.load()
+	if err != nil {
+		return "", err
+	}
+
+	return settings.DefaultIdentityKey, nil
+}
+
+func (m *settingsManager) SaveDefaultIdentityKey(key string) error {
+	if m == nil {
+		return errors.New("nil settings manager")
+	}
+
+	settings, err := m.load()
+	if err != nil {
+		return err
+	}
+
+	settings.DefaultIdentityKey = key
 	return m.save(settings)
 }
 

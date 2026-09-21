@@ -313,6 +313,25 @@ func (r *Repository) SavePreConnectCommand(cmd string) error {
 	return r.metadataManager.SaveSettings(settings)
 }
 
+// GetDefaultIdentityKey returns the default identity SSH key from settings.
+func (r *Repository) GetDefaultIdentityKey() (string, error) {
+	settings, err := r.metadataManager.GetSettings()
+	if err != nil {
+		return "", err
+	}
+	return settings.DefaultIdentityKey, nil
+}
+
+// SaveDefaultIdentityKey saves the default identity SSH key to settings.
+func (r *Repository) SaveDefaultIdentityKey(key string) error {
+	settings, err := r.metadataManager.GetSettings()
+	if err != nil {
+		settings = Settings{}
+	}
+	settings.DefaultIdentityKey = key
+	return r.metadataManager.SaveSettings(settings)
+}
+
 // LoadSettings loads application settings from the metadata file at the given path.
 // This is a standalone function for use during app initialization before the repository is created.
 func LoadSettings(metaDataPath string) (Settings, error) {

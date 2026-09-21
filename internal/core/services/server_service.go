@@ -969,6 +969,22 @@ func (s *serverService) SaveTheme(theme string) error {
 	return s.serverRepository.SaveTheme(theme)
 }
 
+// GetDefaultIdentityKey returns the default identity SSH key from environment or repository settings.
+func (s *serverService) GetDefaultIdentityKey() (string, error) {
+	if envKey := os.Getenv("NEOSSH_DEFAULT_KEY"); envKey != "" {
+		return envKey, nil
+	}
+	if envKey := os.Getenv("NEOSSH_DEFAULT_IDENTITY_KEY"); envKey != "" {
+		return envKey, nil
+	}
+	return s.serverRepository.GetDefaultIdentityKey()
+}
+
+// SaveDefaultIdentityKey saves the default identity SSH key to repository settings.
+func (s *serverService) SaveDefaultIdentityKey(key string) error {
+	return s.serverRepository.SaveDefaultIdentityKey(key)
+}
+
 const unknownLabel = "unknown"
 
 var psCommand = func() *exec.Cmd {

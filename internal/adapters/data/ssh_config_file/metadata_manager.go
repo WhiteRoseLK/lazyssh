@@ -27,8 +27,9 @@ import (
 
 // Settings contains application-level settings stored in the metadata file.
 type Settings struct {
-	Theme             string `json:"theme,omitempty"`
-	PreConnectCommand string `json:"pre_connect_command,omitempty"`
+	Theme              string `json:"theme,omitempty"`
+	PreConnectCommand  string `json:"pre_connect_command,omitempty"`
+	DefaultIdentityKey string `json:"default_identity_key,omitempty"`
 }
 
 type ServerMetadata struct {
