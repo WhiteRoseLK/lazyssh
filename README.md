@@ -38,6 +38,7 @@ If you are coming from **lazyssh**, here is a concrete summary of everything **n
 
 | Feature | Description | Shortcut / Usage |
 | :--- | :--- | :---: |
+| **CLI Pre-filtering & Direct Connect** | Launch pre-filtered (`neossh prod` or `-f prod`) to prevent exposing your entire server fleet during screen shares, or connect directly (`neossh -c <alias>`). | `neossh <filter>` / `-c` |
 | **Read-Only / Viewer Mode** | Protect production files with an immutable viewer mode. Blocks add, edit, delete, clone, paste, and key installs with an interactive indicator and notification. | `--readonly` / `-r` |
 | **Exit On Disconnect** | Automatically exits `neossh` when your SSH session terminates, providing a seamless one-shot terminal launcher experience. | `-x` / `--exit-on-disconnect` |
 | **Multi-Alias Directive Support** | Preserves and indexes all space-separated aliases on a single `Host` line (`Host web1 web2 staging`). Supports fuzzy search and connection by any defined alias without dropping them on writeback. | *Automatic* |
@@ -211,13 +212,16 @@ sudo mv neossh /usr/local/bin/
 `neossh` provides command line flags for automation, alternative configurations, and scripting:
 
 ```bash
-neossh [flags]
+neossh [filter] [flags]
 ```
 
 ### Options & Flags
 
 | Flag | Shorthand | Description | Default |
 | :--- | :---: | :--- | :---: |
+| `[filter]` | | Optional positional argument to pre-filter server list | `""` |
+| `--filter <pattern>` | `-f` | Pre-filter server list by alias, hostname, or tag | `""` |
+| `--connect` | `-c` | Connect directly to matching server without launching full TUI picker | `false` |
 | `--sshconfig <path>` | | Specify custom path to SSH config file | `~/.ssh/config` |
 | `--readonly`, `--ssh-config-readonly` | `-r` | Run in read-only / viewer mode (prevents writing or modifying SSH configuration) | `false` |
 | `--exit-on-disconnect`, `--auto-exit` | `-x` | Exit `neossh` immediately after SSH session terminates (one-shot launcher) | `false` |
@@ -227,6 +231,17 @@ neossh [flags]
 ```bash
 # Launch normal interactive TUI:
 neossh
+
+# Launch pre-filtered to "prod" servers (avoids exposing other servers on screen shares):
+neossh prod
+# or using flag:
+neossh -f prod
+
+# Connect directly via SSH to a specific server alias without opening the picker:
+neossh -c my-server
+
+# Combine direct connect with exit-on-disconnect:
+neossh -c -x my-server
 
 # Open in safe read-only viewer mode (modifications disabled):
 neossh -r
@@ -320,6 +335,7 @@ This project is licensed under the [Apache-2.0 License](LICENSE).
   - `@Ferdyverse` — Multi-alias `Host` lines support
   - `@Midas-sudo` — Wildcard pattern blocks
   - `@Mehrdad-Farshi` — SSH error diagnostics display
+  - `@leleobhz` — CLI filter and direct connect options
   - `@gonsalvesc` — XDG base directory specification support
   - `@levinion` — Copy SSH command shortcut
   - `@gaoyifan` — Persistent sort mode

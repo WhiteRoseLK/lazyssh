@@ -212,7 +212,8 @@ func TestHandlers_ReadOnlyBlocking(t *testing.T) {
 		ReadOnly: true,
 	}).(*tui)
 	uiApp.app = appInstance
-	uiApp.buildComponents().buildLayout()
+	uiApp.buildComponents()
+	uiApp.buildLayout()
 
 	// Verify updateListTitle includes [READONLY]
 	uiApp.updateListTitle()

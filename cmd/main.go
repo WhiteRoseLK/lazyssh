@@ -19,9 +19,13 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
+	"strings"
 
 	"github.com/WhiteRoseLK/neossh/internal/adapters/data/ssh_config_file"
 	"github.com/WhiteRoseLK/neossh/internal/adapters/ui"
+	"github.com/WhiteRoseLK/neossh/internal/core/domain"
+	"github.com/WhiteRoseLK/neossh/internal/core/ports"
 	"github.com/WhiteRoseLK/neossh/internal/core/services"
 	"github.com/WhiteRoseLK/neossh/internal/logger"
 	"github.com/spf13/cobra"
@@ -34,15 +38,17 @@ var (
 	sshConfigFile     string
 	exitOnDisconnect  bool
 	sshConfigReadonly bool
+	filterQuery       string
+	connectDirectly   bool
 
 	rootCmd = newRootCmd()
 )
 
 func newRootCmd() *cobra.Command {
-
 	cmd := &cobra.Command{
-		Use:   ui.AppName,
+		Use:   ui.AppName + " [filter]",
 		Short: "NeoSSH server picker TUI",
+		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			isReadonly := sshConfigReadonly
 			if ro, err := cmd.Flags().GetBool("readonly"); err == nil && ro {
@@ -50,6 +56,19 @@ func newRootCmd() *cobra.Command {
 			}
 			if ro, err := cmd.Flags().GetBool("ssh-config-readonly"); err == nil && ro {
 				isReadonly = true
+			}
+
+			filter := filterQuery
+			if len(args) > 0 {
+				filter = args[0]
+			}
+			if f, err := cmd.Flags().GetString("filter"); err == nil && f != "" {
+				filter = f
+			}
+
+			isConnect := connectDirectly
+			if c, err := cmd.Flags().GetBool("connect"); err == nil && c {
+				isConnect = true
 			}
 
 			log, err := logger.New("NEOSSH")
@@ -67,77 +86,37 @@ func newRootCmd() *cobra.Command {
 				os.Exit(1)
 			}
 
-			if sshConfigFile == "" {
-				sshConfigFile = filepath.Join(home, ".ssh", "config")
-			} else {
-				stat, err := os.Stat(sshConfigFile)
-				if err != nil {
-					fmt.Fprintf(os.Stderr, "Error getting file info: %v\n", err)
-					os.Exit(1)
-				}
-				if stat.Mode()&os.ModeType != 0 {
-					f, err := os.CreateTemp("", "tmpfile-")
-					if err != nil {
-						log.Fatal(err)
-					}
-
-					// close and remove the temporary file at the end of the program
-					defer func() {
-						_ = f.Close()
-						_ = os.Remove(f.Name())
-					}()
-
-					// write data to the temporary file
-					fd, err := os.Open(sshConfigFile) //nolint:gosec // G304: path comes from user flag, intentional
-					if err != nil {
-						fmt.Fprintf(os.Stderr, "Error opening file: %v\n", err)
-						os.Exit(1)
-					}
-					defer func() {
-						_ = fd.Close()
-					}()
-
-					// Read the entire contents at once
-					content, err := io.ReadAll(fd)
-					if err != nil {
-						fmt.Fprintf(os.Stderr, "Error reading file: %v\n", err)
-						os.Exit(1)
-					}
-					if _, err := f.WriteString(string(content)); err != nil {
-						log.Fatal(err)
-					}
-
-					sshConfigFile = f.Name()
-				}
-			}
-
-			configDir := filepath.Join(home, ".neossh")
-			if xdgConfig := os.Getenv("XDG_CONFIG_HOME"); xdgConfig != "" {
-				configDir = filepath.Join(xdgConfig, "neossh")
-			}
-			if err := os.MkdirAll(configDir, 0o750); err != nil {
-				log.Errorw("failed to create config directory", "error", err)
+			resolvedConfig, cleanup, err := resolveSSHConfigFile(home, sshConfigFile)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error resolving config file: %v\n", err)
 				os.Exit(1)
 			}
-			metaDataFile := filepath.Join(configDir, "metadata.json")
+			defer cleanup()
 
-			// Migrate metadata from legacy lazyssh if neossh metadata doesn't exist yet
-			if _, err := os.Stat(metaDataFile); os.IsNotExist(err) {
-				legacyFile := filepath.Join(home, ".lazyssh", "metadata.json")
-				if xdgConfig := os.Getenv("XDG_CONFIG_HOME"); xdgConfig != "" {
-					legacyFile = filepath.Join(xdgConfig, "lazyssh", "metadata.json")
-				}
-				//nolint:gosec // G304: path constructed from user home directory
-				if data, err := os.ReadFile(legacyFile); err == nil {
-					_ = os.WriteFile(metaDataFile, data, 0o600)
-				}
+			metaDataFile, err := ensureMetadataFile(home)
+			if err != nil {
+				log.Errorw("failed to setup metadata file", "error", err)
+				os.Exit(1)
 			}
 
-			serverRepo := ssh_config_file.NewRepository(log, sshConfigFile, metaDataFile)
+			serverRepo := ssh_config_file.NewRepository(log, resolvedConfig, metaDataFile)
 			serverService := services.NewServerService(log, serverRepo, services.WithReadOnly(isReadonly))
+
+			if isConnect {
+				connected, err := handleDirectConnect(filter, serverService)
+				if err != nil {
+					return err
+				}
+				if connected {
+					return nil
+				}
+				// If multiple matches without exact match, launch interactive TUI pre-filtered so user can choose
+			}
+
 			tui := ui.NewTUI(log, serverService, version, gitCommit, ui.Config{
 				ExitOnDisconnect: exitOnDisconnect,
 				ReadOnly:         isReadonly,
+				InitialFilter:    filter,
 			})
 
 			return tui.Run()
@@ -159,9 +138,123 @@ func newRootCmd() *cobra.Command {
 	cmd.PersistentFlags().BoolVarP(
 		&sshConfigReadonly, "readonly", "r", false, "run in read-only mode (alias for --ssh-config-readonly)",
 	)
+	cmd.PersistentFlags().StringVarP(
+		&filterQuery, "filter", "f", "", "pre-filter server list by alias, hostname, or tag",
+	)
+	cmd.PersistentFlags().BoolVarP(
+		&connectDirectly, "connect", "c", false, "connect directly to matching server without launching full TUI picker",
+	)
 
 	cmd.SilenceUsage = true
 	return cmd
+}
+
+func resolveSSHConfigFile(home, customPath string) (string, func(), error) {
+	if customPath == "" {
+		return filepath.Join(home, ".ssh", "config"), func() {}, nil
+	}
+
+	stat, err := os.Stat(customPath)
+	if err != nil {
+		return "", nil, err
+	}
+
+	if stat.Mode()&os.ModeType != 0 {
+		f, err := os.CreateTemp("", "tmpfile-")
+		if err != nil {
+			return "", nil, err
+		}
+
+		cleanup := func() {
+			_ = f.Close()
+			_ = os.Remove(f.Name())
+		}
+
+		fd, err := os.Open(customPath) //nolint:gosec // G304: path comes from user flag, intentional
+		if err != nil {
+			cleanup()
+			return "", nil, err
+		}
+		defer func() {
+			_ = fd.Close()
+		}()
+
+		content, err := io.ReadAll(fd)
+		if err != nil {
+			cleanup()
+			return "", nil, err
+		}
+		if _, err := f.WriteString(string(content)); err != nil {
+			cleanup()
+			return "", nil, err
+		}
+
+		return f.Name(), cleanup, nil
+	}
+
+	return customPath, func() {}, nil
+}
+
+func ensureMetadataFile(home string) (string, error) {
+	configDir := filepath.Join(home, ".neossh")
+	if xdgConfig := os.Getenv("XDG_CONFIG_HOME"); xdgConfig != "" {
+		configDir = filepath.Join(xdgConfig, "neossh")
+	}
+	if err := os.MkdirAll(configDir, 0o750); err != nil {
+		return "", err
+	}
+	metaDataFile := filepath.Join(configDir, "metadata.json")
+
+	// Migrate metadata from legacy lazyssh if neossh metadata doesn't exist yet
+	if _, err := os.Stat(metaDataFile); os.IsNotExist(err) {
+		legacyFile := filepath.Join(home, ".lazyssh", "metadata.json")
+		if xdgConfig := os.Getenv("XDG_CONFIG_HOME"); xdgConfig != "" {
+			legacyFile = filepath.Join(xdgConfig, "lazyssh", "metadata.json")
+		}
+		//nolint:gosec // G304: path constructed from user home directory
+		if data, err := os.ReadFile(legacyFile); err == nil {
+			_ = os.WriteFile(metaDataFile, data, 0o600)
+		}
+	}
+
+	return metaDataFile, nil
+}
+
+func handleDirectConnect(filter string, serverService ports.ServerService) (bool, error) {
+	if strings.TrimSpace(filter) == "" {
+		return false, fmt.Errorf("--connect requires a server alias or filter argument (e.g. neossh -c <alias>)")
+	}
+
+	matches, err := serverService.ListServers(filter)
+	if err != nil {
+		return false, fmt.Errorf("failed to query servers: %w", err)
+	}
+
+	var targetServer *domain.Server
+	for i := range matches {
+		if strings.EqualFold(matches[i].Alias, filter) || slices.ContainsFunc(matches[i].Aliases, func(a string) bool {
+			return strings.EqualFold(a, filter)
+		}) {
+			targetServer = &matches[i]
+			break
+		}
+	}
+	if targetServer == nil && len(matches) == 1 {
+		targetServer = &matches[0]
+	}
+
+	if targetServer != nil {
+		if targetServer.IsWildcardServer() {
+			return false, fmt.Errorf("cannot initiate direct SSH connection to wildcard pattern block '%s'", targetServer.Alias)
+		}
+		return true, serverService.SSH(targetServer.Alias)
+	}
+
+	if len(matches) == 0 {
+		return false, fmt.Errorf("no server matching '%s' found", filter)
+	}
+
+	return false, nil
 }
 
 func main() {

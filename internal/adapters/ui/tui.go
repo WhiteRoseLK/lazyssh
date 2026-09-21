@@ -16,6 +16,7 @@ package ui
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/gdamore/tcell/v2"
 	"go.uber.org/zap"
@@ -33,6 +34,7 @@ type App interface {
 type Config struct {
 	ExitOnDisconnect bool
 	ReadOnly         bool
+	InitialFilter    string
 }
 
 type tui struct {
@@ -59,14 +61,17 @@ type tui struct {
 	sortMode         SortMode
 	pingStatuses     map[string]domain.Server
 	exitOnDisconnect bool
+	initialFilter    string
 }
 
 func NewTUI(logger *zap.SugaredLogger, ss ports.ServerService, version, commit string, cfg ...Config) App {
 	var exitOnDisconnect bool
 	var readonly bool
+	var initialFilter string
 	if len(cfg) > 0 {
 		exitOnDisconnect = cfg[0].ExitOnDisconnect
 		readonly = cfg[0].ReadOnly
+		initialFilter = cfg[0].InitialFilter
 	}
 	return &tui{
 		logger:           logger,
@@ -78,7 +83,12 @@ func NewTUI(logger *zap.SugaredLogger, ss ports.ServerService, version, commit s
 		settings:         newSettingsManager(logger),
 		pingStatuses:     make(map[string]domain.Server),
 		exitOnDisconnect: exitOnDisconnect,
+		initialFilter:    initialFilter,
 	}
+}
+
+func (t *tui) InitialFilter() string {
+	return t.initialFilter
 }
 
 func (t *tui) IsReadOnly() bool {
@@ -110,7 +120,12 @@ func (t *tui) Run() error {
 		}
 	}()
 	t.app.EnableMouse(true)
-	t.initializeTheme().buildComponents().loadPreferences().buildLayout().bindEvents().loadInitialData()
+	t.initializeTheme()
+	t.buildComponents()
+	t.loadPreferences()
+	t.buildLayout()
+	t.bindEvents()
+	t.loadInitialData()
 	t.app.SetRoot(t.root, true)
 	t.logger.Infow("starting TUI application", "version", t.version, "commit", t.commit)
 	if err := t.app.Run(); err != nil {
@@ -120,7 +135,7 @@ func (t *tui) Run() error {
 	return nil
 }
 
-func (t *tui) initializeTheme() *tui {
+func (t *tui) initializeTheme() {
 	tview.Styles.PrimitiveBackgroundColor = tcell.Color232
 	tview.Styles.ContrastBackgroundColor = tcell.Color235
 	tview.Styles.BorderColor = tcell.Color238
@@ -129,10 +144,9 @@ func (t *tui) initializeTheme() *tui {
 	tview.Styles.TertiaryTextColor = tcell.Color245
 	tview.Styles.SecondaryTextColor = tcell.Color245
 	tview.Styles.GraphicsColor = tcell.Color238
-	return t
 }
 
-func (t *tui) buildComponents() *tui {
+func (t *tui) buildComponents() {
 	t.header = NewAppHeader(t.version, t.commit, RepoURL, t.readonly)
 	t.searchBar = NewSearchBar().
 		OnSearch(t.handleSearchInput).
@@ -148,13 +162,11 @@ func (t *tui) buildComponents() *tui {
 
 	// default sort mode
 	t.sortMode = SortByAliasAsc
-
-	return t
 }
 
-func (t *tui) loadPreferences() *tui {
+func (t *tui) loadPreferences() {
 	if t.settings == nil {
-		return t
+		return
 	}
 
 	if mode, err := t.settings.LoadSortMode(); err == nil {
@@ -162,11 +174,9 @@ func (t *tui) loadPreferences() *tui {
 	} else {
 		t.logger.Warnw("failed to load sort mode preference", "error", err)
 	}
-
-	return t
 }
 
-func (t *tui) buildLayout() *tui {
+func (t *tui) buildLayout() {
 	t.left = tview.NewFlex().SetDirection(tview.FlexRow).
 		AddItem(t.searchBar, 3, 0, false).
 		AddItem(t.serverList, 0, 1, true)
@@ -182,10 +192,9 @@ func (t *tui) buildLayout() *tui {
 		AddItem(t.header, 2, 0, false).
 		AddItem(t.content, 0, 1, true).
 		AddItem(t.statusBar, 1, 0, false)
-	return t
 }
 
-func (t *tui) bindEvents() *tui {
+func (t *tui) bindEvents() {
 	t.root.SetInputCapture(t.handleGlobalKeys)
 	t.app.SetBeforeDrawFunc(func(screen tcell.Screen) bool {
 		if t.serverList != nil {
@@ -193,16 +202,22 @@ func (t *tui) bindEvents() *tui {
 		}
 		return false
 	})
-	return t
 }
 
-func (t *tui) loadInitialData() *tui {
-	servers, _ := t.serverService.ListServers("")
-	sortServersForUI(servers, t.sortMode)
+func (t *tui) loadInitialData() {
+	query := t.initialFilter
+	servers, _ := t.serverService.ListServers(query)
+	if strings.TrimSpace(query) == "" {
+		sortServersForUI(servers, t.sortMode)
+	}
 	t.updateListTitle()
 	t.serverList.UpdateServers(servers)
-
-	return t
+	if query != "" {
+		t.searchBar.SetText(query)
+		if len(servers) == 0 {
+			t.details.ShowEmpty()
+		}
+	}
 }
 
 func (t *tui) updateListTitle() {
