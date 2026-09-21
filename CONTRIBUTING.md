@@ -42,6 +42,18 @@ Thank you for your interest in contributing to **neossh**! We welcome bug report
 
 ---
 
+## 📖 Documentation Requirements
+
+To ensure user documentation never goes stale:
+- Any PR introducing a **new feature**, **CLI flag**, **configuration directive**, or **keybinding** **MUST** include updates to `README.md` in the exact same pull request.
+- Specifically verify:
+  - `## ⚡ What's New & Fixed vs. lazyssh?` (Feature summary table)
+  - `## 💻 Command Line Usage` (CLI flag table and example usage)
+  - `## ⌨️ Keybindings` (Key table and any mode restrictions)
+  - `### Credits & Acknowledgments` (Attribution for external issue reporters/authors)
+
+---
+
 ## 💬 Conventional Commits
 
 We use **Conventional Commits** to automate our versioning, changelog generation, and releases via **Google Release Please**.

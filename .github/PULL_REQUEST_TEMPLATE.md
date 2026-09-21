@@ -21,4 +21,5 @@ Closes #
 - [ ] I have run `make quality` (or `golangci-lint run`) with no new warnings or errors.
 - [ ] I have run `go test ./...` and all tests pass.
 - [ ] I have added tests that prove my fix is effective or that my feature works.
+- [ ] 📖 Documentation: I have updated `README.md` (new flags, keybindings, features, or CLI options) if applicable.
 - [ ] My commit messages follow [Conventional Commits](https://www.conventionalcommits.org/) (e.g. `feat(ui): ...`, `fix(config): ...`).
