@@ -56,6 +56,7 @@ If you are coming from **lazyssh**, here is a concrete summary of everything **n
 | **Parallel Ping All** | Concurrently pings all configured servers in the background with real-time colored latency badges in the list: `[<50ms]` (green), `[<150ms]` (yellow), `[>150ms]` (red), or `[DOWN]` (red). | <kbd>G</kbd> |
 | **One-Touch SSH Key Deployment** | Automatically pushes your public SSH key to the remote host using native `ssh-copy-id` directly from the TUI. | <kbd>K</kbd> |
 | **Copy SSH Command** | Copies the full SSH connection command directly to your system clipboard. | <kbd>c</kbd> |
+| **Pre-Connect Command Hooks** | Run automated local scripts/hooks (VPN bring-up, Wake-on-LAN, bastion tunnels, token refresh) before connecting. Supports token expansions (`%h`, `%p`, `%r`, `%n`), environment variables, and config comment persistence (`# pre-connect: ...`). | `--pre-connect <cmd>` / UI form |
 | **SCP Command Generator** | Generates and copies ready-to-use `scp` upload and download command templates with port, identity key, and proxy jump arguments directly to your clipboard. | <kbd>o</kbd> / `--scp <alias>` |
 | **Paste SSH Command** | Parses any SSH command from system clipboard (flags, identity keys, ports, jump hosts) into an add-server modal with intelligent alias deduction and deduplication. | <kbd>v</kbd> |
 | **Duplicate / Clone Server** | Instantly clones any existing server configuration into the Add form with automatic alias deduplication (`srv_1`, `srv_2`), eliminating manual re-typing. | <kbd>y</kbd> / <kbd>C</kbd> |
@@ -254,6 +255,7 @@ neossh [filter] [flags]
 | `--lang <code>` | `-l` | Set interface language: `en`, `fr`, `zh-CN` (or via `NEOSSH_LANG`) | `""` *(English default)* |
 | `--show-hidden` | `-H` | Display hidden servers in UI list | `false` |
 | `--scp <alias>` | | Generate SCP upload/download command templates for a server alias and copy to clipboard | `""` |
+| `--pre-connect <cmd>` | | Run local hook command before SSH connect (supports `%h`, `%p`, `%r`, `%n`) | `""` |
 | `--sshconfig <path>` | | Specify custom path to SSH config file | `~/.ssh/config` |
 | `--readonly`, `--ssh-config-readonly` | `-r` | Run in read-only / viewer mode (prevents writing or modifying SSH configuration) | `false` |
 | `--exit-on-disconnect`, `--auto-exit` | `-x` | Exit `neossh` immediately after SSH session terminates (one-shot launcher) | `false` |
@@ -410,6 +412,40 @@ Host db-primary
 
 ---
 
+### 🪝 Pre-Connect Command Hooks
+
+`neossh` allows executing custom local commands or scripts right before connecting to an SSH host. This is particularly useful for:
+- 🛡️ Triggering corporate VPN connection scripts before dialing private IP ranges.
+- ⚡ Sending Wake-on-LAN (WOL) magic packets to spin up remote bare-metal hosts.
+- 🔑 Refreshing short-lived cloud credentials or MFA tokens (AWS SSM, Cloudflare Access, Okta).
+
+#### Configuration in `~/.ssh/config`
+Pre-connect hooks can be configured directly in SSH config comments using `# pre-connect:` or `# hook:`:
+
+```ssh-config
+Host vpn-internal # pre-connect: /usr/local/bin/vpn-connect.sh %h
+    HostName 10.10.0.50
+    User devops
+
+Host workstation-lab
+    # hook: wakeonlan 00:11:22:33:44:55
+    HostName 192.168.1.105
+    User admin
+```
+
+#### Token Expansion & Context Environment Variables
+Hook commands support tokens and environment variables:
+- `%h`: Remote Hostname / IP address
+- `%p`: Remote SSH Port
+- `%r`: Remote User
+- `%n`: Server Alias
+- `%%`: Literal `%`
+- Environment variables: `NEOSSH_ALIAS`, `NEOSSH_HOST`, `NEOSSH_PORT`, `NEOSSH_USER`
+
+If the pre-connect hook command exits with a non-zero exit code, the SSH connection is safely aborted and the error output is reported.
+
+---
+
 ## 🤝 Contributing
 
 Contributions are welcome! Feel free to open an [Issue](https://github.com/WhiteRoseLK/neossh/issues) or submit a Pull Request.
@@ -430,7 +466,7 @@ This project is licensed under the [Apache-2.0 License](LICENSE).
   - `@natefabian18` — `--exit-on-disconnect` session behavior
   - `@Ferdyverse` — Multi-alias `Host` lines support & SSH config tags comments
   - `@Q0`, `@Midas-sudo` — Server folders, nested grouping, and tmux session integration
-  - `@Midas-sudo` — Wildcard pattern blocks
+  - `@Midas-sudo` — Wildcard pattern blocks & pre-connect command hooks
   - `@Mehrdad-Farshi` — SSH error diagnostics display
   - `@leleobhz` — CLI filter and direct connect options
   - `@eznix86` — Import hosts from `~/.ssh/known_hosts` (CLI flag & bootstrap)

@@ -64,7 +64,7 @@ func formatDefaultValue(fieldName, value string) string {
 		return value + " seconds"
 	case "ControlPath", "ProxyJump", "ProxyCommand", "RemoteCommand",
 		"LocalForward", "RemoteForward", "DynamicForward",
-		"LocalCommand", "SendEnv", "SetEnv", "BindAddress", "BindInterface",
+		"PreConnectCommand", "LocalCommand", "SendEnv", "SetEnv", "BindAddress", "BindInterface",
 		"CanonicalDomains", "CanonicalizePermittedCNAMEs",
 		"PubkeyAcceptedAlgorithms", "HostbasedAcceptedAlgorithms",
 		"HostKeyAlgorithms", "Ciphers", "MACs", "KexAlgorithms":
@@ -643,6 +643,14 @@ var fieldHelpData = map[string]FieldHelp{
 	},
 
 	// Command execution
+	"PreConnectCommand": {
+		Field:       "PreConnectCommand",
+		Description: "Local script or command executed before initiating SSH connection. Supports %h, %p, %r, %n.",
+		Syntax:      "command",
+		Examples:    []string{"vpn-connect.sh %h", "wol %h", "fetch-iam-token.sh %n"},
+		Default:     "none",
+		Category:    "Command",
+	},
 	"LocalCommand": {
 		Field:       "LocalCommand",
 		Description: "Command to execute on local machine after connecting.",

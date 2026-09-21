@@ -604,3 +604,15 @@ func TestHandleSCPFlag(t *testing.T) {
 		t.Errorf("expected not found error, got %v", err)
 	}
 }
+
+func TestRootCmd_PreConnectFlag(t *testing.T) {
+	preConnectFlag = ""
+	cmd := newRootCmd()
+	err := cmd.ParseFlags([]string{"--pre-connect", "vpn-up.sh %h"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if preConnectFlag != "vpn-up.sh %h" {
+		t.Errorf("expected preConnectFlag=%q, got %q", "vpn-up.sh %h", preConnectFlag)
+	}
+}
