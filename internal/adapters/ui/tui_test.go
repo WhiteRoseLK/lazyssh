@@ -66,6 +66,16 @@ func (m *mockServerService) ImportKnownHosts(string) (domain.ImportResult, error
 	return domain.ImportResult{}, nil
 }
 
+func (m *mockServerService) SetHidden(alias string, hidden bool) error {
+	for i := range m.servers {
+		if m.servers[i].Alias == alias {
+			m.servers[i].Hidden = hidden
+			break
+		}
+	}
+	return nil
+}
+
 func TestNewTUI_ExitOnDisconnectConfig(t *testing.T) {
 	logger := zap.NewNop().Sugar()
 	svc := &mockServerService{}

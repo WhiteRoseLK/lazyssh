@@ -77,8 +77,12 @@ func normalizeGlobalHotkey(key rune) rune {
 		return 'v'
 	case 'y', 'Y':
 		return 'y'
-	case 'h', 'H':
+	case 'h':
 		return 'h'
+	case 'H':
+		return 'H'
+	case 'm', 'M':
+		return 'm'
 	case 'g':
 		return 'g'
 	case 'G':
@@ -119,6 +123,22 @@ func (t *tui) handleNavigationKey(key tcell.Key) bool {
 	}
 }
 
+func (t *tui) handleFocusKeys(cmd rune) bool {
+	switch cmd {
+	case '0', '/':
+		t.handleSearchFocus()
+		return true
+	case '1':
+		t.handleServerListFocus()
+		return true
+	case '2', '3':
+		t.handleDetailsFocus()
+		return true
+	default:
+		return false
+	}
+}
+
 func (t *tui) handleGlobalKeys(event *tcell.EventKey) *tcell.EventKey {
 	// Don't handle global keys when search has focus
 	if t.app.GetFocus() == t.searchBar {
@@ -129,29 +149,22 @@ func (t *tui) handleGlobalKeys(event *tcell.EventKey) *tcell.EventKey {
 		return nil
 	}
 
+	cmd := commandKey(event)
 	if t.readonly {
-		switch commandKey(event) {
-		case 'a', 'e', 'd', 'c', 'C', 'y', 'p', 'v', 'K', 't', 'i', 'I':
+		switch cmd {
+		case 'a', 'e', 'd', 'c', 'C', 'y', 'p', 'v', 'K', 't', 'i', 'I', 'm':
 			t.showReadonlyModal()
 			return nil
 		}
 	}
 
-	switch commandKey(event) {
-	case '0':
-		t.handleSearchFocus()
+	if t.handleFocusKeys(cmd) {
 		return nil
-	case '1':
-		t.handleServerListFocus()
-		return nil
-	case '2', '3':
-		t.handleDetailsFocus()
-		return nil
+	}
+
+	switch cmd {
 	case 'q':
 		t.handleQuit()
-		return nil
-	case '/':
-		t.handleSearchFocus()
 		return nil
 	case 'a':
 		t.handleServerAdd()
@@ -164,6 +177,12 @@ func (t *tui) handleGlobalKeys(event *tcell.EventKey) *tcell.EventKey {
 		return nil
 	case 'p':
 		t.handleServerPin()
+		return nil
+	case 'm':
+		t.handleToggleServerHidden()
+		return nil
+	case 'H':
+		t.handleToggleShowHidden()
 		return nil
 	case 's':
 		t.handleSortToggle()
@@ -228,6 +247,34 @@ func (t *tui) handleServerPin() {
 		_ = t.serverService.SetPinned(server.Alias, pinned)
 		t.refreshServerList()
 	}
+}
+
+func (t *tui) handleToggleServerHidden() {
+	if server, ok := t.serverList.GetSelectedServer(); ok {
+		newHidden := !server.Hidden
+		if err := t.serverService.SetHidden(server.Alias, newHidden); err != nil {
+			t.showStatusTempColor("Failed to toggle hidden: "+err.Error(), "#FF6B6B")
+			return
+		}
+		if newHidden {
+			t.showStatusTemp("Hidden: " + server.Alias)
+		} else {
+			t.showStatusTemp("Unhidden: " + server.Alias)
+		}
+		t.refreshServerList()
+		t.updateListTitle()
+	}
+}
+
+func (t *tui) handleToggleShowHidden() {
+	t.showHidden = !t.showHidden
+	if t.showHidden {
+		t.showStatusTemp("Showing hidden servers")
+	} else {
+		t.showStatusTemp("Hiding hidden servers")
+	}
+	t.refreshServerList()
+	t.updateListTitle()
 }
 
 func (t *tui) handleSortToggle() {
@@ -381,8 +428,9 @@ func (t *tui) handleSearchInput(query string) {
 	if strings.TrimSpace(query) == "" {
 		sortServersForUI(filtered, t.sortMode)
 	}
-	t.serverList.UpdateServers(filtered)
-	if len(filtered) == 0 {
+	displayServers := t.filterServersForDisplay(filtered)
+	t.serverList.UpdateServers(displayServers)
+	if len(displayServers) == 0 {
 		t.details.ShowEmpty()
 	}
 }
@@ -713,6 +761,7 @@ func (t *tui) handleServerSave(server domain.Server, original *domain.Server) {
 					t.showStatusTempColor("Save failed: "+err.Error(), "#FF6B6B")
 					return
 				}
+				_ = t.serverService.SetHidden(newCopy.Alias, newCopy.Hidden)
 				t.showStatusTemp(fmt.Sprintf("Updated %s in %s", newCopy.Alias, chosen))
 				t.refreshServerList()
 				t.handleFormCancel()
@@ -727,6 +776,8 @@ func (t *tui) handleServerSave(server domain.Server, original *domain.Server) {
 		t.app.SetRoot(modal, true)
 		return
 	}
+
+	_ = t.serverService.SetHidden(server.Alias, server.Hidden)
 
 	if server.SourceFile != "" {
 		verb := "Added"
@@ -1326,7 +1377,7 @@ func (t *tui) refreshServerList() {
 	if strings.TrimSpace(query) == "" {
 		sortServersForUI(filtered, t.sortMode)
 	}
-	t.serverList.UpdateServers(filtered)
+	t.serverList.UpdateServers(t.filterServersForDisplay(filtered))
 }
 
 func (t *tui) returnToMain() {

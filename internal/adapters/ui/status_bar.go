@@ -20,11 +20,11 @@ import (
 )
 
 func DefaultStatusText() string {
-	return "[white]Tab[-] Panels  • [white]↑↓[-] Navigate  • [white]Enter[-] SSH  • [white]f[-] Forward  • [white]x[-] Stop Forward  • [white]c[-] Copy SSH  • [white]v[-] Paste SSH  • [white]y[-] Clone  • [white]h[-] Copy Host  • [white]a[-] Add  • [white]e[-] Edit  • [white]g/G[-] Ping (All)  • [white]K[-] Install Key  • [white]d[-] Delete  • [white]p[-] Pin/Unpin  • [white]i[-] Import  • [white]/[-] Search  • [white]q[-] Quit"
+	return "[white]Tab[-] Panels  • [white]↑↓[-] Navigate  • [white]Enter[-] SSH  • [white]f[-] Forward  • [white]x[-] Stop Forward  • [white]c[-] Copy SSH  • [white]v[-] Paste SSH  • [white]y[-] Clone  • [white]h[-] Copy Host  • [white]m[-] Hide  • [white]H[-] Toggle Hidden  • [white]a[-] Add  • [white]e[-] Edit  • [white]g/G[-] Ping (All)  • [white]K[-] Install Key  • [white]d[-] Delete  • [white]p[-] Pin/Unpin  • [white]i[-] Import  • [white]/[-] Search  • [white]q[-] Quit"
 }
 
 func ReadonlyStatusText() string {
-	return "[white]Tab[-] Panels  • [white]↑↓[-] Navigate  • [white]Enter[-] SSH  • [white]f[-] Forward  • [white]x[-] Stop Forward  • [white]c[-] Copy SSH  • [white]h[-] Copy Host  • [white]g/G[-] Ping (All)  • [white]p[-] Pin/Unpin  • [white]/[-] Search  • [white]q[-] Quit  • [red::b][READONLY][-]"
+	return "[white]Tab[-] Panels  • [white]↑↓[-] Navigate  • [white]Enter[-] SSH  • [white]f[-] Forward  • [white]x[-] Stop Forward  • [white]c[-] Copy SSH  • [white]h[-] Copy Host  • [white]H[-] Toggle Hidden  • [white]g/G[-] Ping (All)  • [white]p[-] Pin/Unpin  • [white]/[-] Search  • [white]q[-] Quit  • [red::b][READONLY][-]"
 }
 
 func StatusText(readonly bool) string {

@@ -55,6 +55,8 @@ func (m *mockServerRepository) DeleteServer(domain.Server) error { return nil }
 
 func (m *mockServerRepository) SetPinned(string, bool) error { return nil }
 
+func (m *mockServerRepository) SetHidden(string, bool) error { return nil }
+
 func (m *mockServerRepository) GetConfigFile() string { return "~/.ssh/config" }
 
 func (m *mockServerRepository) RecordSSH(alias string) error {
@@ -404,6 +406,11 @@ func TestServerService_ReadOnlyMode(t *testing.T) {
 		t.Fatalf("ImportKnownHosts in readonly mode: expected ErrReadOnly, got %v", err)
 	}
 
+	// SetHidden should fail with ErrReadOnly
+	if err := svc.SetHidden("existing-srv", true); !errors.Is(err, ErrReadOnly) {
+		t.Fatalf("SetHidden in readonly mode: expected ErrReadOnly, got %v", err)
+	}
+
 	// DiscoverKnownHosts should succeed in readonly mode (non-modifying)
 	discovered, res, err := svc.DiscoverKnownHosts("/dummy/known_hosts")
 	if err != nil {
@@ -434,5 +441,15 @@ func TestServerService_ImportKnownHosts_NormalMode(t *testing.T) {
 	}
 	if res.Discovered != 2 || res.Imported != 1 || res.Skipped != 1 {
 		t.Fatalf("unexpected ImportResult: %+v", res)
+	}
+}
+
+func TestServerService_SetHidden_NormalMode(t *testing.T) {
+	logger := zap.NewNop().Sugar()
+	mockRepo := &mockServerRepository{}
+	svc := NewServerService(logger, mockRepo, WithReadOnly(false))
+
+	if err := svc.SetHidden("existing-srv", true); err != nil {
+		t.Fatalf("SetHidden failed in normal mode: %v", err)
 	}
 }

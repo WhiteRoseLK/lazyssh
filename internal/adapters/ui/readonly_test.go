@@ -57,6 +57,10 @@ func (m *mockReadOnlyService) SetPinned(alias string, pinned bool) error {
 	return nil
 }
 
+func (m *mockReadOnlyService) SetHidden(alias string, hidden bool) error {
+	return nil
+}
+
 func (m *mockReadOnlyService) SSH(alias string) error {
 	return nil
 }

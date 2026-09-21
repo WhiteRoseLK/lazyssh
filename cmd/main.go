@@ -42,6 +42,7 @@ var (
 	connectDirectly   bool
 	importKnownHosts  bool
 	knownHostsFile    string
+	showHidden        bool
 
 	rootCmd = newRootCmd()
 )
@@ -150,6 +151,7 @@ func newRootCmd() *cobra.Command {
 				ExitOnDisconnect: exitOnDisconnect,
 				ReadOnly:         isReadonly,
 				InitialFilter:    filter,
+				ShowHidden:       showHidden,
 			})
 
 			return tui.Run()
@@ -182,6 +184,9 @@ func newRootCmd() *cobra.Command {
 	)
 	cmd.PersistentFlags().StringVar(
 		&knownHostsFile, "known-hosts", "", "path to known_hosts file (default: ~/.ssh/known_hosts)",
+	)
+	cmd.PersistentFlags().BoolVarP(
+		&showHidden, "show-hidden", "H", false, "display hidden servers in UI list",
 	)
 
 	cmd.SilenceUsage = true

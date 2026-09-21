@@ -414,6 +414,16 @@ func (r *Repository) mergeMetadata(servers []domain.Server, metadata map[string]
 					servers[i].PinnedAt = pinnedAt
 				}
 			}
+
+			if meta.Hidden {
+				servers[i].Hidden = true
+			}
+		}
+
+		if slices.ContainsFunc(servers[i].Tags, func(t string) bool {
+			return strings.EqualFold(t, "hidden")
+		}) {
+			servers[i].Hidden = true
 		}
 	}
 	return servers

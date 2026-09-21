@@ -133,6 +133,14 @@ func formatServerLine(s domain.Server, maxAliasWidth int, width int) (primary, s
 			tagBadges = wildcardBadge
 		}
 	}
+	if s.Hidden {
+		hiddenBadge := "[#6B7280][hidden][-]"
+		if tagBadges != "" {
+			tagBadges = hiddenBadge + " " + tagBadges
+		} else {
+			tagBadges = hiddenBadge
+		}
+	}
 
 	// Use a consistent color for alias; host/IP fixed width; then forwarding column
 	mainText := fmt.Sprintf("%s [white::b]%s[-] [#AAAAAA]%-18s[-] %s [#888888]Last SSH: %-8s[-]  %s", icon, paddedAlias, s.Host, fCol, humanizeDuration(s.LastSeen), tagBadges)

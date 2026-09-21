@@ -33,6 +33,7 @@ type Server struct {
 	PingStatus    string        // "up", "down", "checking", or ""
 	PingLatency   time.Duration // ping latency
 	IsWildcard    bool          // indicates wildcard pattern block (Host containing * or ?)
+	Hidden        bool          // indicates server is marked hidden from the primary UI list
 
 	// Additional SSH config fields
 	// Connection and proxy settings
