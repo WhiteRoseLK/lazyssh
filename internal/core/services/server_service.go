@@ -356,6 +356,9 @@ func (s *serverService) SetPinned(alias string, pinned bool) error {
 // SSH starts an interactive SSH session to the given alias using the system's ssh client.
 func (s *serverService) SSH(alias string) error {
 	s.logger.Infow("ssh start", "alias", alias)
+	if strings.ContainsAny(alias, "*?") {
+		return fmt.Errorf("cannot initiate direct SSH connection to a wildcard pattern block")
+	}
 	cmdFactory := s.newSSHCommand
 	if cmdFactory == nil {
 		cmdFactory = func(a string) *exec.Cmd {
@@ -397,6 +400,9 @@ func (s *serverService) SSH(alias string) error {
 // SSHWithArgs runs system ssh with provided extra args (e.g., -L/-R/-D) for the given alias.
 func (s *serverService) SSHWithArgs(alias string, extraArgs []string) error {
 	s.logger.Infow("ssh start (with args)", "alias", alias, "args", extraArgs)
+	if strings.ContainsAny(alias, "*?") {
+		return fmt.Errorf("cannot initiate direct SSH connection to a wildcard pattern block")
+	}
 	cmdFactory := s.newSSHCommandWithArgs
 	if cmdFactory == nil {
 		cmdFactory = func(a string, extra []string) *exec.Cmd {
@@ -501,6 +507,9 @@ func (b *limitedBuffer) String() string {
 // CopySSHKey installs public SSH keys to the remote host using ssh-copy-id.
 func (s *serverService) CopySSHKey(alias string) error {
 	s.logger.Infow("ssh-copy-id start", "alias", alias)
+	if strings.ContainsAny(alias, "*?") {
+		return fmt.Errorf("cannot install SSH key to a wildcard pattern block")
+	}
 
 	if _, err := exec.LookPath("ssh-copy-id"); err != nil {
 		s.logger.Errorw("ssh-copy-id missing", "error", err)
@@ -650,6 +659,9 @@ func (s *serverService) IsForwarding(alias string) bool {
 
 // Ping checks if the server is reachable on its SSH port.
 func (s *serverService) Ping(server domain.Server) (bool, time.Duration, error) {
+	if server.IsWildcardServer() {
+		return false, 0, fmt.Errorf("cannot ping a wildcard pattern block")
+	}
 	start := time.Now()
 
 	host, port, ok := resolveSSHDestination(server.Alias)

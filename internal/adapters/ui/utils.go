@@ -123,8 +123,19 @@ func formatServerLine(s domain.Server, maxAliasWidth int, width int) (primary, s
 	if aliasWidth < maxAliasWidth {
 		paddedAlias = s.Alias + strings.Repeat(" ", maxAliasWidth-aliasWidth)
 	}
+
+	tagBadges := renderTagBadgesForList(s.Tags)
+	if s.IsWildcardServer() {
+		wildcardBadge := "[#E5C07B][wildcard][-]"
+		if tagBadges != "" {
+			tagBadges = wildcardBadge + " " + tagBadges
+		} else {
+			tagBadges = wildcardBadge
+		}
+	}
+
 	// Use a consistent color for alias; host/IP fixed width; then forwarding column
-	mainText := fmt.Sprintf("%s [white::b]%s[-] [#AAAAAA]%-18s[-] %s [#888888]Last SSH: %-8s[-]  %s", icon, paddedAlias, s.Host, fCol, humanizeDuration(s.LastSeen), renderTagBadgesForList(s.Tags))
+	mainText := fmt.Sprintf("%s [white::b]%s[-] [#AAAAAA]%-18s[-] %s [#888888]Last SSH: %-8s[-]  %s", icon, paddedAlias, s.Host, fCol, humanizeDuration(s.LastSeen), tagBadges)
 
 	// Format ping status
 	pingIndicator := ""

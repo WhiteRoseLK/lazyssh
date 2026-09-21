@@ -40,10 +40,13 @@ func (r *Repository) toDomainServer(lc *loadedConfig) []domain.Server {
 
 	for _, cf := range lc.files {
 		for _, host := range cf.cfg.Hosts {
+			if host.Implicit {
+				continue
+			}
 			aliases := make([]string, 0, len(host.Patterns))
 			for _, pattern := range host.Patterns {
 				alias := pattern.String()
-				if strings.ContainsAny(alias, "!*?[]") {
+				if strings.HasPrefix(alias, "!") {
 					continue
 				}
 				aliases = append(aliases, alias)
@@ -62,6 +65,7 @@ func (r *Repository) toDomainServer(lc *loadedConfig) []domain.Server {
 
 			if idx == -1 {
 				primaryAlias := aliases[0]
+				isWildcard := strings.ContainsAny(primaryAlias, "*?")
 				servers = append(servers, domain.Server{
 					Alias:         primaryAlias,
 					Aliases:       aliases,
@@ -69,6 +73,7 @@ func (r *Repository) toDomainServer(lc *loadedConfig) []domain.Server {
 					IdentityFiles: []string{},
 					SourceFile:    cf.path,
 					SourceFiles:   []string{cf.path},
+					IsWildcard:    isWildcard,
 				})
 				idx = len(servers) - 1
 				seenKeys[idx] = make(map[string]bool)
@@ -99,6 +104,10 @@ func (r *Repository) toDomainServer(lc *loadedConfig) []domain.Server {
 				}
 				r.mapKVToServer(&servers[idx], kvNode)
 				seen[key] = true
+			}
+
+			if strings.ContainsAny(servers[idx].Host, "*?") || strings.ContainsAny(servers[idx].Alias, "*?") {
+				servers[idx].IsWildcard = true
 			}
 		}
 	}

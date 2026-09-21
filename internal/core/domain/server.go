@@ -14,7 +14,10 @@
 
 package domain
 
-import "time"
+import (
+	"strings"
+	"time"
+)
 
 type Server struct {
 	Alias         string
@@ -29,6 +32,7 @@ type Server struct {
 	SSHCount      int
 	PingStatus    string        // "up", "down", "checking", or ""
 	PingLatency   time.Duration // ping latency
+	IsWildcard    bool          // indicates wildcard pattern block (Host containing * or ?)
 
 	// Additional SSH config fields
 	// Connection and proxy settings
@@ -125,4 +129,15 @@ type Server struct {
 	// OpenSSH precedence order. A length > 1 means the alias is defined in
 	// multiple files; the UI uses this to prompt on edit/delete.
 	SourceFiles []string
+}
+
+// IsWildcardPattern reports whether the given pattern contains wildcard characters (* or ?).
+func IsWildcardPattern(pattern string) bool {
+	return strings.ContainsAny(pattern, "*?")
+}
+
+// IsWildcardServer reports whether the server represents a wildcard pattern block
+// (e.g. Host * or Host *.internal.example.com).
+func (s Server) IsWildcardServer() bool {
+	return s.IsWildcard || strings.ContainsAny(s.Alias, "*?") || strings.ContainsAny(s.Host, "*?")
 }
