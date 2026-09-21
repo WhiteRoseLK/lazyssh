@@ -229,3 +229,29 @@ func TestShowPortForwardForm_ForwardSSH_ExitOnDisconnectFalse(t *testing.T) {
 		// Expected: app is still running
 	}
 }
+
+func TestNewTUI_InitialFilterConfig(t *testing.T) {
+	logger := zap.NewNop().Sugar()
+	srv := domain.Server{Alias: "srv-prod", Host: "1.2.3.4", Port: 22, User: "root"}
+	svc := &mockServerService{servers: []domain.Server{srv}}
+
+	app := NewTUI(logger, svc, "v1.0.0", "abc", Config{
+		InitialFilter: "srv-prod",
+	}).(*tui)
+
+	if app.InitialFilter() != "srv-prod" {
+		t.Errorf("expected InitialFilter to be 'srv-prod', got %q", app.InitialFilter())
+	}
+
+	app.buildComponents().loadPreferences().buildLayout().bindEvents().loadInitialData()
+
+	// Verify searchBar text is set
+	if app.searchBar.GetText() != "srv-prod" {
+		t.Errorf("expected searchBar text to be 'srv-prod', got %q", app.searchBar.GetText())
+	}
+
+	// Verify server list has been populated
+	if app.serverList.GetItemCount() == 0 {
+		t.Errorf("expected server list to have at least 1 server item")
+	}
+}

@@ -151,3 +151,80 @@ func TestRootCmd_ReadOnlyFlags(t *testing.T) {
 		})
 	}
 }
+
+func TestRootCmd_FilterAndConnectFlags(t *testing.T) {
+	cmd := newRootCmd()
+
+	filterFlag := cmd.PersistentFlags().Lookup("filter")
+	if filterFlag == nil {
+		t.Fatal("expected persistent flag --filter to exist")
+	}
+	if filterFlag.Shorthand != "f" {
+		t.Errorf("expected shorthand 'f', got %q", filterFlag.Shorthand)
+	}
+
+	connectFlag := cmd.PersistentFlags().Lookup("connect")
+	if connectFlag == nil {
+		t.Fatal("expected persistent flag --connect to exist")
+	}
+	if connectFlag.Shorthand != "c" {
+		t.Errorf("expected shorthand 'c', got %q", connectFlag.Shorthand)
+	}
+}
+
+func TestRootCmd_FilterParsing(t *testing.T) {
+	tests := []struct {
+		name            string
+		args            []string
+		expectedFilter  string
+		expectedConnect bool
+	}{
+		{
+			name:            "default no filter",
+			args:            []string{},
+			expectedFilter:  "",
+			expectedConnect: false,
+		},
+		{
+			name:            "flag --filter",
+			args:            []string{"--filter", "prod-web"},
+			expectedFilter:  "prod-web",
+			expectedConnect: false,
+		},
+		{
+			name:            "flag -f",
+			args:            []string{"-f", "staging"},
+			expectedFilter:  "staging",
+			expectedConnect: false,
+		},
+		{
+			name:            "flag --connect",
+			args:            []string{"--connect"},
+			expectedFilter:  "",
+			expectedConnect: true,
+		},
+		{
+			name:            "flag -c with -f",
+			args:            []string{"-c", "-f", "my-server"},
+			expectedFilter:  "my-server",
+			expectedConnect: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			filterQuery = ""
+			connectDirectly = false
+			cmd := newRootCmd()
+			if err := cmd.ParseFlags(tt.args); err != nil {
+				t.Fatalf("unexpected error parsing flags %v: %v", tt.args, err)
+			}
+			if filterQuery != tt.expectedFilter {
+				t.Errorf("filterQuery = %q, want %q", filterQuery, tt.expectedFilter)
+			}
+			if connectDirectly != tt.expectedConnect {
+				t.Errorf("connectDirectly = %v, want %v", connectDirectly, tt.expectedConnect)
+			}
+		})
+	}
+}

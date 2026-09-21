@@ -19,9 +19,12 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
+	"strings"
 
 	"github.com/WhiteRoseLK/neossh/internal/adapters/data/ssh_config_file"
 	"github.com/WhiteRoseLK/neossh/internal/adapters/ui"
+	"github.com/WhiteRoseLK/neossh/internal/core/domain"
 	"github.com/WhiteRoseLK/neossh/internal/core/services"
 	"github.com/WhiteRoseLK/neossh/internal/logger"
 	"github.com/spf13/cobra"
@@ -34,15 +37,17 @@ var (
 	sshConfigFile     string
 	exitOnDisconnect  bool
 	sshConfigReadonly bool
+	filterQuery       string
+	connectDirectly   bool
 
 	rootCmd = newRootCmd()
 )
 
 func newRootCmd() *cobra.Command {
-
 	cmd := &cobra.Command{
-		Use:   ui.AppName,
+		Use:   ui.AppName + " [filter]",
 		Short: "NeoSSH server picker TUI",
+		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			isReadonly := sshConfigReadonly
 			if ro, err := cmd.Flags().GetBool("readonly"); err == nil && ro {
@@ -50,6 +55,19 @@ func newRootCmd() *cobra.Command {
 			}
 			if ro, err := cmd.Flags().GetBool("ssh-config-readonly"); err == nil && ro {
 				isReadonly = true
+			}
+
+			filter := filterQuery
+			if len(args) > 0 {
+				filter = args[0]
+			}
+			if f, err := cmd.Flags().GetString("filter"); err == nil && f != "" {
+				filter = f
+			}
+
+			isConnect := connectDirectly
+			if c, err := cmd.Flags().GetBool("connect"); err == nil && c {
+				isConnect = true
 			}
 
 			log, err := logger.New("NEOSSH")
@@ -135,9 +153,45 @@ func newRootCmd() *cobra.Command {
 
 			serverRepo := ssh_config_file.NewRepository(log, sshConfigFile, metaDataFile)
 			serverService := services.NewServerService(log, serverRepo, services.WithReadOnly(isReadonly))
+
+			if isConnect {
+				if strings.TrimSpace(filter) == "" {
+					return fmt.Errorf("--connect requires a server alias or filter argument (e.g. neossh -c <alias>)")
+				}
+				matches, err := serverService.ListServers(filter)
+				if err != nil {
+					return fmt.Errorf("failed to query servers: %w", err)
+				}
+				var targetServer *domain.Server
+				for i := range matches {
+					if strings.EqualFold(matches[i].Alias, filter) || slices.ContainsFunc(matches[i].Aliases, func(a string) bool {
+						return strings.EqualFold(a, filter)
+					}) {
+						targetServer = &matches[i]
+						break
+					}
+				}
+				if targetServer == nil && len(matches) == 1 {
+					targetServer = &matches[0]
+				}
+
+				if targetServer != nil {
+					if targetServer.IsWildcardServer() {
+						return fmt.Errorf("cannot initiate direct SSH connection to wildcard pattern block '%s'", targetServer.Alias)
+					}
+					return serverService.SSH(targetServer.Alias)
+				}
+
+				if len(matches) == 0 {
+					return fmt.Errorf("no server matching '%s' found", filter)
+				}
+				// If multiple matches without exact match, launch interactive TUI pre-filtered so user can choose
+			}
+
 			tui := ui.NewTUI(log, serverService, version, gitCommit, ui.Config{
 				ExitOnDisconnect: exitOnDisconnect,
 				ReadOnly:         isReadonly,
+				InitialFilter:    filter,
 			})
 
 			return tui.Run()
@@ -158,6 +212,12 @@ func newRootCmd() *cobra.Command {
 	)
 	cmd.PersistentFlags().BoolVarP(
 		&sshConfigReadonly, "readonly", "r", false, "run in read-only mode (alias for --ssh-config-readonly)",
+	)
+	cmd.PersistentFlags().StringVarP(
+		&filterQuery, "filter", "f", "", "pre-filter server list by alias, hostname, or tag",
+	)
+	cmd.PersistentFlags().BoolVarP(
+		&connectDirectly, "connect", "c", false, "connect directly to matching server without launching full TUI picker",
 	)
 
 	cmd.SilenceUsage = true

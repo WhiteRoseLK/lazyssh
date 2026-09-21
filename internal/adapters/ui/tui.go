@@ -16,6 +16,7 @@ package ui
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/gdamore/tcell/v2"
 	"go.uber.org/zap"
@@ -33,6 +34,7 @@ type App interface {
 type Config struct {
 	ExitOnDisconnect bool
 	ReadOnly         bool
+	InitialFilter    string
 }
 
 type tui struct {
@@ -59,14 +61,17 @@ type tui struct {
 	sortMode         SortMode
 	pingStatuses     map[string]domain.Server
 	exitOnDisconnect bool
+	initialFilter    string
 }
 
 func NewTUI(logger *zap.SugaredLogger, ss ports.ServerService, version, commit string, cfg ...Config) App {
 	var exitOnDisconnect bool
 	var readonly bool
+	var initialFilter string
 	if len(cfg) > 0 {
 		exitOnDisconnect = cfg[0].ExitOnDisconnect
 		readonly = cfg[0].ReadOnly
+		initialFilter = cfg[0].InitialFilter
 	}
 	return &tui{
 		logger:           logger,
@@ -78,7 +83,12 @@ func NewTUI(logger *zap.SugaredLogger, ss ports.ServerService, version, commit s
 		settings:         newSettingsManager(logger),
 		pingStatuses:     make(map[string]domain.Server),
 		exitOnDisconnect: exitOnDisconnect,
+		initialFilter:    initialFilter,
 	}
+}
+
+func (t *tui) InitialFilter() string {
+	return t.initialFilter
 }
 
 func (t *tui) IsReadOnly() bool {
@@ -197,10 +207,19 @@ func (t *tui) bindEvents() *tui {
 }
 
 func (t *tui) loadInitialData() *tui {
-	servers, _ := t.serverService.ListServers("")
-	sortServersForUI(servers, t.sortMode)
+	query := t.initialFilter
+	servers, _ := t.serverService.ListServers(query)
+	if strings.TrimSpace(query) == "" {
+		sortServersForUI(servers, t.sortMode)
+	}
 	t.updateListTitle()
 	t.serverList.UpdateServers(servers)
+	if query != "" {
+		t.searchBar.SetText(query)
+		if len(servers) == 0 {
+			t.details.ShowEmpty()
+		}
+	}
 
 	return t
 }
