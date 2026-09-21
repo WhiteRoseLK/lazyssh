@@ -74,6 +74,7 @@ func (r *Repository) toDomainServer(lc *loadedConfig) []domain.Server {
 					SourceFile:    cf.path,
 					SourceFiles:   []string{cf.path},
 					IsWildcard:    isWildcard,
+					Tags:          extractHostTags(host),
 				})
 				idx = len(servers) - 1
 				seenKeys[idx] = make(map[string]bool)
@@ -89,6 +90,11 @@ func (r *Repository) toDomainServer(lc *loadedConfig) []domain.Server {
 						servers[idx].Aliases = append(servers[idx].Aliases, a)
 					}
 					byAlias[a] = idx
+				}
+				for _, tag := range extractHostTags(host) {
+					if !slices.Contains(servers[idx].Tags, tag) {
+						servers[idx].Tags = append(servers[idx].Tags, tag)
+					}
 				}
 			}
 
@@ -389,7 +395,9 @@ func (r *Repository) mergeMetadata(servers []domain.Server, metadata map[string]
 		}
 
 		if exists {
-			servers[i].Tags = meta.Tags
+			if len(servers[i].Tags) == 0 {
+				servers[i].Tags = meta.Tags
+			}
 			servers[i].SSHCount = meta.SSHCount
 			if meta.File != "" {
 				servers[i].SourceFile = meta.File

@@ -147,6 +147,9 @@ func (r *Repository) createHostFromServer(server domain.Server) *ssh_config.Host
 		EOLComment:         "Added by neossh",
 		SpaceBeforeComment: strings.Repeat(" ", 4),
 	}
+	if len(server.Tags) > 0 {
+		host.EOLComment = " " + formatTagsComment(server.Tags)
+	}
 
 	// Basic config - always present
 	r.addKVNodeIfNotEmpty(host, "HostName", server.Host)
@@ -404,6 +407,7 @@ func (r *Repository) updateHostNodes(host *ssh_config.Host, oldServer, newServer
 	r.updateListField(host, "DynamicForward", oldServer.DynamicForward, newServer.DynamicForward, nil)
 	r.updateListField(host, "SendEnv", oldServer.SendEnv, newServer.SendEnv, nil)
 	r.updateListField(host, "SetEnv", oldServer.SetEnv, newServer.SetEnv, nil)
+	r.updateHostTags(host, newServer.Tags)
 	cleanHostEmptyNodes(host)
 }
 

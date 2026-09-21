@@ -42,6 +42,7 @@ If you are coming from **lazyssh**, here is a concrete summary of everything **n
 | **Read-Only / Viewer Mode** | Protect production files with an immutable viewer mode. Blocks add, edit, delete, clone, paste, and key installs with an interactive indicator and notification. | `--readonly` / `-r` |
 | **Exit On Disconnect** | Automatically exits `neossh` when your SSH session terminates, providing a seamless one-shot terminal launcher experience. | `-x` / `--exit-on-disconnect` |
 | **Multi-Alias Directive Support** | Preserves and indexes all space-separated aliases on a single `Host` line (`Host web1 web2 staging`). Supports fuzzy search and connection by any defined alias without dropping them on writeback. | *Automatic* |
+| **SSH Config Tag Comments** | Store and sync tags directly in `~/.ssh/config` comments (`# tags: prod, db` on the `Host` line or inside the block), keeping tags in sync across machines without relying solely on local `metadata.json`. | *Automatic* / <kbd>t</kbd> |
 | **Wildcard Pattern Blocks** | Accurately reads and preserves wildcard configurations (`Host *.corp`, `Host *`) across edits, displays `[wildcard]` badges, and guards against accidental direct connections. | *Automatic* |
 | **Diagnostic SSH Error Modals** | Intercepts SSH subprocess `stderr` on connection failures (`connection refused`, `host unreachable`, `permission denied`, timeouts) and displays the exact reason in a clear UI modal dialog. | *Automatic* |
 | **Portable Tilde Paths (`~`)** | Normalizes absolute paths to portable relative tilde paths (`~/.ssh/id_rsa`) across Linux, macOS, and Windows. | *Automatic* |
@@ -104,7 +105,7 @@ If you are coming from **lazyssh**, here is a concrete summary of everything **n
 ### Quick Server Navigation
 - 🔍 Fuzzy search by alias, IP, or tags (`/`).
 - 🖥 One‑keypress SSH into the selected server (`Enter`).
-- 🏷 Tag servers (e.g., `prod`, `dev`, `test`) for quick filtering.
+- 🏷 Tag servers (e.g., `prod`, `dev`, `test`) stored directly as SSH config comments for quick filtering and cross-machine synchronization.
 - ↕️ Sort by alias or last SSH (toggle + reverse).
 - 🔢 Jump focus between panels using numeric shortcuts (`1`, `2`, `3`).
 
@@ -314,6 +315,28 @@ neossh --sshconfig ~/.ssh/config_work -r
 
 ---
 
+## 🏷️ Server Tags in SSH Config Comments
+
+`neossh` stores server tags directly within your `~/.ssh/config` file as comments, ensuring your tags stay in sync across machines (e.g. via dotfiles or Git) without relying exclusively on a local machine-specific `metadata.json`:
+
+```ssh
+# Inline on the Host line:
+Host web-prod # tags: prod, web, us-east
+    HostName 192.168.1.10
+    User ubuntu
+
+# Or inside the Host block:
+Host db-primary
+    # tags: prod, database
+    HostName 192.168.1.20
+    User postgres
+```
+
+- **Two-Way Synchronization**: Tags edited in the TUI (via <kbd>t</kbd> or the full edit form <kbd>e</kbd>) are written directly to your SSH config.
+- **Backwards Compatibility**: Any existing tags in `metadata.json` (or migrated from `~/.lazyssh`) are seamlessly loaded on startup and will be saved directly into `~/.ssh/config` upon your next edit.
+
+---
+
 ## 🤝 Contributing
 
 Contributions are welcome! Feel free to open an [Issue](https://github.com/WhiteRoseLK/neossh/issues) or submit a Pull Request.
@@ -332,7 +355,7 @@ This project is licensed under the [Apache-2.0 License](LICENSE).
   - `@omani` — `--sshconfig` custom config flag
   - `@yaronuliel` — `--ssh-config-readonly` mode
   - `@natefabian18` — `--exit-on-disconnect` session behavior
-  - `@Ferdyverse` — Multi-alias `Host` lines support
+  - `@Ferdyverse` — Multi-alias `Host` lines support & SSH config tags comments
   - `@Midas-sudo` — Wildcard pattern blocks
   - `@Mehrdad-Farshi` — SSH error diagnostics display
   - `@leleobhz` — CLI filter and direct connect options
