@@ -47,8 +47,9 @@ func (r *Repository) filterServers(servers []domain.Server, query string) []doma
 
 // matchesQuery checks if any field of the server matches the query string.
 func (r *Repository) matchesQuery(server domain.Server, query string) bool {
-	fields := make([]string, 0, 2+len(server.Tags)+len(server.Aliases))
+	fields := make([]string, 0, 3+len(server.Tags)+len(server.Aliases))
 	fields = append(fields,
+		strings.ToLower(server.Alias),
 		strings.ToLower(server.Host),
 		strings.ToLower(server.User),
 	)
@@ -120,10 +121,25 @@ func (r *Repository) hostContainsPattern(host *ssh_config.Host, target string) b
 
 // createHostFromServer creates a new ssh_config.Host from a domain.Server.
 func (r *Repository) createHostFromServer(server domain.Server) *ssh_config.Host {
+	patterns := make([]*ssh_config.Pattern, 0)
+	seen := make(map[string]bool)
+
+	if server.Alias != "" {
+		patterns = append(patterns, &ssh_config.Pattern{Str: server.Alias})
+		seen[server.Alias] = true
+	}
+	for _, alias := range server.Aliases {
+		if alias != "" && !seen[alias] {
+			patterns = append(patterns, &ssh_config.Pattern{Str: alias})
+			seen[alias] = true
+		}
+	}
+	if len(patterns) == 0 {
+		patterns = append(patterns, &ssh_config.Pattern{Str: ""})
+	}
+
 	host := &ssh_config.Host{
-		Patterns: []*ssh_config.Pattern{
-			{Str: server.Alias},
-		},
+		Patterns:           patterns,
 		Nodes:              make([]ssh_config.Node, 0),
 		EOLComment:         "Added by neossh",
 		SpaceBeforeComment: strings.Repeat(" ", 4),

@@ -72,6 +72,9 @@ func (sd *ServerDetails) UpdateServer(server domain.Server) {
 
 	// Basic information
 	aliasText := strings.Join(server.Aliases, ", ")
+	if aliasText == "" {
+		aliasText = server.Alias
+	}
 
 	userText := server.User
 

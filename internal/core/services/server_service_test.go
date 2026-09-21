@@ -298,3 +298,54 @@ func TestCopySSHKeyMissingBinary(t *testing.T) {
 		t.Fatal("expected error when ssh-copy-id is not in PATH, got nil")
 	}
 }
+
+type multiAliasRepo struct {
+	ports.ServerRepository
+	servers []domain.Server
+}
+
+func (m *multiAliasRepo) ListServers(query string) ([]domain.Server, error) {
+	return m.servers, nil
+}
+
+func TestListServers_FindByMultipleAliases(t *testing.T) {
+	repo := &multiAliasRepo{
+		servers: []domain.Server{
+			{
+				Alias:   "web1",
+				Aliases: []string{"web1", "web.prod.internal", "prod-web"},
+				Host:    "10.0.0.1",
+				User:    "admin",
+			},
+			{
+				Alias:   "db1",
+				Aliases: []string{"db1", "database.internal"},
+				Host:    "10.0.0.2",
+				User:    "postgres",
+			},
+		},
+	}
+
+	svc := &serverService{
+		logger:           zap.NewNop().Sugar(),
+		serverRepository: repo,
+	}
+
+	// Search by secondary alias "prod-web"
+	res, err := svc.ListServers("prod-web")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(res) == 0 || res[0].Alias != "web1" {
+		t.Fatalf("expected web1 to match 'prod-web', got %+v", res)
+	}
+
+	// Search by secondary alias "database.internal"
+	res, err = svc.ListServers("database")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(res) == 0 || res[0].Alias != "db1" {
+		t.Fatalf("expected db1 to match 'database', got %+v", res)
+	}
+}

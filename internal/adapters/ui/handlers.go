@@ -17,6 +17,7 @@ package ui
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -215,9 +216,34 @@ func (t *tui) getExistingAliases() []string {
 		return []string{}
 	}
 
-	aliases := make([]string, len(servers))
-	for i, s := range servers {
-		aliases[i] = s.Alias
+	aliases := make([]string, 0)
+	for _, s := range servers {
+		if len(s.Aliases) > 0 {
+			aliases = append(aliases, s.Aliases...)
+		} else if s.Alias != "" {
+			aliases = append(aliases, s.Alias)
+		}
+	}
+	return aliases
+}
+
+// getExistingAliasesExcept returns all existing server aliases except those belonging to exclude
+func (t *tui) getExistingAliasesExcept(exclude domain.Server) []string {
+	servers, err := t.serverService.ListServers("")
+	if err != nil {
+		return []string{}
+	}
+
+	aliases := make([]string, 0)
+	for _, s := range servers {
+		if s.Alias == exclude.Alias || slices.Contains(s.Aliases, exclude.Alias) {
+			continue
+		}
+		if len(s.Aliases) > 0 {
+			aliases = append(aliases, s.Aliases...)
+		} else if s.Alias != "" {
+			aliases = append(aliases, s.Alias)
+		}
 	}
 	return aliases
 }
@@ -386,7 +412,7 @@ func (t *tui) handleServerEdit() {
 			SetVersionInfo(t.version, t.commit).
 			OnSave(t.handleServerSave).
 			OnCancel(t.handleFormCancel).
-			SetExistingAliases(t.getExistingAliases())
+			SetExistingAliases(t.getExistingAliasesExcept(server))
 		t.app.SetRoot(form, true)
 	}
 }
@@ -396,6 +422,7 @@ func (t *tui) handleServerClone() {
 		cloned := cloneServer(server)
 		existingAliases := t.getExistingAliases()
 		cloned.Alias = GenerateUniqueAlias(server.Alias, existingAliases)
+		cloned.Aliases = []string{cloned.Alias}
 		cloned.PinnedAt = time.Time{}
 		cloned.LastSeen = time.Time{}
 		cloned.PingStatus = ""
@@ -414,6 +441,7 @@ func (t *tui) handleServerClone() {
 
 func cloneServer(s domain.Server) domain.Server {
 	cloned := s
+	cloned.Aliases = nil
 	if s.IdentityFiles != nil {
 		cloned.IdentityFiles = make([]string, len(s.IdentityFiles))
 		copy(cloned.IdentityFiles, s.IdentityFiles)

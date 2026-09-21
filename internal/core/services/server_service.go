@@ -153,6 +153,11 @@ func computeServerScore(srv domain.Server, q string) int {
 	}
 	if len(srv.Aliases) > 0 {
 		fields = append(fields, strings.Join(srv.Aliases, " "))
+		for _, a := range srv.Aliases {
+			if a != "" {
+				fields = append(fields, a)
+			}
+		}
 	}
 	if len(srv.Tags) > 0 {
 		fields = append(fields, strings.Join(srv.Tags, " "))
