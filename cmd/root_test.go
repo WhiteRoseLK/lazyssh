@@ -567,3 +567,40 @@ func TestRootCmd_ThemeFlag(t *testing.T) {
 		})
 	}
 }
+
+func TestRootCmd_SCPFlag(t *testing.T) {
+	scpFlag = ""
+	cmd := newRootCmd()
+	err := cmd.ParseFlags([]string{"--scp", "myserver"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if scpFlag != "myserver" {
+		t.Errorf("expected scpFlag=%q, got %q", "myserver", scpFlag)
+	}
+}
+
+func TestHandleSCPFlag(t *testing.T) {
+	svc := &mockDirectConnectService{
+		servers: []domain.Server{
+			{
+				Alias: "web-prod",
+				Host:  "10.0.0.1",
+				User:  "ubuntu",
+				Port:  2202,
+			},
+		},
+	}
+
+	// Test found
+	err := handleSCPFlag(svc, "web-prod")
+	if err != nil {
+		t.Errorf("expected no error for valid server alias, got %v", err)
+	}
+
+	// Test not found
+	err = handleSCPFlag(svc, "nonexistent")
+	if err == nil || !strings.Contains(err.Error(), "not found") {
+		t.Errorf("expected not found error, got %v", err)
+	}
+}

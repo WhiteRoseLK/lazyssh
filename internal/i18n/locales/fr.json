@@ -11,8 +11,8 @@
   "search.label": " 🔍 Recherche : ",
   "search.title": " 0 Recherche (/ pour filtrer, Échap pour quitter) ",
 
-  "statusbar.readonly": "[yellow::b]MODE LECTURE SEULE[::-] (Modifications verrouillées) • [white]Tab[-] Changer panneau • [white]Entrée[-] Connecter • [white]c[-] Copier • [white]g/G[-] Ping • [white]P[-] Git SSH • [white]T[-] Thème • [white]q[-] Quitter",
-  "statusbar.normal": "[white]Tab[-] Changer panneau • [white]Entrée[-] Connecter • [white]a[-] Ajouter • [white]e[-] Modifier • [white]d[-] Supprimer • [white]c[-] Copier • [white]g/G[-] Ping • [white]P[-] Git SSH • [white]C[-] Commentaire • [white]l/u[-] Agent • [white]T[-] Thème • [white]q[-] Quitter",
+  "statusbar.readonly": "[yellow::b]MODE LECTURE SEULE[::-] (Modifications verrouillées) • [white]Tab[-] Changer panneau • [white]Entrée[-] Connecter • [white]c[-] Copier • [white]o[-] SCP • [white]g/G[-] Ping • [white]P[-] Git SSH • [white]T[-] Thème • [white]q[-] Quitter",
+  "statusbar.normal": "[white]Tab[-] Changer panneau • [white]Entrée[-] Connecter • [white]a[-] Ajouter • [white]e[-] Modifier • [white]d[-] Supprimer • [white]c[-] Copier • [white]o[-] SCP • [white]g/G[-] Ping • [white]P[-] Git SSH • [white]C[-] Commentaire • [white]l/u[-] Agent • [white]T[-] Thème • [white]q[-] Quitter",
 
   "details.title": " Détails ",
   "details.label.basic": "Paramètres de base :",
@@ -41,7 +41,7 @@
   "form.tab.advanced": "Avancé",
   "form.btn.save": "Enregistrer",
   "form.btn.cancel": "Annuler",
-  "form.help.title": "Aide du champ",
+  "form.help.title": "Aide sur le champ",
   "form.help.default": "Défaut",
 
   "dialog.confirm_delete": "Êtes-vous sûr de vouloir supprimer le serveur '%s' ?",
@@ -51,9 +51,21 @@
   "dialog.btn_cancel": "Annuler",
   "dialog.btn_delete": "Supprimer",
 
-  "git.title": " Configuration clé SSH Git & Profils ",
+  "git.title": " Configurer la clé SSH Git et profils ",
   "git.repo": "Dépôt Git :",
-  "git.push_remote": "Dépôt distant (push) :",
+  "git.push_remote": "Remote Push :",
   "git.configured": "Clé SSH Git configurée avec succès !",
-  "git.cleared": "Configuration SSH Git réinitialisée avec succès !"
+  "git.cleared": "Configuration SSH Git supprimée avec succès !",
+
+  "scp.title": " Générateur de commande SCP ",
+  "scp.direction": "Direction du transfert :",
+  "scp.upload": "Téléverser (Local -> Distant)",
+  "scp.download": "Télécharger (Distant -> Local)",
+  "scp.local_path": "Chemin local :",
+  "scp.remote_path": "Chemin distant :",
+  "scp.recursive": "Récursif (-r)",
+  "scp.use_alias": "Utiliser l'alias SSH",
+  "scp.btn_copy": "Copier la commande",
+  "scp.btn_cancel": "Annuler",
+  "scp.preview": "Commande générée :"
 }

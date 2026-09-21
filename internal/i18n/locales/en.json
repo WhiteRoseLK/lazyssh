@@ -11,8 +11,8 @@
   "search.label": " 🔍 Search: ",
   "search.title": " 0 Search (/ to filter, Esc to blur) ",
 
-  "statusbar.readonly": "[yellow::b]READONLY MODE[::-] (Modifications locked) • [white]Tab[-] Switch panel • [white]Enter[-] Connect • [white]c[-] Copy • [white]g/G[-] Ping • [white]P[-] Git SSH • [white]T[-] Theme • [white]q[-] Quit",
-  "statusbar.normal": "[white]Tab[-] Switch panel • [white]Enter[-] Connect • [white]a[-] Add • [white]e[-] Edit • [white]d[-] Delete • [white]c[-] Copy • [white]g/G[-] Ping • [white]P[-] Git SSH • [white]C[-] Comment • [white]l/u[-] Agent • [white]T[-] Theme • [white]q[-] Quit",
+  "statusbar.readonly": "[yellow::b]READONLY MODE[::-] (Modifications locked) • [white]Tab[-] Switch panel • [white]Enter[-] Connect • [white]c[-] Copy • [white]o[-] SCP • [white]g/G[-] Ping • [white]P[-] Git SSH • [white]T[-] Theme • [white]q[-] Quit",
+  "statusbar.normal": "[white]Tab[-] Switch panel • [white]Enter[-] Connect • [white]a[-] Add • [white]e[-] Edit • [white]d[-] Delete • [white]c[-] Copy • [white]o[-] SCP • [white]g/G[-] Ping • [white]P[-] Git SSH • [white]C[-] Comment • [white]l/u[-] Agent • [white]T[-] Theme • [white]q[-] Quit",
 
   "details.title": " Details ",
   "details.label.basic": "Basic Settings:",
@@ -55,5 +55,17 @@
   "git.repo": "Git Repository:",
   "git.push_remote": "Push Remote:",
   "git.configured": "Git SSH key configured successfully!",
-  "git.cleared": "Git SSH configuration cleared successfully!"
+  "git.cleared": "Git SSH configuration cleared successfully!",
+
+  "scp.title": " SCP Command Generator ",
+  "scp.direction": "Transfer Direction:",
+  "scp.upload": "Upload (Local -> Remote)",
+  "scp.download": "Download (Remote -> Local)",
+  "scp.local_path": "Local Path:",
+  "scp.remote_path": "Remote Path:",
+  "scp.recursive": "Recursive (-r)",
+  "scp.use_alias": "Use SSH Alias",
+  "scp.btn_copy": "Copy Command",
+  "scp.btn_cancel": "Cancel",
+  "scp.preview": "Generated Command:"
 }

@@ -322,6 +322,81 @@ func BuildSSHCommand(s domain.Server) string {
 	return strings.Join(parts, " ")
 }
 
+// BuildSCPCommand constructs a ready-to-run scp command for the given server.
+// If isUpload is true: scp [options] <localPath> <target>:<remotePath>
+// If isUpload is false: scp [options] <target>:<remotePath> <localPath>
+// If recursive is true: adds -r flag.
+// If useAlias is true: uses server.Alias as the target instead of user@host with port/identity flags.
+func BuildSCPCommand(s domain.Server, isUpload bool, localPath, remotePath string, recursive, useAlias bool) string {
+	if localPath == "" {
+		localPath = "./file"
+	}
+	if remotePath == "" {
+		remotePath = "~/"
+	}
+
+	parts := []string{"scp"}
+
+	if recursive {
+		parts = append(parts, "-r")
+	}
+
+	var target string
+	if useAlias && s.Alias != "" {
+		target = s.Alias
+	} else {
+		// Port option: scp uses capital -P (unlike ssh which uses lowercase -p)
+		if s.Port != 0 && s.Port != 22 {
+			parts = append(parts, "-P", fmt.Sprintf("%d", s.Port))
+		}
+
+		// Identity file options
+		for _, keyFile := range s.IdentityFiles {
+			if keyFile != "" {
+				parts = append(parts, "-i", quoteIfNeeded(keyFile))
+			}
+		}
+
+		// ProxyJump option
+		if s.ProxyJump != "" {
+			parts = append(parts, "-J", quoteIfNeeded(s.ProxyJump))
+		}
+
+		// Target specification
+		switch {
+		case s.User != "" && s.Host != "":
+			target = fmt.Sprintf("%s@%s", s.User, s.Host)
+		case s.Host != "":
+			target = s.Host
+		default:
+			target = s.Alias
+		}
+	}
+
+	remoteTarget := fmt.Sprintf("%s:%s", target, remotePath)
+	if strings.ContainsAny(remotePath, " \t") {
+		remoteTarget = fmt.Sprintf("%s:%q", target, remotePath)
+	}
+
+	if isUpload {
+		parts = append(parts, quoteIfNeeded(localPath), remoteTarget)
+	} else {
+		parts = append(parts, remoteTarget, quoteIfNeeded(localPath))
+	}
+
+	return strings.Join(parts, " ")
+}
+
+// BuildSCPUploadCommand constructs an scp upload command for the given server.
+func BuildSCPUploadCommand(s domain.Server, localPath, remotePath string, recursive, useAlias bool) string {
+	return BuildSCPCommand(s, true, localPath, remotePath, recursive, useAlias)
+}
+
+// BuildSCPDownloadCommand constructs an scp download command for the given server.
+func BuildSCPDownloadCommand(s domain.Server, remotePath, localPath string, recursive, useAlias bool) string {
+	return BuildSCPCommand(s, false, localPath, remotePath, recursive, useAlias)
+}
+
 // addOption adds an SSH option in the format "-o Key=Value" if value is not empty
 func addOption(parts *[]string, key, value string) {
 	if value != "" {

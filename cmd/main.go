@@ -28,6 +28,7 @@ import (
 	"github.com/WhiteRoseLK/neossh/internal/core/ports"
 	"github.com/WhiteRoseLK/neossh/internal/core/services"
 	"github.com/WhiteRoseLK/neossh/internal/logger"
+	"github.com/atotto/clipboard"
 	"github.com/spf13/cobra"
 )
 
@@ -46,6 +47,7 @@ var (
 	themeFlag         string
 	gitSSHFlag        string
 	langFlag          string
+	scpFlag           string
 
 	rootCmd = newRootCmd()
 )
@@ -120,6 +122,10 @@ func newRootCmd() *cobra.Command {
 
 			if handled, err := handleGitSSHFlag(cmd, gitService, isReadonly); handled {
 				return err
+			}
+
+			if scpFlag != "" {
+				return handleSCPFlag(serverService, scpFlag)
 			}
 
 			if isImportKH {
@@ -200,6 +206,9 @@ func newRootCmd() *cobra.Command {
 	)
 	cmd.PersistentFlags().StringVarP(
 		&langFlag, "lang", "l", "", "set interface language: en, fr, zh-CN (or via NEOSSH_LANG)",
+	)
+	cmd.PersistentFlags().StringVar(
+		&scpFlag, "scp", "", "generate SCP command templates for server alias (e.g. --scp myserver)",
 	)
 
 	cmd.SilenceUsage = true
@@ -366,6 +375,41 @@ func handleImportKnownHostsFlag(
 	} else {
 		fmt.Printf("Successfully imported %d host(s) from %s (%d already configured or skipped).\n",
 			result.Imported, khPath, result.Skipped)
+	}
+	return nil
+}
+
+func handleSCPFlag(serverService ports.ServerService, alias string) error {
+	servers, err := serverService.ListServers("")
+	if err != nil {
+		return fmt.Errorf("failed to list servers: %w", err)
+	}
+
+	var found *domain.Server
+	for i := range servers {
+		if strings.EqualFold(servers[i].Alias, alias) {
+			found = &servers[i]
+			break
+		}
+	}
+
+	if found == nil {
+		return fmt.Errorf("server alias %q not found", alias)
+	}
+
+	uploadCmd := ui.BuildSCPUploadCommand(*found, "./<local_file>", "~/<remote_file>", false, false)
+	downloadCmd := ui.BuildSCPDownloadCommand(*found, "~/<remote_file>", "./<local_file>", false, false)
+	aliasUploadCmd := ui.BuildSCPUploadCommand(*found, "./<local_file>", "~/<remote_file>", false, true)
+	aliasDownloadCmd := ui.BuildSCPDownloadCommand(*found, "~/<remote_file>", "./<local_file>", false, true)
+
+	fmt.Printf("SCP Command Templates for [%s]:\n\n", found.Alias)
+	fmt.Printf("• Upload (Local -> Remote):\n  %s\n\n", uploadCmd)
+	fmt.Printf("• Download (Remote -> Local):\n  %s\n\n", downloadCmd)
+	fmt.Printf("• Quick Alias Upload:\n  %s\n\n", aliasUploadCmd)
+	fmt.Printf("• Quick Alias Download:\n  %s\n", aliasDownloadCmd)
+
+	if err := clipboard.WriteAll(uploadCmd); err == nil {
+		fmt.Println("\n✓ Copied default upload command to system clipboard.")
 	}
 	return nil
 }
