@@ -38,13 +38,19 @@ If you are coming from **lazyssh**, here is a concrete summary of everything **n
 
 | Feature | Description | Shortcut / Usage |
 | :--- | :--- | :---: |
+| **Read-Only / Viewer Mode** | Protect production files with an immutable viewer mode. Blocks add, edit, delete, clone, paste, and key installs with an interactive indicator and notification. | `--readonly` / `-r` |
+| **Exit On Disconnect** | Automatically exits `neossh` when your SSH session terminates, providing a seamless one-shot terminal launcher experience. | `-x` / `--exit-on-disconnect` |
+| **Multi-Alias Directive Support** | Preserves and indexes all space-separated aliases on a single `Host` line (`Host web1 web2 staging`). Supports fuzzy search and connection by any defined alias without dropping them on writeback. | *Automatic* |
+| **Wildcard Pattern Blocks** | Accurately reads and preserves wildcard configurations (`Host *.corp`, `Host *`) across edits, displays `[wildcard]` badges, and guards against accidental direct connections. | *Automatic* |
+| **Diagnostic SSH Error Modals** | Intercepts SSH subprocess `stderr` on connection failures (`connection refused`, `host unreachable`, `permission denied`, timeouts) and displays the exact reason in a clear UI modal dialog. | *Automatic* |
+| **Portable Tilde Paths (`~`)** | Normalizes absolute paths to portable relative tilde paths (`~/.ssh/id_rsa`) across Linux, macOS, and Windows. | *Automatic* |
 | **Parallel Ping All** | Concurrently pings all configured servers in the background with real-time colored latency badges in the list: `[<50ms]` (green), `[<150ms]` (yellow), `[>150ms]` (red), or `[DOWN]` (red). | <kbd>G</kbd> |
 | **One-Touch SSH Key Deployment** | Automatically pushes your public SSH key to the remote host using native `ssh-copy-id` directly from the TUI. | <kbd>K</kbd> |
 | **Copy SSH Command** | Copies the full SSH connection command directly to your system clipboard. | <kbd>c</kbd> |
 | **Paste SSH Command** | Parses any SSH command from system clipboard (flags, identity keys, ports, jump hosts) into an add-server modal with intelligent alias deduction and deduplication. | <kbd>v</kbd> |
 | **Duplicate / Clone Server** | Instantly clones any existing server configuration into the Add form with automatic alias deduplication (`srv_1`, `srv_2`), eliminating manual re-typing. | <kbd>y</kbd> / <kbd>C</kbd> |
 | **Zero-Friction Migration** | Automatically detects and migrates your favorites, tags, and connection history from `~/.lazyssh` to `~/.neossh`. | *Automatic* |
-| **Custom Config Path** | Loads any alternative SSH config file without modifying `~/.ssh/config`. | `-F <path>` |
+| **Custom Config Path** | Loads any alternative SSH config file without modifying `~/.ssh/config`. | `--sshconfig <path>` |
 | **Persistent Sorting** | Remembers your preferred sort mode (by alias, last SSH connection, ascending/descending) across sessions. | <kbd>s</kbd> |
 | **Quick Panel Jump** | Instant focus switching between Search, Server List, and Details panels using numeric keys. | <kbd>1</kbd> / <kbd>2</kbd> / <kbd>3</kbd> |
 | **Modern Toolchain & Deps** | Fully upgraded to latest upstream packages (`tview v0.42`, `tcell/v2 v2.13`, `cobra v1.10`, `zap v1.28`, `go-runewidth v0.0.30`), with Go race detection and `golangci-lint` v2. | *Core* |
@@ -200,27 +206,65 @@ sudo mv neossh /usr/local/bin/
 
 ---
 
+## 💻 Command Line Usage
+
+`neossh` provides command line flags for automation, alternative configurations, and scripting:
+
+```bash
+neossh [flags]
+```
+
+### Options & Flags
+
+| Flag | Shorthand | Description | Default |
+| :--- | :---: | :--- | :---: |
+| `--sshconfig <path>` | | Specify custom path to SSH config file | `~/.ssh/config` |
+| `--readonly`, `--ssh-config-readonly` | `-r` | Run in read-only / viewer mode (prevents writing or modifying SSH configuration) | `false` |
+| `--exit-on-disconnect`, `--auto-exit` | `-x` | Exit `neossh` immediately after SSH session terminates (one-shot launcher) | `false` |
+| `--help` | `-h` | Display help message and available options | |
+
+#### Examples:
+```bash
+# Launch normal interactive TUI:
+neossh
+
+# Open in safe read-only viewer mode (modifications disabled):
+neossh -r
+
+# Connect and exit automatically when the SSH session ends:
+neossh -x
+
+# Load a dedicated work or staging SSH config file in read-only mode:
+neossh --sshconfig ~/.ssh/config_work -r
+```
+
+---
+
 ## ⌨️ Keybindings
 
 | Key | Action |
 |:---:|--------|
 | `Enter` | SSH into selected server |
 | `/` | Fuzzy search by alias, IP, or tag |
-| `a` | Add new server |
-| `e` | Edit selected server |
-| `d` | Delete selected server |
+| `a` | Add new server *(disabled in read-only mode)* |
+| `e` | Edit selected server *(disabled in read-only mode)* |
+| `d` | Delete selected server *(disabled in read-only mode)* |
 | `p` | Pin / unpin server |
-| `t` | Edit tags |
+| `t` | Edit tags *(disabled in read-only mode)* |
 | `c` | Copy SSH connection command to clipboard |
-| `v` | Paste SSH command from clipboard (creates server entry) |
-| `y` / `C` | Duplicate / clone selected server entry |
-| `K` | Push SSH public key to server via `ssh-copy-id` |
+| `v` | Paste SSH command from clipboard *(disabled in read-only mode)* |
+| `y` / `C` | Duplicate / clone selected server entry *(disabled in read-only mode)* |
+| `K` | Push SSH public key to server via `ssh-copy-id` *(disabled in read-only mode)* |
+| `f` | Configure SSH port forwarding (Local / Remote / Dynamic) |
 | `s` | Toggle sort mode (alias, last SSH, reverse) |
 | `g` | Ping selected server |
 | `G` | Ping all servers (parallel check with latency badges) |
 | `1` / `2` / `3` | Focus Search / Server List / Details |
 | `j` / `k` or `↓` / `↑` | Navigate server list |
 | `q` / `Ctrl+C` | Quit |
+
+> [!NOTE]
+> When launched with `--readonly` / `-r`, all modifying operations (`a`, `e`, `d`, `y`, `C`, `v`, `t`, `K`) are locked with clear informational dialogs, making it completely safe for shared or production environments.
 
 ---
 
@@ -271,6 +315,11 @@ This project is licensed under the [Apache-2.0 License](LICENSE).
 - **Community contributors**: Full credit to all contributors from the upstream repository whose ideas and pull requests made this release possible:
   - `@DelphicOkami`, `@malaiwah`, `@aabichou`, `@barthofu` — SSH `Include` support
   - `@omani` — `--sshconfig` custom config flag
+  - `@yaronuliel` — `--ssh-config-readonly` mode
+  - `@natefabian18` — `--exit-on-disconnect` session behavior
+  - `@Ferdyverse` — Multi-alias `Host` lines support
+  - `@Midas-sudo` — Wildcard pattern blocks
+  - `@Mehrdad-Farshi` — SSH error diagnostics display
   - `@gonsalvesc` — XDG base directory specification support
   - `@levinion` — Copy SSH command shortcut
   - `@gaoyifan` — Persistent sort mode
