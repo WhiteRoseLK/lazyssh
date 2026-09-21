@@ -322,14 +322,31 @@ func TestResolveSSHConfigFile_Default(t *testing.T) {
 }
 
 func TestEnsureMetadataFile(t *testing.T) {
-	tmpDir := t.TempDir()
-	metaFile, err := ensureMetadataFile(tmpDir)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	t.Run("without XDG_CONFIG_HOME", func(t *testing.T) {
+		t.Setenv("XDG_CONFIG_HOME", "")
+		tmpDir := t.TempDir()
+		metaFile, err := ensureMetadataFile(tmpDir)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
 
-	expected := filepath.Join(tmpDir, ".neossh", "metadata.json")
-	if metaFile != expected {
-		t.Errorf("expected %q, got %q", expected, metaFile)
-	}
+		expected := filepath.Join(tmpDir, ".neossh", "metadata.json")
+		if metaFile != expected {
+			t.Errorf("expected %q, got %q", expected, metaFile)
+		}
+	})
+
+	t.Run("with XDG_CONFIG_HOME", func(t *testing.T) {
+		xdgDir := t.TempDir()
+		t.Setenv("XDG_CONFIG_HOME", xdgDir)
+		metaFile, err := ensureMetadataFile(t.TempDir())
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		expected := filepath.Join(xdgDir, "neossh", "metadata.json")
+		if metaFile != expected {
+			t.Errorf("expected %q, got %q", expected, metaFile)
+		}
+	})
 }
