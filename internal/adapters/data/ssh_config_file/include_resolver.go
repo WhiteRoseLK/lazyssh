@@ -29,9 +29,46 @@ import (
 
 const maxIncludeDepth = 16
 
+// includeGuardMarker prefixes an `Include` directive that has been neutralized
+// into a comment before parsing. The third-party parser eagerly resolves
+// `Include` directives itself (using the real OS filesystem, ignoring our
+// FileSystem abstraction) and hard-fails when a glob matches a directory
+// (os.ReadFile returns EISDIR). Since we resolve includes ourselves in
+// loadFileAndIncludes, we make the parser's copy inert. The marker is a comment,
+// so the parser preserves it verbatim; restoreIncludeDirectives turns it back
+// into a real `Include` directive when a file is written, keeping round-trips
+// lossless.
+const includeGuardMarker = "# neossh-include: "
+
 // hasGlobMeta reports whether s contains any character special to filepath.Glob.
 func hasGlobMeta(s string) bool {
 	return strings.ContainsAny(s, "*?[")
+}
+
+// guardIncludeDirectives rewrites every `Include` directive into a comment so
+// ssh_config.Decode does not try to read the referenced files. The original
+// line (keyword, spacing, arguments and trailing comment) is preserved after the
+// marker and restored verbatim by restoreIncludeDirectives.
+func guardIncludeDirectives(data []byte) []byte {
+	lines := strings.Split(string(data), "\n")
+	for i, line := range lines {
+		trimmed := strings.TrimLeft(line, " \t")
+		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+		if key, _ := splitDirective(trimmed); !strings.EqualFold(key, "include") {
+			continue
+		}
+		indent := line[:len(line)-len(trimmed)]
+		lines[i] = indent + includeGuardMarker + trimmed
+	}
+	return []byte(strings.Join(lines, "\n"))
+}
+
+// restoreIncludeDirectives reverses guardIncludeDirectives on file content that
+// is about to be written back to disk.
+func restoreIncludeDirectives(content string) string {
+	return strings.ReplaceAll(content, includeGuardMarker, "")
 }
 
 // configFile pairs a parsed ssh_config.Config with the absolute path of the
@@ -132,6 +169,10 @@ func (r *Repository) loadFileAndIncludes(path string, lc *loadedConfig, visited 
 	// Normalize CRLF to LF to prevent extraneous blank lines being parsed as empty nodes
 	normalized := bytes.ReplaceAll(data, []byte("\r\n"), []byte("\n"))
 	normalized = bytes.ReplaceAll(normalized, []byte("\r"), []byte("\n"))
+
+	// Inert the Include directives: we resolve them ourselves below, and the
+	// parser would otherwise fail on glob matches that are directories.
+	normalized = guardIncludeDirectives(normalized)
 
 	cfg, decodeErr := ssh_config.Decode(bytes.NewReader(normalized))
 	if decodeErr != nil {

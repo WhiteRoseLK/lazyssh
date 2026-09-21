@@ -26,6 +26,11 @@ import (
 
 var reMultipleNewlines = regexp.MustCompile(`\n{3,}`)
 
+// configCacheTTL bounds how long a parsed config may be reused for read paths.
+// Kept short so external file edits are picked up quickly; explicit refreshes
+// and local mutations invalidate the cache immediately regardless.
+const configCacheTTL = 2 * time.Second
+
 // loadConfig reads and parses the SSH config file plus every file pulled in
 // via top-level `Include` directives. Returns a loadedConfig containing all
 // per-file parses in OpenSSH precedence order (main first).
@@ -53,7 +58,39 @@ func (r *Repository) saveFiles(lc *loadedConfig, dirty []string) error {
 			return err
 		}
 	}
+	// Any successful write changes the parsed config on disk; drop the cache so
+	// the next read reflects it immediately.
+	r.InvalidateCache()
 	return nil
+}
+
+// loadConfigCached is the read-path counterpart to loadConfig: it reuses a very
+// recent parse so the UI's frequent listings (one per ping result) don't re-read
+// and re-parse every included file each time. Mutations bypass the cache via
+// loadConfig and invalidate it in saveFiles, and InvalidateCache forces a
+// re-read (e.g. on explicit refresh).
+func (r *Repository) loadConfigCached() (*loadedConfig, error) {
+	r.cacheMu.Lock()
+	defer r.cacheMu.Unlock()
+
+	if r.cachedLC != nil && time.Since(r.cacheAt) < configCacheTTL {
+		return r.cachedLC, nil
+	}
+
+	lc, err := r.loadConfig()
+	if err != nil {
+		return nil, err
+	}
+	r.cachedLC = lc
+	r.cacheAt = time.Now()
+	return lc, nil
+}
+
+// InvalidateCache drops the cached parse so the next read re-reads from disk.
+func (r *Repository) InvalidateCache() {
+	r.cacheMu.Lock()
+	r.cachedLC = nil
+	r.cacheMu.Unlock()
 }
 
 func (r *Repository) writeOneFile(path string, cfg *ssh_config.Config) error {
@@ -111,6 +148,8 @@ func (r *Repository) writeConfigToFile(filePath string, cfg *ssh_config.Config) 
 	configContent := cfg.String()
 	// Collapse 3 or more consecutive newlines to 2 (one blank line between blocks)
 	configContent = reMultipleNewlines.ReplaceAllString(configContent, "\n\n")
+	// Turn the inert Include markers back into real directives.
+	configContent = restoreIncludeDirectives(configContent)
 
 	if _, err := file.WriteString(configContent); err != nil {
 		return fmt.Errorf("failed to write config content: %w", err)

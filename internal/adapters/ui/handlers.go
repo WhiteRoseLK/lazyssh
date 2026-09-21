@@ -1141,6 +1141,20 @@ func (t *tui) handleModalClose() {
 	t.returnToMain()
 }
 
+// configCacheInvalidator is implemented by repositories that cache parsed
+// config. Kept as a local interface so the port stays free of cache concerns.
+type configCacheInvalidator interface {
+	InvalidateCache()
+}
+
+// invalidateConfigCache forces the repository to re-read the config on its next
+// listing; used by explicit refresh so on-disk changes are always picked up.
+func (t *tui) invalidateConfigCache() {
+	if ci, ok := t.serverRepo.(configCacheInvalidator); ok {
+		ci.InvalidateCache()
+	}
+}
+
 // handleRefreshBackground refreshes the server list in the background without leaving the current screen.
 // It preserves the current search query and selection, shows transient status, and avoids concurrent runs.
 func (t *tui) handleRefreshBackground() {
@@ -1153,6 +1167,7 @@ func (t *tui) handleRefreshBackground() {
 	t.showStatusTemp("Refreshing…")
 
 	go func(prevIdx int, q string) {
+		t.invalidateConfigCache()
 		servers, err := t.serverService.ListServers(q)
 		if err != nil {
 			t.app.QueueUpdateDraw(func() {
