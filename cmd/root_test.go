@@ -96,8 +96,58 @@ func TestRootCmd_FlagsExist(t *testing.T) {
 		t.Errorf("expected shorthand 'x', got %q", exitFlag.Shorthand)
 	}
 
-	autoExitFlag := cmd.PersistentFlags().Lookup("auto-exit")
-	if autoExitFlag == nil {
-		t.Fatal("expected persistent flag --auto-exit to exist")
+	roFlag := cmd.PersistentFlags().Lookup("ssh-config-readonly")
+	if roFlag == nil {
+		t.Fatal("expected persistent flag --ssh-config-readonly to exist")
+	}
+
+	roAlias := cmd.PersistentFlags().Lookup("readonly")
+	if roAlias == nil {
+		t.Fatal("expected persistent flag --readonly to exist")
+	}
+	if roAlias.Shorthand != "r" {
+		t.Errorf("expected shorthand 'r', got %q", roAlias.Shorthand)
+	}
+}
+
+func TestRootCmd_ReadOnlyFlags(t *testing.T) {
+	tests := []struct {
+		name             string
+		args             []string
+		expectedReadOnly bool
+	}{
+		{
+			name:             "default without readonly",
+			args:             []string{},
+			expectedReadOnly: false,
+		},
+		{
+			name:             "flag --ssh-config-readonly",
+			args:             []string{"--ssh-config-readonly"},
+			expectedReadOnly: true,
+		},
+		{
+			name:             "flag --readonly",
+			args:             []string{"--readonly"},
+			expectedReadOnly: true,
+		},
+		{
+			name:             "flag -r",
+			args:             []string{"-r"},
+			expectedReadOnly: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sshConfigReadonly = false
+			cmd := newRootCmd()
+			if err := cmd.ParseFlags(tt.args); err != nil {
+				t.Fatalf("unexpected error parsing flags %v: %v", tt.args, err)
+			}
+			if sshConfigReadonly != tt.expectedReadOnly {
+				t.Errorf("sshConfigReadonly = %v, want %v", sshConfigReadonly, tt.expectedReadOnly)
+			}
+		})
 	}
 }

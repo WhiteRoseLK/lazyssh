@@ -27,14 +27,20 @@ type AppHeader struct {
 	version   string
 	gitCommit string
 	repoURL   string
+	readonly  bool
 }
 
-func NewAppHeader(version, gitCommit, repoURL string) *AppHeader {
+func NewAppHeader(version, gitCommit, repoURL string, readonly ...bool) *AppHeader {
+	ro := false
+	if len(readonly) > 0 {
+		ro = readonly[0]
+	}
 	header := &AppHeader{
 		Flex:      tview.NewFlex(),
 		version:   version,
 		repoURL:   repoURL,
 		gitCommit: gitCommit,
+		readonly:  ro,
 	}
 	header.build()
 	return header
@@ -65,6 +71,9 @@ func (h *AppHeader) buildLeftSection(bg tcell.Color) *tview.TextView {
 		SetTextAlign(tview.AlignLeft)
 	left.SetBackgroundColor(bg)
 	stylizedName := "🚀 [#FFFFFF::b]neo[-][#55D7FF::b]ssh[-]"
+	if h.readonly {
+		stylizedName += " [#EF4444::b][READONLY][-]"
+	}
 	left.SetText(stylizedName)
 	return left
 }
@@ -87,6 +96,9 @@ func (h *AppHeader) buildCenterSection(bg tcell.Color) *tview.TextView {
 	text := versionTag
 	if commitTag != "" {
 		text += "  " + commitTag
+	}
+	if h.readonly {
+		text += "  " + makeTag("READONLY", "#EF4444") // red
 	}
 
 	center.SetText(text)

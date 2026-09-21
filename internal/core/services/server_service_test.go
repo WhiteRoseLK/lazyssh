@@ -349,3 +349,52 @@ func TestListServers_FindByMultipleAliases(t *testing.T) {
 		t.Fatalf("expected db1 to match 'database', got %+v", res)
 	}
 }
+
+func TestServerService_ReadOnlyMode(t *testing.T) {
+	logger := zap.NewNop().Sugar()
+	mockRepo := &mockServerRepository{}
+
+	svc := NewServerService(logger, mockRepo, WithReadOnly(true))
+
+	testSrv := domain.Server{
+		Alias: "new-srv",
+		Host:  "5.6.7.8",
+		User:  "admin",
+		Port:  22,
+	}
+	existingSrv := domain.Server{
+		Alias: "existing-srv",
+		Host:  "1.2.3.4",
+		User:  "root",
+		Port:  22,
+	}
+
+	// AddServer should fail with ErrReadOnly
+	if err := svc.AddServer(testSrv); !errors.Is(err, ErrReadOnly) {
+		t.Fatalf("AddServer in readonly mode: expected ErrReadOnly, got %v", err)
+	}
+
+	// UpdateServer should fail with ErrReadOnly
+	if err := svc.UpdateServer(existingSrv, testSrv); !errors.Is(err, ErrReadOnly) {
+		t.Fatalf("UpdateServer in readonly mode: expected ErrReadOnly, got %v", err)
+	}
+
+	// DeleteServer should fail with ErrReadOnly
+	if err := svc.DeleteServer(existingSrv); !errors.Is(err, ErrReadOnly) {
+		t.Fatalf("DeleteServer in readonly mode: expected ErrReadOnly, got %v", err)
+	}
+
+	// CopySSHKey should fail with ErrReadOnly
+	if err := svc.CopySSHKey("existing-srv"); !errors.Is(err, ErrReadOnly) {
+		t.Fatalf("CopySSHKey in readonly mode: expected ErrReadOnly, got %v", err)
+	}
+
+	// Non-modifying operations should succeed
+	servers, err := svc.ListServers("")
+	if err != nil {
+		t.Fatalf("ListServers failed in readonly mode: %v", err)
+	}
+	if servers != nil {
+		t.Fatalf("expected nil servers from mock, got %v", servers)
+	}
+}

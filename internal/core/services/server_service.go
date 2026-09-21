@@ -37,9 +37,13 @@ import (
 	"go.uber.org/zap"
 )
 
+// ErrReadOnly is returned when an operation modifying SSH configuration is attempted in read-only mode.
+var ErrReadOnly = errors.New("readonly mode: SSH configuration modifications are disabled")
+
 type serverService struct {
 	serverRepository ports.ServerRepository
 	logger           *zap.SugaredLogger
+	readonly         bool
 
 	fwMu     sync.Mutex
 	forwards map[string][]*os.Process
@@ -48,9 +52,19 @@ type serverService struct {
 	newSSHCommandWithArgs func(alias string, extraArgs []string) *exec.Cmd
 }
 
+// ServerServiceOption allows configuring a serverService instance.
+type ServerServiceOption func(*serverService)
+
+// WithReadOnly sets whether the service operates in read-only mode.
+func WithReadOnly(ro bool) ServerServiceOption {
+	return func(s *serverService) {
+		s.readonly = ro
+	}
+}
+
 // NewServerService creates a new instance of serverService.
-func NewServerService(logger *zap.SugaredLogger, sr ports.ServerRepository) ports.ServerService {
-	return &serverService{
+func NewServerService(logger *zap.SugaredLogger, sr ports.ServerRepository, opts ...ServerServiceOption) ports.ServerService {
+	s := &serverService{
 		logger:           logger,
 		serverRepository: sr,
 		newSSHCommand: func(alias string) *exec.Cmd {
@@ -64,6 +78,10 @@ func NewServerService(logger *zap.SugaredLogger, sr ports.ServerRepository) port
 			return exec.Command("ssh", args...)
 		},
 	}
+	for _, opt := range opts {
+		opt(s)
+	}
+	return s
 }
 
 // ListServers returns servers. With empty query, keep pinned-first default ordering.
@@ -311,6 +329,9 @@ func validateServer(srv domain.Server) error {
 
 // UpdateServer updates an existing server with new details.
 func (s *serverService) UpdateServer(server domain.Server, newServer domain.Server) error {
+	if s.readonly {
+		return ErrReadOnly
+	}
 	if err := validateServer(newServer); err != nil {
 		s.logger.Warnw("validation failed on update", "error", err, "server", newServer)
 		return err
@@ -324,6 +345,9 @@ func (s *serverService) UpdateServer(server domain.Server, newServer domain.Serv
 
 // AddServer adds a new server to the repository.
 func (s *serverService) AddServer(server domain.Server) error {
+	if s.readonly {
+		return ErrReadOnly
+	}
 	if err := validateServer(server); err != nil {
 		s.logger.Warnw("validation failed on add", "error", err, "server", server)
 		return err
@@ -337,6 +361,9 @@ func (s *serverService) AddServer(server domain.Server) error {
 
 // DeleteServer removes a server from the repository.
 func (s *serverService) DeleteServer(server domain.Server) error {
+	if s.readonly {
+		return ErrReadOnly
+	}
 	err := s.serverRepository.DeleteServer(server)
 	if err != nil {
 		s.logger.Errorw("failed to delete server", "error", err, "server", server)
@@ -500,6 +527,9 @@ func (b *limitedBuffer) String() string {
 
 // CopySSHKey installs public SSH keys to the remote host using ssh-copy-id.
 func (s *serverService) CopySSHKey(alias string) error {
+	if s.readonly {
+		return ErrReadOnly
+	}
 	s.logger.Infow("ssh-copy-id start", "alias", alias)
 
 	if _, err := exec.LookPath("ssh-copy-id"); err != nil {
