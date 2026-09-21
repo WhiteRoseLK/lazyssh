@@ -172,7 +172,21 @@ brew install neossh
 
 ---
 
-### Option 2: Pre-compiled Binaries (Direct Download)
+### Option 2: Arch Linux (AUR)
+
+`neossh` is available in the Arch User Repository ([AUR/neossh](https://aur.archlinux.org/packages/neossh)):
+
+```bash
+# Using yay:
+yay -S neossh
+
+# Using paru:
+paru -S neossh
+```
+
+---
+
+### Option 3: Pre-compiled Binaries (Direct Download)
 
 Ready-to-run binaries are available for **macOS**, **Linux**, and **Windows** on the [Releases page](https://github.com/WhiteRoseLK/neossh/releases/latest).
 
@@ -196,7 +210,7 @@ sudo mv neossh /usr/local/bin/
 
 ---
 
-### Option 3: Go Install
+### Option 4: Go Install
 
 If you have Go installed:
 
@@ -208,7 +222,7 @@ go install github.com/WhiteRoseLK/neossh/cmd@latest
 
 ---
 
-### Option 4: Build from Source
+### Option 5: Build from Source
 
 **Prerequisites**: [Go](https://go.dev/) 1.22+ and `git` (and optionally `make`).
 
@@ -475,7 +489,7 @@ This project is licensed under the [Apache-2.0 License](LICENSE).
   - `@Q0`, `@Midas-sudo` — Server folders, nested grouping, and tmux session integration
   - `@Midas-sudo` — Wildcard pattern blocks & pre-connect command hooks
   - `@Mehrdad-Farshi` — SSH error diagnostics display
-  - `@leleobhz` — CLI filter and direct connect options
+  - `@leleobhz` — CLI filter, direct connect options, and Arch Linux AUR package maintenance
   - `@eznix86` — Import hosts from `~/.ssh/known_hosts` (CLI flag & bootstrap)
   - `@OleksandrKucherenko` — Git SSH key configuration, profile switcher, and SSH key management
   - `@gonsalvesc` — XDG base directory specification support
