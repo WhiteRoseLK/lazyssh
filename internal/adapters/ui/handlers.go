@@ -133,7 +133,10 @@ func (t *tui) handleFocusKeys(cmd rune) bool {
 	case '1':
 		t.handleServerListFocus()
 		return true
-	case '2', '3':
+	case '2':
+		t.handleActiveListFocus()
+		return true
+	case '3':
 		t.handleDetailsFocus()
 		return true
 	default:
@@ -164,82 +167,94 @@ func (t *tui) handleGlobalKeys(event *tcell.EventKey) *tcell.EventKey {
 		return nil
 	}
 
-	switch cmd {
-	case 'q':
-		t.handleQuit()
-		return nil
-	case 'a':
-		t.handleServerAdd()
-		return nil
-	case 'e':
-		t.handleServerEdit()
-		return nil
-	case 'd':
-		t.handleServerDelete()
-		return nil
-	case 'p':
-		t.handleServerPin()
-		return nil
-	case 'm':
-		t.handleToggleServerHidden()
-		return nil
-	case 'H':
-		t.handleToggleShowHidden()
-		return nil
-	case 's':
-		t.handleSortToggle()
-		return nil
-	case 'S':
-		t.handleSortReverse()
-		return nil
-	case 'c':
-		t.handleCopyCommand()
-		return nil
-	case 'v':
-		t.handlePasteCommand()
-		return nil
-	case 'y', 'C':
-		t.handleServerClone()
-		return nil
-	case 'h':
-		t.handleCopyHost()
-		return nil
-	case 'g':
-		t.handlePingSelected()
-		return nil
-	case 'G':
-		t.handlePingAll()
-		return nil
-	case 'r':
-		t.handleRefreshBackground()
-		return nil
-	case 't':
-		t.handleTagsEdit()
-		return nil
-	case 'f':
-		t.handlePortForward()
-		return nil
-	case 'x':
-		t.handleStopForwarding()
-		return nil
-	case 'j':
-		t.handleNavigateDown()
-		return nil
-	case 'k':
-		t.handleNavigateUp()
-		return nil
-	case 'K':
-		t.handleInstallSSHKey()
-		return nil
-	case 'i', 'I':
-		t.handleImportKnownHosts()
-		return nil
-	case 'T':
-		t.handleThemeToggle()
+	if t.handleActionKeys(cmd) {
 		return nil
 	}
 
 	return event
+}
+
+func (t *tui) handleActionKeys(cmd rune) bool {
+	switch cmd {
+	case 'q':
+		t.handleQuit()
+		return true
+	case 'a':
+		t.handleServerAdd()
+		return true
+	case 'e':
+		t.handleServerEdit()
+		return true
+	case 'd':
+		t.handleServerDelete()
+		return true
+	case 'p':
+		t.handleServerPin()
+		return true
+	case 'm':
+		t.handleToggleServerHidden()
+		return true
+	case 'H':
+		t.handleToggleShowHidden()
+		return true
+	case 's':
+		t.handleSortToggle()
+		return true
+	case 'S':
+		t.handleSortReverse()
+		return true
+	case 'c':
+		t.handleCopyCommand()
+		return true
+	case 'v':
+		t.handlePasteCommand()
+		return true
+	case 'y', 'C':
+		t.handleServerClone()
+		return true
+	case 'h':
+		t.handleCopyHost()
+		return true
+	case 'g':
+		t.handlePingSelected()
+		return true
+	case 'G':
+		t.handlePingAll()
+		return true
+	case 'r':
+		t.handleRefreshBackground()
+		return true
+	case 't':
+		t.handleTagsEdit()
+		return true
+	case 'f':
+		t.handlePortForward()
+		return true
+	case 'x':
+		t.handleStopForwarding()
+		return true
+	case 'j':
+		t.handleNavigateDown()
+		return true
+	case 'k':
+		t.handleNavigateUp()
+		return true
+	case 'K':
+		if t.isActiveListFocused() {
+			t.handleKillActiveSessions()
+		} else {
+			t.handleInstallSSHKey()
+		}
+		return true
+	case 'i', 'I':
+		t.handleImportKnownHosts()
+		return true
+	case 'T':
+		t.handleThemeToggle()
+		return true
+	default:
+		return false
+	}
 }
 
 func (t *tui) handleQuit() {
@@ -442,26 +457,47 @@ func (t *tui) handleTagsEdit() {
 	}
 }
 
-func (t *tui) handleNavigateDown() {
+func (t *tui) targetNavigationList() *ServerList {
+	if t.isActiveListFocused() {
+		return t.activeList
+	}
 	if t.isServerListFocused() {
-		currentIdx := t.serverList.GetCurrentItem()
-		itemCount := t.serverList.GetItemCount()
-		if currentIdx < itemCount-1 {
-			t.serverList.SetCurrentItem(currentIdx + 1)
-		} else {
-			t.serverList.SetCurrentItem(0)
-		}
+		return t.serverList
+	}
+	return nil
+}
+
+func (t *tui) handleNavigateDown() {
+	list := t.targetNavigationList()
+	if list == nil {
+		return
+	}
+	currentIdx := list.GetCurrentItem()
+	itemCount := list.GetItemCount()
+	if itemCount == 0 {
+		return
+	}
+	if currentIdx < itemCount-1 {
+		list.SetCurrentItem(currentIdx + 1)
+	} else {
+		list.SetCurrentItem(0)
 	}
 }
 
 func (t *tui) handleNavigateUp() {
-	if t.isServerListFocused() {
-		currentIdx := t.serverList.GetCurrentItem()
-		if currentIdx > 0 {
-			t.serverList.SetCurrentItem(currentIdx - 1)
-		} else {
-			t.serverList.SetCurrentItem(t.serverList.GetItemCount() - 1)
-		}
+	list := t.targetNavigationList()
+	if list == nil {
+		return
+	}
+	currentIdx := list.GetCurrentItem()
+	itemCount := list.GetItemCount()
+	if itemCount == 0 {
+		return
+	}
+	if currentIdx > 0 {
+		list.SetCurrentItem(currentIdx - 1)
+	} else {
+		list.SetCurrentItem(itemCount - 1)
 	}
 }
 
@@ -472,6 +508,10 @@ func (t *tui) handleSearchInput(query string) {
 	}
 	displayServers := t.filterServersForDisplay(filtered)
 	t.serverList.UpdateServers(displayServers)
+	if t.activeList != nil {
+		active, _ := t.serverService.ListActiveSessions(query)
+		t.activeList.UpdateServers(active)
+	}
 	if len(displayServers) == 0 {
 		t.details.ShowEmpty()
 	}
@@ -485,6 +525,14 @@ func (t *tui) isServerListFocused() bool {
 	return focus == t.serverList || focus == t.serverList.List
 }
 
+func (t *tui) isActiveListFocused() bool {
+	if t == nil || t.app == nil || t.activeList == nil {
+		return false
+	}
+	focus := t.app.GetFocus()
+	return focus == t.activeList || focus == t.activeList.List
+}
+
 func (t *tui) handleSearchFocus() {
 	if t.app != nil && t.searchBar != nil {
 		t.app.SetFocus(t.searchBar)
@@ -495,6 +543,13 @@ func (t *tui) handleSearchFocus() {
 func (t *tui) handleServerListFocus() {
 	if t.app != nil && t.serverList != nil {
 		t.app.SetFocus(t.serverList)
+		t.updateFocusBorders()
+	}
+}
+
+func (t *tui) handleActiveListFocus() {
+	if t.app != nil && t.activeList != nil {
+		t.app.SetFocus(t.activeList)
 		t.updateFocusBorders()
 	}
 }
@@ -512,6 +567,8 @@ func (t *tui) handleNextPanel() {
 	case t.searchBar != nil && (focus == t.searchBar || t.searchBar.HasFocus()):
 		t.handleServerListFocus()
 	case t.serverList != nil && (focus == t.serverList || focus == t.serverList.List || t.serverList.HasFocus()):
+		t.handleActiveListFocus()
+	case t.activeList != nil && (focus == t.activeList || focus == t.activeList.List || t.activeList.HasFocus()):
 		t.handleDetailsFocus()
 	default:
 		t.handleSearchFocus()
@@ -522,6 +579,8 @@ func (t *tui) handlePrevPanel() {
 	focus := t.app.GetFocus()
 	switch {
 	case t.details != nil && (focus == t.details || focus == t.details.TextView || t.details.HasFocus()):
+		t.handleActiveListFocus()
+	case t.activeList != nil && (focus == t.activeList || focus == t.activeList.List || t.activeList.HasFocus()):
 		t.handleServerListFocus()
 	case t.serverList != nil && (focus == t.serverList || focus == t.serverList.List || t.serverList.HasFocus()):
 		t.handleSearchFocus()
@@ -568,27 +627,35 @@ func (t *tui) handleReturnToSearch() {
 }
 
 func (t *tui) handleServerConnect() {
-	if server, ok := t.serverList.GetSelectedServer(); ok {
-		if server.IsWildcardServer() {
-			t.showErrorModal("SSH Connection Warning", "Cannot initiate direct SSH connection to a wildcard pattern block")
-			return
+	var server domain.Server
+	var ok bool
+	if t.isActiveListFocused() {
+		server, ok = t.activeList.GetSelectedServer()
+	} else if t.serverList != nil {
+		server, ok = t.serverList.GetSelectedServer()
+	}
+	if !ok {
+		return
+	}
+	if server.IsWildcardServer() {
+		t.showErrorModal("SSH Connection Warning", "Cannot initiate direct SSH connection to a wildcard pattern block")
+		return
+	}
+	var sshErr error
+	t.app.Suspend(func() {
+		if err := t.serverService.SSH(server.Alias); err != nil {
+			sshErr = err
+			t.logger.Errorw("ssh session error", "alias", server.Alias, "error", err)
 		}
-		var sshErr error
-		t.app.Suspend(func() {
-			if err := t.serverService.SSH(server.Alias); err != nil {
-				sshErr = err
-				t.logger.Errorw("ssh session error", "alias", server.Alias, "error", err)
-			}
-		})
-		if t.exitOnDisconnect {
-			t.app.Stop()
-			return
-		}
-		t.app.Sync()
-		t.refreshServerList()
-		if sshErr != nil {
-			t.showSSHErrorModal(server.Alias, sshErr.Error())
-		}
+	})
+	if t.exitOnDisconnect {
+		t.app.Stop()
+		return
+	}
+	t.app.Sync()
+	t.refreshServerList()
+	if sshErr != nil {
+		t.showSSHErrorModal(server.Alias, sshErr.Error())
 	}
 }
 
@@ -693,6 +760,22 @@ func (t *tui) handleServerAdd() {
 		t.showReadonlyModal()
 		return
 	}
+	if t.isActiveListFocused() {
+		if server, ok := t.activeList.GetSelectedServer(); ok {
+			prefill := server
+			prefill.Alias = ""
+			prefill.Tags = nil
+			form := NewServerForm(ServerFormAdd, nil).
+				SetInitialData(&prefill).
+				SetApp(t.app).
+				SetVersionInfo(t.version, t.commit).
+				OnSave(t.handleServerSave).
+				OnCancel(t.handleFormCancel).
+				SetExistingAliases(t.getExistingAliases())
+			t.app.SetRoot(form, true)
+			return
+		}
+	}
 	form := NewServerForm(ServerFormAdd, nil).
 		SetApp(t.app).
 		SetVersionInfo(t.version, t.commit).
@@ -705,6 +788,10 @@ func (t *tui) handleServerAdd() {
 func (t *tui) handleServerEdit() {
 	if t.readonly {
 		t.showReadonlyModal()
+		return
+	}
+	if t.isActiveListFocused() {
+		t.showStatusTemp("Edit disabled for active sessions. Use 'a' to add.")
 		return
 	}
 	if server, ok := t.serverList.GetSelectedServer(); ok {
@@ -786,7 +873,15 @@ func (t *tui) handleServerSave(server domain.Server, original *domain.Server) {
 	var err error
 	if original != nil {
 		// Edit mode
-		err = t.serverService.UpdateServer(*original, server)
+		base := *original
+		if resolved, ok, resolveErr := t.serverService.ResolveConfigServer(*original); resolveErr != nil {
+			err = resolveErr
+		} else if ok {
+			base = resolved
+		}
+		if err == nil {
+			err = t.serverService.UpdateServer(base, server)
+		}
 	} else {
 		// Add mode
 		err = t.serverService.AddServer(server)
@@ -835,6 +930,10 @@ func (t *tui) handleServerSave(server domain.Server, original *domain.Server) {
 func (t *tui) handleServerDelete() {
 	if t.readonly {
 		t.showReadonlyModal()
+		return
+	}
+	if t.isActiveListFocused() {
+		t.showStatusTemp("Cannot delete active session. Use 'K' to terminate.")
 		return
 	}
 	if server, ok := t.serverList.GetSelectedServer(); ok {
@@ -993,11 +1092,25 @@ func (t *tui) handleRefreshBackground() {
 			})
 			return
 		}
+		var active []domain.Server
+		if t.activeList != nil {
+			var activeErr error
+			active, activeErr = t.serverService.ListActiveSessions(q)
+			if activeErr != nil {
+				t.app.QueueUpdateDraw(func() {
+					t.showStatusTempColor(fmt.Sprintf("Active refresh failed: %v", activeErr), "#FF6B6B")
+				})
+				return
+			}
+		}
 		if strings.TrimSpace(q) == "" {
 			sortServersForUI(servers, t.sortMode)
 		}
 		t.app.QueueUpdateDraw(func() {
 			t.serverList.UpdateServers(servers)
+			if t.activeList != nil {
+				t.activeList.UpdateServers(active)
+			}
 			// Try to restore selection if still valid
 			if prevIdx >= 0 && prevIdx < t.serverList.List.GetItemCount() {
 				t.serverList.SetCurrentItem(prevIdx)
@@ -1420,6 +1533,30 @@ func (t *tui) refreshServerList() {
 		sortServersForUI(filtered, t.sortMode)
 	}
 	t.serverList.UpdateServers(t.filterServersForDisplay(filtered))
+	if t.activeList != nil {
+		active, _ := t.serverService.ListActiveSessions(query)
+		t.activeList.UpdateServers(active)
+	}
+}
+
+// handleKillActiveSessions terminates active SSH sessions for the selected server.
+func (t *tui) handleKillActiveSessions() {
+	if t.activeList == nil {
+		return
+	}
+	if server, ok := t.activeList.GetSelectedServer(); ok {
+		go func(selected domain.Server) {
+			count, err := t.serverService.KillActiveSessions(selected)
+			t.app.QueueUpdateDraw(func() {
+				if err != nil {
+					t.showStatusTempColor("Failed to terminate SSH sessions: "+err.Error(), "#FF6B6B")
+				} else {
+					t.showStatusTemp(fmt.Sprintf("Terminated %d SSH session(s) for %s", count, selected.Alias))
+				}
+				t.refreshServerList()
+			})
+		}(server)
+	}
 }
 
 func (t *tui) returnToMain() {

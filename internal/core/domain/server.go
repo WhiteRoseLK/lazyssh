@@ -34,6 +34,7 @@ type Server struct {
 	PingLatency   time.Duration // ping latency
 	IsWildcard    bool          // indicates wildcard pattern block (Host containing * or ?)
 	Hidden        bool          // indicates server is marked hidden from the primary UI list
+	ActivePID     int           // process ID if representing a live active SSH session
 
 	// Additional SSH config fields
 	// Connection and proxy settings
