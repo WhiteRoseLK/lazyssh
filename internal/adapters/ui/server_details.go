@@ -127,10 +127,15 @@ func (sd *ServerDetails) UpdateServer(server domain.Server) {
 		portText = ""
 	}
 
+	hiddenStr := "No"
+	if server.Hidden {
+		hiddenStr = "Yes"
+	}
+
 	text := fmt.Sprintf(
-		"[::b]%s[-]\n\n[::b]Basic Settings:[-]\n  Host: [white]%s[-]\n  User: [white]%s[-]\n  Port: [white]%s[-]\n  Key:  [white]%s[-]\n  Tags: %s\n  Pinned: [white]%s[-]\n  Last SSH: %s\n  SSH Count: [white]%d[-]\n",
+		"[::b]%s[-]\n\n[::b]Basic Settings:[-]\n  Host: [white]%s[-]\n  User: [white]%s[-]\n  Port: [white]%s[-]\n  Key:  [white]%s[-]\n  Tags: %s\n  Pinned: [white]%s[-]\n  Hidden: [white]%s[-]\n  Last SSH: %s\n  SSH Count: [white]%d[-]\n",
 		aliasText, hostText, userText, portText,
-		serverKey, tagsText, pinnedStr,
+		serverKey, tagsText, pinnedStr, hiddenStr,
 		lastSeen, server.SSHCount)
 
 	// Advanced settings section (only show non-empty fields)

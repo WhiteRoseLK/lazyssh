@@ -35,6 +35,7 @@ type Config struct {
 	ExitOnDisconnect bool
 	ReadOnly         bool
 	InitialFilter    string
+	ShowHidden       bool
 }
 
 type tui struct {
@@ -62,16 +63,19 @@ type tui struct {
 	pingStatuses     map[string]domain.Server
 	exitOnDisconnect bool
 	initialFilter    string
+	showHidden       bool
 }
 
 func NewTUI(logger *zap.SugaredLogger, ss ports.ServerService, version, commit string, cfg ...Config) App {
 	var exitOnDisconnect bool
 	var readonly bool
 	var initialFilter string
+	var showHidden bool
 	if len(cfg) > 0 {
 		exitOnDisconnect = cfg[0].ExitOnDisconnect
 		readonly = cfg[0].ReadOnly
 		initialFilter = cfg[0].InitialFilter
+		showHidden = cfg[0].ShowHidden
 	}
 	return &tui{
 		logger:           logger,
@@ -84,7 +88,12 @@ func NewTUI(logger *zap.SugaredLogger, ss ports.ServerService, version, commit s
 		pingStatuses:     make(map[string]domain.Server),
 		exitOnDisconnect: exitOnDisconnect,
 		initialFilter:    initialFilter,
+		showHidden:       showHidden,
 	}
+}
+
+func (t *tui) ShowHidden() bool {
+	return t.showHidden
 }
 
 func (t *tui) InitialFilter() string {
@@ -256,17 +265,31 @@ func (t *tui) updateFocusBorders() {
 	}
 }
 
+func (t *tui) filterServersForDisplay(servers []domain.Server) []domain.Server {
+	if t.showHidden {
+		return servers
+	}
+	filtered := make([]domain.Server, 0, len(servers))
+	for _, s := range servers {
+		if !s.Hidden {
+			filtered = append(filtered, s)
+		}
+	}
+	return filtered
+}
+
 func (t *tui) loadInitialData() {
 	query := t.initialFilter
 	servers, _ := t.serverService.ListServers(query)
 	if strings.TrimSpace(query) == "" {
 		sortServersForUI(servers, t.sortMode)
 	}
+	displayServers := t.filterServersForDisplay(servers)
 	t.updateListTitle()
-	t.serverList.UpdateServers(servers)
+	t.serverList.UpdateServers(displayServers)
 	if query != "" {
 		t.searchBar.SetText(query)
-		if len(servers) == 0 {
+		if len(displayServers) == 0 {
 			t.details.ShowEmpty()
 		}
 	}
@@ -278,7 +301,11 @@ func (t *tui) updateListTitle() {
 		if t.readonly {
 			roIndicator = " [READONLY]"
 		}
-		t.serverList.SetTitle(fmt.Sprintf(" 1 Servers%s — Sort: %s ", roIndicator, t.sortMode.String()))
+		hiddenIndicator := ""
+		if t.showHidden {
+			hiddenIndicator = " [SHOW HIDDEN]"
+		}
+		t.serverList.SetTitle(fmt.Sprintf(" 1 Servers%s%s — Sort: %s ", roIndicator, hiddenIndicator, t.sortMode.String()))
 	}
 }
 

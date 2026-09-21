@@ -23,6 +23,7 @@ type ServerRepository interface {
 	AddServers(servers []domain.Server) error
 	DeleteServer(server domain.Server) error
 	SetPinned(alias string, pinned bool) error
+	SetHidden(alias string, hidden bool) error
 	RecordSSH(alias string) error
 	GetConfigFile() string
 	DiscoverKnownHosts(knownHostsPath string) ([]domain.Server, domain.ImportResult, error)

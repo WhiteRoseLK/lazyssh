@@ -1184,12 +1184,18 @@ func (sf *ServerForm) getDefaultValues() ServerFormData {
 
 	if server != nil {
 		return ServerFormData{
-			Alias:                server.Alias,
-			Host:                 server.Host,
-			User:                 server.User,
-			Port:                 fmt.Sprint(server.Port),
-			Key:                  strings.Join(server.IdentityFiles, ", "),
-			Tags:                 strings.Join(server.Tags, ", "),
+			Alias: server.Alias,
+			Host:  server.Host,
+			User:  server.User,
+			Port:  fmt.Sprint(server.Port),
+			Key:   strings.Join(server.IdentityFiles, ", "),
+			Tags:  strings.Join(server.Tags, ", "),
+			Hidden: func() string {
+				if server.Hidden {
+					return "yes"
+				}
+				return "no"
+			}(),
 			ProxyJump:            server.ProxyJump,
 			ProxyCommand:         server.ProxyCommand,
 			RemoteCommand:        server.RemoteCommand,
@@ -1259,12 +1265,13 @@ func (sf *ServerForm) getDefaultValues() ServerFormData {
 	// For new servers, use empty values instead of SSH defaults
 	// SSH defaults will be applied by the SSH client if values are not specified
 	return ServerFormData{
-		Alias: "",   // Explicitly empty for new servers
-		Host:  "",   // Explicitly empty for new servers
-		User:  "",   // Empty for new servers (SSH will use current username)
-		Port:  "22", // Keep port 22 as it's the standard SSH port
-		Key:   "",   // Empty for new servers (SSH will try default keys)
-		Tags:  "",
+		Alias:  "",   // Explicitly empty for new servers
+		Host:   "",   // Explicitly empty for new servers
+		User:   "",   // Empty for new servers (SSH will use current username)
+		Port:   "22", // Keep port 22 as it's the standard SSH port
+		Key:    "",   // Empty for new servers (SSH will try default keys)
+		Tags:   "",
+		Hidden: "no",
 
 		// All other fields should be empty for new servers
 		// The SSH client will use its defaults when these are not specified
@@ -1371,6 +1378,14 @@ func (sf *ServerForm) createBasicForm() {
 
 	// Tags field
 	sf.addValidatedInputField(form, "Tags:", "Tags", defaultValues.Tags, 30, GetFieldPlaceholder("Tags"))
+
+	// Hidden dropdown
+	hiddenOptions := []string{"no", "yes"}
+	hiddenIndex := 0
+	if strings.EqualFold(defaultValues.Hidden, "yes") {
+		hiddenIndex = 1
+	}
+	sf.addDropDownWithHelp(form, "Hidden:", "Hidden", hiddenOptions, hiddenIndex)
 
 	// Add save and cancel buttons
 	form.AddButton("Save", sf.handleSaveButton)
@@ -1757,12 +1772,13 @@ func (sf *ServerForm) createAdvancedForm() {
 }
 
 type ServerFormData struct {
-	Alias string
-	Host  string
-	User  string
-	Port  string
-	Key   string
-	Tags  string
+	Alias  string
+	Host   string
+	User   string
+	Port   string
+	Key    string
+	Tags   string
+	Hidden string
 
 	// Connection and proxy settings
 	ProxyJump            string
@@ -1892,12 +1908,13 @@ func (sf *ServerForm) getFormData() ServerFormData {
 	}
 
 	return ServerFormData{
-		Alias: getFieldText("Alias:"),
-		Host:  getFieldText("Host/IP:"),
-		User:  getFieldText("User:"),
-		Port:  getFieldText("Port:"),
-		Key:   getFieldText("Keys:"),
-		Tags:  getFieldText("Tags:"),
+		Alias:  getFieldText("Alias:"),
+		Host:   getFieldText("Host/IP:"),
+		User:   getFieldText("User:"),
+		Port:   getFieldText("Port:"),
+		Key:    getFieldText("Keys:"),
+		Tags:   getFieldText("Tags:"),
+		Hidden: getDropdownValue("Hidden:"),
 		// Connection and proxy settings
 		ProxyJump:            getFieldText("ProxyJump:"),
 		ProxyCommand:         getFieldText("ProxyCommand:"),
@@ -2171,6 +2188,7 @@ func (sf *ServerForm) serversDiffer(a, b domain.Server) bool {
 		"Aliases":  true, // Computed field
 		"LastSeen": true, // Metadata field
 		"PinnedAt": true, // Metadata field
+		"Hidden":   true, // Metadata field
 		"SSHCount": true, // Metadata field
 	}
 
@@ -2315,6 +2333,7 @@ func (sf *ServerForm) dataToServer(data ServerFormData) domain.Server {
 		Port:                 port,
 		IdentityFiles:        keys,
 		Tags:                 tags,
+		Hidden:               strings.EqualFold(data.Hidden, "yes"),
 		ProxyJump:            data.ProxyJump,
 		ProxyCommand:         data.ProxyCommand,
 		RemoteCommand:        data.RemoteCommand,

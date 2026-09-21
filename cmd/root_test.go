@@ -480,3 +480,44 @@ func TestRootCmd_ImportKnownHosts_Execution(t *testing.T) {
 		t.Errorf("expected config to contain 'Port 2222', got:\n%s", cfgStr)
 	}
 }
+
+func TestRootCmd_ShowHiddenFlag(t *testing.T) {
+	tests := []struct {
+		name     string
+		args     []string
+		expected bool
+	}{
+		{
+			name:     "default is false",
+			args:     []string{},
+			expected: false,
+		},
+		{
+			name:     "flag --show-hidden",
+			args:     []string{"--show-hidden"},
+			expected: true,
+		},
+		{
+			name:     "flag shorthand -H",
+			args:     []string{"-H"},
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			showHidden = false
+			cmd := newRootCmd()
+			cmd.SetArgs(tt.args)
+			_ = cmd.ParseFlags(tt.args)
+
+			val, err := cmd.Flags().GetBool("show-hidden")
+			if err != nil {
+				t.Fatalf("failed to get show-hidden flag: %v", err)
+			}
+			if val != tt.expected {
+				t.Errorf("expected show-hidden=%v, got %v", tt.expected, val)
+			}
+		})
+	}
+}

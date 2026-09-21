@@ -39,6 +39,7 @@ If you are coming from **lazyssh**, here is a concrete summary of everything **n
 | Feature | Description | Shortcut / Usage |
 | :--- | :--- | :---: |
 | **Import Known Hosts** | Quickly bootstrap your SSH config by discovering and importing unconfigured hosts from `~/.ssh/known_hosts` with automatic deduplication, standard port parsing (`[host]:port`), and safe skipping of hashed entries. | `--import-known-hosts` / <kbd>i</kbd> |
+| **Hidden Hosts Support** | Hide jump hosts, proxy targets, or internal nodes from the primary server list (<kbd>m</kbd> or form), reveal on demand with <kbd>H</kbd>, or launch with hidden servers visible. | <kbd>m</kbd> / <kbd>H</kbd> / `-H` |
 | **CLI Pre-filtering & Direct Connect** | Launch pre-filtered (`neossh prod` or `-f prod`) to prevent exposing your entire server fleet during screen shares, or connect directly (`neossh -c <alias>`). | `neossh <filter>` / `-c` |
 
 | **Read-Only / Viewer Mode** | Protect production files with an immutable viewer mode. Blocks add, edit, delete, clone, paste, and key installs with an interactive indicator and notification. | `--readonly` / `-r` |
@@ -228,6 +229,7 @@ neossh [filter] [flags]
 | `--connect` | `-c` | Connect directly to matching server without launching full TUI picker | `false` |
 | `--import-known-hosts` | | Import newly discovered hosts from `known_hosts` into SSH config | `false` |
 | `--known-hosts <path>` | | Specify custom path to `known_hosts` file | `~/.ssh/known_hosts` |
+| `--show-hidden` | `-H` | Display hidden servers in UI list | `false` |
 | `--sshconfig <path>` | | Specify custom path to SSH config file | `~/.ssh/config` |
 | `--readonly`, `--ssh-config-readonly` | `-r` | Run in read-only / viewer mode (prevents writing or modifying SSH configuration) | `false` |
 | `--exit-on-disconnect`, `--auto-exit` | `-x` | Exit `neossh` immediately after SSH session terminates (one-shot launcher) | `false` |
@@ -237,6 +239,9 @@ neossh [filter] [flags]
 ```bash
 # Launch normal interactive TUI:
 neossh
+
+# Launch TUI revealing all hidden hosts:
+neossh -H
 
 # Bootstrap SSH config by importing discovered hosts from ~/.ssh/known_hosts:
 neossh --import-known-hosts
@@ -277,6 +282,8 @@ neossh --sshconfig ~/.ssh/config_work -r
 | `e` | Edit selected server *(disabled in read-only mode)* |
 | `d` | Delete selected server *(disabled in read-only mode)* |
 | `i` | Import discovered hosts from `known_hosts` *(disabled in read-only mode)* |
+| `m` | Mark selected server as hidden / visible *(disabled in read-only mode)* |
+| `H` | Toggle displaying hidden servers in the list |
 | `p` | Pin / unpin server |
 | `t` | Edit tags *(disabled in read-only mode)* |
 | `c` | Copy SSH connection command to clipboard |
@@ -293,7 +300,7 @@ neossh --sshconfig ~/.ssh/config_work -r
 | `q` / `Ctrl+C` | Quit |
 
 > [!NOTE]
-> When launched with `--readonly` / `-r`, all modifying operations (`a`, `e`, `d`, `y`, `C`, `v`, `t`, `K`, `i`) are locked with clear informational dialogs, making it completely safe for shared or production environments.
+> When launched with `--readonly` / `-r`, all modifying operations (`a`, `e`, `d`, `y`, `C`, `v`, `t`, `K`, `i`, `m`) are locked with clear informational dialogs, making it completely safe for shared or production environments.
 
 
 ---
@@ -379,4 +386,5 @@ This project is licensed under the [Apache-2.0 License](LICENSE).
   - `@gaoyifan` — Persistent sort mode
   - `@k161196` — Panel focus shortcuts
   - `@shekel588` — Keyboard navigation improvements, focus borders, active field styling, and confirmation dialogs
+  - `@vtmocanu` — Hidden hosts support, visibility toggling, and filtering
   - `@arniom`, `@leoncamel`, `@breakersun`, `@OlalalalaO`, `@manato-tajiri`, `@komapro` — Bug fixes & documentation improvements

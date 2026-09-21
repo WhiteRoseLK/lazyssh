@@ -26,6 +26,7 @@ type ServerService interface {
 	AddServer(server domain.Server) error
 	DeleteServer(server domain.Server) error
 	SetPinned(alias string, pinned bool) error
+	SetHidden(alias string, hidden bool) error
 	SSH(alias string) error
 	SSHWithArgs(alias string, extraArgs []string) error
 	CopySSHKey(alias string) error
