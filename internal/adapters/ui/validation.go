@@ -144,9 +144,9 @@ func GetFieldValidatorsWithContext(originalAlias string, existingAliases []strin
 	// Basic fields
 	validators["Alias"] = fieldValidator{
 		Required: true,
-		Pattern:  regexp.MustCompile(`^[a-zA-Z0-9._-]+$`),
+		Pattern:  regexp.MustCompile(`^[a-zA-Z0-9._*?-]+$`),
 		Validate: createAliasValidator(originalAlias, existingAliases),
-		Message:  "Alias is required and can only contain letters, numbers, dots, hyphens, and underscores",
+		Message:  "Alias is required and can only contain letters, numbers, dots, hyphens, underscores, and wildcards (*, ?)",
 	}
 	validators["Host"] = fieldValidator{
 		Required: true,
@@ -489,8 +489,25 @@ func validateHost(host string) error {
 		return nil
 	}
 
+	// If host contains wildcard characters (* or ?), validate wildcard pattern
+	if strings.ContainsAny(host, "*?") {
+		return validateWildcardHost(host)
+	}
+
 	// Validate as hostname
 	return validateHostname(host)
+}
+
+// validateWildcardHost validates a wildcard host pattern
+func validateWildcardHost(host string) error {
+	if len(host) > 253 {
+		return fmt.Errorf("hostname too long")
+	}
+	const invalidWildcardChars = "@#$%^&()=+[]{}|\\;:'\"<>,/"
+	if strings.ContainsAny(host, invalidWildcardChars) {
+		return fmt.Errorf("host contains invalid characters")
+	}
+	return nil
 }
 
 // validateHostname validates a hostname (not IP)

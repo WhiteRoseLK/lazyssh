@@ -558,6 +558,63 @@ ssh user@example.com`,
 				}
 			},
 		},
+		{
+			name: "wildcard host pattern *.corp",
+			cmd:  "ssh *.corp",
+			check: func(t *testing.T, s interface{}) {
+				server := s.(*domain.Server)
+				if !server.IsWildcard {
+					t.Errorf("expected IsWildcard to be true, got false")
+				}
+				if !server.IsWildcardServer() {
+					t.Errorf("expected IsWildcardServer() to be true, got false")
+				}
+				if server.Host != "*.corp" {
+					t.Errorf("expected host '*.corp', got %s", server.Host)
+				}
+				if server.Alias != "*.corp" {
+					t.Errorf("expected alias '*.corp', got %s", server.Alias)
+				}
+			},
+		},
+		{
+			name: "wildcard host pattern with user and subdomain",
+			cmd:  "ssh user@*.internal.example.com",
+			check: func(t *testing.T, s interface{}) {
+				server := s.(*domain.Server)
+				if !server.IsWildcard {
+					t.Errorf("expected IsWildcard to be true, got false")
+				}
+				if !server.IsWildcardServer() {
+					t.Errorf("expected IsWildcardServer() to be true, got false")
+				}
+				if server.Host != "*.internal.example.com" {
+					t.Errorf("expected host '*.internal.example.com', got %s", server.Host)
+				}
+				if server.User != "user" {
+					t.Errorf("expected user 'user', got %s", server.User)
+				}
+				if server.Alias != "*.internal.example.com" {
+					t.Errorf("expected alias '*.internal.example.com', got %s", server.Alias)
+				}
+			},
+		},
+		{
+			name: "wildcard single asterisk",
+			cmd:  "ssh *",
+			check: func(t *testing.T, s interface{}) {
+				server := s.(*domain.Server)
+				if !server.IsWildcard {
+					t.Errorf("expected IsWildcard to be true, got false")
+				}
+				if !server.IsWildcardServer() {
+					t.Errorf("expected IsWildcardServer() to be true, got false")
+				}
+				if server.Host != "*" {
+					t.Errorf("expected host '*', got %s", server.Host)
+				}
+			},
+		},
 	}
 
 	for _, tt := range tests {

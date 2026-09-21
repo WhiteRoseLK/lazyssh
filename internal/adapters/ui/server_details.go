@@ -75,11 +75,22 @@ func (sd *ServerDetails) UpdateServer(server domain.Server) {
 		pinnedStr = "false"
 	}
 	tagsText := renderTagChips(server.Tags)
+	if server.IsWildcardServer() {
+		wildcardChip := "[black:#E5C07B] wildcard [-:-:-]"
+		if tagsText != "" {
+			tagsText = wildcardChip + " " + tagsText
+		} else {
+			tagsText = wildcardChip
+		}
+	}
 
 	// Basic information
 	aliasText := strings.Join(server.Aliases, ", ")
 	if aliasText == "" {
 		aliasText = server.Alias
+	}
+	if server.IsWildcardServer() {
+		aliasText = fmt.Sprintf("%s [#E5C07B][wildcard][-]", aliasText)
 	}
 
 	userText := server.User

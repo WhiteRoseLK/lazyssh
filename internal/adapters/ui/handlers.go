@@ -372,6 +372,10 @@ func (t *tui) handleReturnToSearch() {
 
 func (t *tui) handleServerConnect() {
 	if server, ok := t.serverList.GetSelectedServer(); ok {
+		if server.IsWildcardServer() {
+			t.showErrorModal("SSH Connection Warning", "Cannot initiate direct SSH connection to a wildcard pattern block")
+			return
+		}
 		var sshErr error
 		t.app.Suspend(func() {
 			if err := t.serverService.SSH(server.Alias); err != nil {
@@ -397,6 +401,10 @@ func (t *tui) handleInstallSSHKey() {
 		return
 	}
 	if server, ok := t.serverList.GetSelectedServer(); ok {
+		if server.IsWildcardServer() {
+			t.showErrorModal("SSH Key Installation Warning", "Cannot install SSH key to a wildcard pattern block")
+			return
+		}
 		alias := server.Alias
 		t.showStatusTemp(fmt.Sprintf("Installing key to %s…", alias))
 		var copyErr error
@@ -575,6 +583,10 @@ func (t *tui) handleFormCancel() {
 
 func (t *tui) handlePingSelected() {
 	if server, ok := t.serverList.GetSelectedServer(); ok {
+		if server.IsWildcardServer() {
+			t.showStatusTemp("Cannot ping a wildcard pattern block")
+			return
+		}
 		alias := server.Alias
 
 		// Set checking status
@@ -643,6 +655,9 @@ func (t *tui) handlePingAll() {
 	// Set all servers to checking status
 	t.pingStatuses = make(map[string]domain.Server)
 	for _, server := range servers {
+		if server.IsWildcardServer() {
+			continue
+		}
 		s := server
 		s.PingStatus = StatusChecking
 		t.pingStatuses[s.Alias] = s
@@ -651,6 +666,9 @@ func (t *tui) handlePingAll() {
 
 	// Ping all servers concurrently
 	for _, server := range servers {
+		if server.IsWildcardServer() {
+			continue
+		}
 		go func(srv domain.Server) {
 			up, dur, err := t.serverService.Ping(srv)
 			t.app.QueueUpdateDraw(func() {
@@ -905,6 +923,10 @@ func (t *tui) showEditTagsForm(server domain.Server) {
 
 func (t *tui) handlePortForward() {
 	if server, ok := t.serverList.GetSelectedServer(); ok {
+		if server.IsWildcardServer() {
+			t.showErrorModal("Port Forwarding Warning", "Cannot port forward with a wildcard pattern block")
+			return
+		}
 		t.showPortForwardForm(server)
 	}
 }

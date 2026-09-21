@@ -126,6 +126,9 @@ func ParseSSHCommand(cmd string) (*domain.Server, error) {
 	if server.Alias != "" && len(server.Aliases) == 0 {
 		server.Aliases = []string{server.Alias}
 	}
+	if strings.ContainsAny(server.Alias, "*?") || strings.ContainsAny(server.Host, "*?") {
+		server.IsWildcard = true
+	}
 
 	return server, nil
 }

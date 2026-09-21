@@ -75,6 +75,17 @@ func GenerateUniqueAlias(baseAlias string, existingAliases []string) string {
 func GenerateSmartAlias(host, user string, port int) string {
 	alias := host
 
+	// If host contains wildcard characters, preserve it verbatim
+	if strings.ContainsAny(host, "*?") {
+		if user != "" && !isCommonUser(user) {
+			alias = fmt.Sprintf("%s@%s", user, alias)
+		}
+		if port != 0 && port != 22 {
+			alias = fmt.Sprintf("%s:%d", alias, port)
+		}
+		return alias
+	}
+
 	// Simplify common domain patterns
 	// Remove www. prefix
 	alias = strings.TrimPrefix(alias, "www.")

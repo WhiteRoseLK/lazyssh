@@ -952,9 +952,16 @@ func (sf *ServerForm) validateField(fieldName, value string) string {
 
 	// Check required
 	if validator.Required && strings.TrimSpace(value) == "" {
-		err := fmt.Sprintf("%s is required", fieldName)
-		sf.validation.SetError(fieldName, err)
-		return err
+		isWildcardServer := (sf.original != nil && sf.original.IsWildcardServer()) ||
+			strings.ContainsAny(originalAlias, "*?") ||
+			strings.ContainsAny(sf.getFormData().Alias, "*?")
+		if fieldName == "Host" && isWildcardServer {
+			// Host is optional for wildcard blocks
+		} else {
+			err := fmt.Sprintf("%s is required", fieldName)
+			sf.validation.SetError(fieldName, err)
+			return err
+		}
 	}
 
 	// If field is empty and not required, it's valid
