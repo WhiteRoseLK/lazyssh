@@ -76,6 +76,18 @@ func (m *mockServerService) SetHidden(alias string, hidden bool) error {
 	return nil
 }
 
+func (m *mockServerService) ListActiveSessions(string) ([]domain.Server, error) {
+	return nil, nil
+}
+
+func (m *mockServerService) KillActiveSessions(domain.Server) (int, error) {
+	return 0, nil
+}
+
+func (m *mockServerService) ResolveConfigServer(server domain.Server) (domain.Server, bool, error) {
+	return server, true, nil
+}
+
 func TestNewTUI_ExitOnDisconnectConfig(t *testing.T) {
 	logger := zap.NewNop().Sugar()
 	svc := &mockServerService{}

@@ -53,6 +53,7 @@ type tui struct {
 	header     *AppHeader
 	searchBar  *SearchBar
 	serverList *ServerList
+	activeList *ServerList
 	details    *ServerDetails
 	statusBar  *tview.TextView
 
@@ -230,11 +231,17 @@ func (t *tui) buildComponents() {
 	t.serverList = NewServerList().
 		OnSelectionChange(t.handleServerSelectionChange).
 		OnReturnToSearch(t.handleReturnToSearch).
-		OnTab(t.handleDetailsFocus).
+		OnTab(t.handleActiveListFocus).
 		OnBacktab(t.handleSearchFocus)
+	t.activeList = NewServerList().
+		OnSelectionChange(t.handleServerSelectionChange).
+		OnReturnToSearch(t.handleReturnToSearch).
+		OnTab(t.handleDetailsFocus).
+		OnBacktab(t.handleServerListFocus)
+	t.activeList.SetTitle(" 2 Active Sessions (K: Terminate) ")
 	t.details = NewServerDetails(t.readonly).
 		OnTab(t.handleSearchFocus).
-		OnBacktab(t.handleServerListFocus).
+		OnBacktab(t.handleActiveListFocus).
 		OnEscape(t.handleServerListFocus)
 	t.statusBar = NewStatusBar(t.readonly)
 
@@ -257,7 +264,8 @@ func (t *tui) loadPreferences() {
 func (t *tui) buildLayout() {
 	t.left = tview.NewFlex().SetDirection(tview.FlexRow).
 		AddItem(t.searchBar, 3, 0, false).
-		AddItem(t.serverList, 0, 1, true)
+		AddItem(t.serverList, 0, 1, true).
+		AddItem(t.activeList, 8, 0, false)
 
 	right := tview.NewFlex().SetDirection(tview.FlexRow).
 		AddItem(t.details, 0, 1, false)
@@ -280,6 +288,9 @@ func (t *tui) bindEvents() {
 		if t.serverList != nil {
 			t.serverList.RefreshDisplay()
 		}
+		if t.activeList != nil {
+			t.activeList.RefreshDisplay()
+		}
 		return false
 	})
 }
@@ -287,6 +298,7 @@ func (t *tui) bindEvents() {
 func (t *tui) updateFocusBorders() {
 	searchFocused := t.searchBar != nil && t.searchBar.HasFocus()
 	listFocused := t.serverList != nil && t.serverList.HasFocus()
+	activeFocused := t.activeList != nil && t.activeList.HasFocus()
 	detailsFocused := t.details != nil && t.details.HasFocus()
 
 	if t.searchBar != nil {
@@ -302,6 +314,14 @@ func (t *tui) updateFocusBorders() {
 			t.serverList.SetBorderColor(CurrentTheme.BorderColorFocused).SetTitleColor(CurrentTheme.TitleColorFocused)
 		} else {
 			t.serverList.SetBorderColor(CurrentTheme.BorderColorUnfocused).SetTitleColor(CurrentTheme.TitleColorUnfocused)
+		}
+	}
+
+	if t.activeList != nil {
+		if activeFocused {
+			t.activeList.SetBorderColor(CurrentTheme.BorderColorFocused).SetTitleColor(CurrentTheme.TitleColorFocused)
+		} else {
+			t.activeList.SetBorderColor(CurrentTheme.BorderColorUnfocused).SetTitleColor(CurrentTheme.TitleColorUnfocused)
 		}
 	}
 
@@ -325,6 +345,10 @@ func (t *tui) rebuildUI() {
 	if t.serverList != nil {
 		currentIdx = t.serverList.GetCurrentItem()
 	}
+	activeIdx := 0
+	if t.activeList != nil {
+		activeIdx = t.activeList.GetCurrentItem()
+	}
 
 	t.buildComponents()
 	t.buildLayout()
@@ -336,6 +360,9 @@ func (t *tui) rebuildUI() {
 	t.loadInitialData()
 	if currentIdx >= 0 && currentIdx < t.serverList.GetItemCount() {
 		t.serverList.SetCurrentItem(currentIdx)
+	}
+	if activeIdx >= 0 && activeIdx < t.activeList.GetItemCount() {
+		t.activeList.SetCurrentItem(activeIdx)
 	}
 	if srv, ok := t.serverList.GetSelectedServer(); ok {
 		t.details.UpdateServer(srv)
@@ -368,6 +395,10 @@ func (t *tui) loadInitialData() {
 	displayServers := t.filterServersForDisplay(servers)
 	t.updateListTitle()
 	t.serverList.UpdateServers(displayServers)
+	if t.activeList != nil {
+		active, _ := t.serverService.ListActiveSessions(query)
+		t.activeList.UpdateServers(active)
+	}
 	if query != "" {
 		t.searchBar.SetText(query)
 		if len(displayServers) == 0 {

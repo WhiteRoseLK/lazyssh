@@ -129,10 +129,16 @@ func TestPanelNavigation_TabAndBacktabCycling(t *testing.T) {
 		t.Fatalf("expected serverList to have focus")
 	}
 
-	// Tab from serverList -> details
+	// Tab from serverList -> activeList
+	app.handleNextPanel()
+	if app.app.GetFocus() != app.activeList {
+		t.Fatalf("expected activeList to have focus after Tab from serverList")
+	}
+
+	// Tab from activeList -> details
 	app.handleNextPanel()
 	if app.app.GetFocus() != app.details {
-		t.Fatalf("expected details to have focus after Tab from serverList")
+		t.Fatalf("expected details to have focus after Tab from activeList")
 	}
 
 	// Tab from details -> searchBar
@@ -159,10 +165,16 @@ func TestPanelNavigation_TabAndBacktabCycling(t *testing.T) {
 		t.Fatalf("expected details to have focus after Shift-Tab from searchBar")
 	}
 
-	// Shift-Tab from details -> serverList
+	// Shift-Tab from details -> activeList
+	app.handlePrevPanel()
+	if app.app.GetFocus() != app.activeList {
+		t.Fatalf("expected activeList to have focus after Shift-Tab from details")
+	}
+
+	// Shift-Tab from activeList -> serverList
 	app.handlePrevPanel()
 	if app.app.GetFocus() != app.serverList {
-		t.Fatalf("expected serverList to have focus after Shift-Tab from details")
+		t.Fatalf("expected serverList to have focus after Shift-Tab from activeList")
 	}
 }
 
@@ -181,10 +193,10 @@ func TestPanelNavigation_NumericKeys(t *testing.T) {
 		t.Fatalf("expected blurSearchBar to restore focus to serverList")
 	}
 
-	// '2' focuses details
+	// '2' focuses activeList
 	app.handleGlobalKeys(tcell.NewEventKey(tcell.KeyRune, '2', tcell.ModNone))
-	if app.app.GetFocus() != app.details {
-		t.Fatalf("expected '2' to focus details")
+	if app.app.GetFocus() != app.activeList {
+		t.Fatalf("expected '2' to focus activeList")
 	}
 
 	// '1' focuses serverList

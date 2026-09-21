@@ -107,6 +107,18 @@ func (m *mockReadOnlyService) SaveTheme(string) error {
 	return nil
 }
 
+func (m *mockReadOnlyService) ListActiveSessions(string) ([]domain.Server, error) {
+	return nil, nil
+}
+
+func (m *mockReadOnlyService) KillActiveSessions(domain.Server) (int, error) {
+	return 0, nil
+}
+
+func (m *mockReadOnlyService) ResolveConfigServer(server domain.Server) (domain.Server, bool, error) {
+	return server, true, nil
+}
+
 func TestTUI_ReadOnlyState(t *testing.T) {
 	logger := zap.NewNop().Sugar()
 	mockSvc := &mockReadOnlyService{}

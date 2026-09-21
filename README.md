@@ -58,8 +58,9 @@ If you are coming from **lazyssh**, here is a concrete summary of everything **n
 | **Duplicate / Clone Server** | Instantly clones any existing server configuration into the Add form with automatic alias deduplication (`srv_1`, `srv_2`), eliminating manual re-typing. | <kbd>y</kbd> / <kbd>C</kbd> |
 | **Zero-Friction Migration** | Automatically detects and migrates your favorites, tags, and connection history from `~/.lazyssh` to `~/.neossh`. | *Automatic* |
 | **Custom Config Path** | Loads any alternative SSH config file without modifying `~/.ssh/config`. | `--sshconfig <path>` |
-| **Focus Borders & UI Navigation** | Distinct focus borders highlight the currently active panel (Search, Server List, Details), with smooth <kbd>Tab</kbd> / <kbd>Shift+Tab</kbd> cycling across panels and form fields, active field highlights, and robust destructive confirmation dialogs. | <kbd>Tab</kbd> / <kbd>Shift+Tab</kbd> |
-| **Quick Panel Jump** | Instant focus switching between Search, Server List, and Details panels using numeric keys. | <kbd>0</kbd> / <kbd>1</kbd> / <kbd>2</kbd> |
+| **Active SSH Sessions Panel** | Dedicated live panel tracking running SSH and background sessions with process inspection (PID, forwarded ports, identity keys), one-touch process termination (<kbd>K</kbd>), and instant configuration generation (<kbd>a</kbd>) directly from running connections. | <kbd>2</kbd> / <kbd>K</kbd> |
+| **Focus Borders & UI Navigation** | Distinct focus borders highlight the currently active panel (Search, Servers, Active Sessions, Details), with smooth <kbd>Tab</kbd> / <kbd>Shift+Tab</kbd> cycling across panels and form fields, active field highlights, and robust destructive confirmation dialogs. | <kbd>Tab</kbd> / <kbd>Shift+Tab</kbd> |
+| **Quick Panel Jump** | Instant focus switching between Search, Servers, Active Sessions, and Details panels using numeric keys. | <kbd>0</kbd> / <kbd>1</kbd> / <kbd>2</kbd> / <kbd>3</kbd> |
 | **Modern Toolchain & Deps** | Fully upgraded to latest upstream packages (`tview v0.42`, `tcell/v2 v2.13`, `cobra v1.10`, `zap v1.28`, `go-runewidth v0.0.30`), with Go race detection and `golangci-lint` v2. | *Core* |
 
 ### 🛠️ Bug Fixes & Stability Improvements
@@ -298,14 +299,14 @@ neossh --sshconfig ~/.ssh/config_work -r
 | `c` | Copy SSH connection command to clipboard |
 | `v` | Paste SSH command from clipboard *(disabled in read-only mode)* |
 | `y` / `C` | Duplicate / clone selected server entry *(disabled in read-only mode)* |
-| `K` | Push SSH public key to server via `ssh-copy-id` *(disabled in read-only mode)* |
+| `K` | Terminate active SSH session (when on Active Sessions) / Push SSH key via `ssh-copy-id` (when on Servers) *(disabled in read-only mode)* |
 | `f` | Configure SSH port forwarding (Local / Remote / Dynamic) |
 | `s` | Toggle sort mode (alias, last SSH, reverse) |
 | `g` | Ping selected server |
 | `G` | Ping all servers (parallel check with latency badges) |
-| `Tab` / `Shift+Tab` | Cycle focus between Search, Server List, and Details panels |
-| `0` / `1` / `2` / `3` | Focus Search (`0`) / Server List (`1`) / Details (`2`, `3`) |
-| `j` / `k` or `↓` / `↑` | Navigate server list |
+| `Tab` / `Shift+Tab` | Cycle focus between Search, Servers, Active Sessions, and Details panels |
+| `0` / `1` / `2` / `3` | Focus Search (`0`) / Servers (`1`) / Active Sessions (`2`) / Details (`3`) |
+| `j` / `k` or `↓` / `↑` | Navigate server / active session list |
 | `q` / `Ctrl+C` | Quit |
 
 > [!NOTE]
@@ -393,7 +394,7 @@ This project is licensed under the [Apache-2.0 License](LICENSE).
   - `@gonsalvesc` — XDG base directory specification support
   - `@levinion` — Copy SSH command shortcut
   - `@gaoyifan` — Persistent sort mode
-  - `@k161196` — Panel focus shortcuts
+  - `@k161196` — Panel focus shortcuts, active background SSH sessions panel, and process controls
   - `@shekel588` — Keyboard navigation improvements, focus borders, active field styling, and confirmation dialogs
   - `@vtmocanu` — Hidden hosts support, visibility toggling, and filtering
   - `@davidszp` — Dark, Light, and System color theme support with runtime toggle

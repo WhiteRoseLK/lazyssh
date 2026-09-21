@@ -38,4 +38,7 @@ type ServerService interface {
 	ImportKnownHosts(knownHostsPath string) (domain.ImportResult, error)
 	GetTheme() (string, error)
 	SaveTheme(theme string) error
+	ListActiveSessions(query string) ([]domain.Server, error)
+	KillActiveSessions(server domain.Server) (int, error)
+	ResolveConfigServer(server domain.Server) (domain.Server, bool, error)
 }

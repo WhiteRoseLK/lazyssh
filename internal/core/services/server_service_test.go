@@ -457,3 +457,88 @@ func TestServerService_SetHidden_NormalMode(t *testing.T) {
 		t.Fatalf("SetHidden failed in normal mode: %v", err)
 	}
 }
+
+func TestHelperPSProcess(t *testing.T) {
+	if os.Getenv("GO_WANT_HELPER_PS") != "1" {
+		return
+	}
+	_, _ = os.Stdout.WriteString(" 9999 ssh test.example.com -p 22 -l user1\n")
+	os.Exit(0)
+}
+
+func TestSplitPSLine(t *testing.T) {
+	pid, comm, args := splitPSLine(" 12345 ssh root@192.168.1.10 -p 2222")
+	if pid != 12345 || comm != "ssh" || args != "root@192.168.1.10 -p 2222" {
+		t.Fatalf("unexpected splitPSLine: pid=%d, comm=%s, args=%s", pid, comm, args)
+	}
+}
+
+func TestParseSSHArgs(t *testing.T) {
+	session := parseSSHArgs([]string{"ssh", "-p", "2200", "-l", "admin", "-i", "~/.ssh/id_rsa", "-L", "8080:localhost:80", "myserver.local"})
+	if session.port != 2200 {
+		t.Fatalf("expected port 2200, got %d", session.port)
+	}
+	if session.user != "admin" {
+		t.Fatalf("expected user admin, got %s", session.user)
+	}
+	if session.host != "myserver.local" {
+		t.Fatalf("expected host myserver.local, got %s", session.host)
+	}
+	if len(session.identityFiles) != 1 || session.identityFiles[0] != "~/.ssh/id_rsa" {
+		t.Fatalf("unexpected identityFiles: %v", session.identityFiles)
+	}
+	if len(session.localForward) != 1 || session.localForward[0] != "8080:localhost:80" {
+		t.Fatalf("unexpected localForward: %v", session.localForward)
+	}
+}
+
+func TestListActiveSessions_And_KillActiveSessions(t *testing.T) {
+	oldPS := psCommand
+	oldKill := killPIDFunc
+	defer func() {
+		psCommand = oldPS
+		killPIDFunc = oldKill
+	}()
+
+	psCommand = func() *exec.Cmd {
+		cs := []string{"-test.run=TestHelperPSProcess", "--"}
+		cmd := exec.Command(os.Args[0], cs...)
+		cmd.Env = append(os.Environ(), "GO_WANT_HELPER_PS=1")
+		return cmd
+	}
+
+	killedPIDs := make([]int, 0)
+	killPIDFunc = func(pid int) error {
+		killedPIDs = append(killedPIDs, pid)
+		return nil
+	}
+
+	logger := zap.NewNop().Sugar()
+	mockRepo := &mockServerRepository{}
+	svc := NewServerService(logger, mockRepo)
+
+	sessions, err := svc.ListActiveSessions("")
+	if err != nil {
+		t.Fatalf("ListActiveSessions failed: %v", err)
+	}
+	if len(sessions) != 1 {
+		t.Fatalf("expected 1 session, got %d", len(sessions))
+	}
+	if sessions[0].ActivePID != 9999 {
+		t.Fatalf("expected PID 9999, got %d", sessions[0].ActivePID)
+	}
+	if sessions[0].Host != "test.example.com" {
+		t.Fatalf("expected test.example.com, got %s", sessions[0].Host)
+	}
+
+	count, err := svc.KillActiveSessions(sessions[0])
+	if err != nil {
+		t.Fatalf("KillActiveSessions failed: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("expected killed count 1, got %d", count)
+	}
+	if len(killedPIDs) != 1 || killedPIDs[0] != 9999 {
+		t.Fatalf("expected killed PID 9999, got %v", killedPIDs)
+	}
+}
