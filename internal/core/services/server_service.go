@@ -392,12 +392,50 @@ func (s *serverService) SetHidden(alias string, hidden bool) error {
 	return err
 }
 
+var terminalTitleWriter io.Writer = os.Stdout
+
+// SetTerminalTitle sets the terminal emulator window/tab title using standard OSC 0 sequence.
+func SetTerminalTitle(title string) {
+	if terminalTitleWriter != nil {
+		_, _ = fmt.Fprintf(terminalTitleWriter, "\033]0;%s\007", title)
+	}
+}
+
+// RestoreTerminalTitle restores the terminal emulator window/tab title to default.
+func RestoreTerminalTitle() {
+	if terminalTitleWriter != nil {
+		_, _ = fmt.Fprint(terminalTitleWriter, "\033]0;\007")
+	}
+}
+
+func (s *serverService) formatTerminalTitle(alias string) string {
+	title := alias
+	if s.serverRepository != nil {
+		if servers, err := s.serverRepository.ListServers(alias); err == nil {
+			for _, srv := range servers {
+				if strings.EqualFold(srv.Alias, alias) {
+					if srv.Host != "" && !strings.EqualFold(srv.Host, alias) {
+						title = fmt.Sprintf("%s (%s)", alias, srv.Host)
+					}
+					break
+				}
+			}
+		}
+	}
+	return title
+}
+
 // SSH starts an interactive SSH session to the given alias using the system's ssh client.
 func (s *serverService) SSH(alias string) error {
 	s.logger.Infow("ssh start", "alias", alias)
 	if strings.ContainsAny(alias, "*?") {
 		return fmt.Errorf("cannot initiate direct SSH connection to a wildcard pattern block")
 	}
+
+	title := s.formatTerminalTitle(alias)
+	SetTerminalTitle(title)
+	defer RestoreTerminalTitle()
+
 	cmdFactory := s.newSSHCommand
 	if cmdFactory == nil {
 		cmdFactory = func(a string) *exec.Cmd {
@@ -442,6 +480,11 @@ func (s *serverService) SSHWithArgs(alias string, extraArgs []string) error {
 	if strings.ContainsAny(alias, "*?") {
 		return fmt.Errorf("cannot initiate direct SSH connection to a wildcard pattern block")
 	}
+
+	title := s.formatTerminalTitle(alias)
+	SetTerminalTitle(title)
+	defer RestoreTerminalTitle()
+
 	cmdFactory := s.newSSHCommandWithArgs
 	if cmdFactory == nil {
 		cmdFactory = func(a string, extra []string) *exec.Cmd {
