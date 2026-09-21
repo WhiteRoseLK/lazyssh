@@ -44,30 +44,31 @@ const (
 )
 
 type ServerForm struct {
-	*tview.Flex                 // The root container (includes header, form panel and hint bar)
-	header          *AppHeader  // The app header
-	formPanel       *tview.Flex // The actual form panel
-	pages           *tview.Pages
-	tabBar          *tview.TextView
-	forms           map[string]*tview.Form
-	currentTab      string
-	tabs            []string
-	tabAbbrev       map[string]string // Abbreviated tab names for narrow views
-	mode            ServerFormMode
-	original        *domain.Server
-	initialData     *domain.Server // Initial data for pre-filling form (used in Add mode)
-	existingAliases []string       // List of existing aliases for validation
-	existingGroups  []string       // List of existing groups for autocomplete
-	onSave          func(domain.Server, *domain.Server)
-	onCancel        func()
-	app             *tview.Application // Reference to app for showing modals
-	version         string             // Version for header
-	commit          string             // Commit for header
-	validation      *ValidationState   // Validation state for all fields
-	helpPanel       *tview.TextView    // Help panel for field descriptions
-	helpMode        HelpDisplayMode    // Current help display mode
-	currentField    string             // Currently focused field
-	mainContainer   *tview.Flex        // Container for form and help panel
+	*tview.Flex                    // The root container (includes header, form panel and hint bar)
+	header             *AppHeader  // The app header
+	formPanel          *tview.Flex // The actual form panel
+	pages              *tview.Pages
+	tabBar             *tview.TextView
+	forms              map[string]*tview.Form
+	currentTab         string
+	tabs               []string
+	tabAbbrev          map[string]string // Abbreviated tab names for narrow views
+	mode               ServerFormMode
+	original           *domain.Server
+	initialData        *domain.Server // Initial data for pre-filling form (used in Add mode)
+	existingAliases    []string       // List of existing aliases for validation
+	existingGroups     []string       // List of existing groups for autocomplete
+	onSave             func(domain.Server, *domain.Server)
+	onCancel           func()
+	app                *tview.Application // Reference to app for showing modals
+	version            string             // Version for header
+	commit             string             // Commit for header
+	validation         *ValidationState   // Validation state for all fields
+	helpPanel          *tview.TextView    // Help panel for field descriptions
+	helpMode           HelpDisplayMode    // Current help display mode
+	currentField       string             // Currently focused field
+	mainContainer      *tview.Flex        // Container for form and help panel
+	defaultIdentityKey string             // Configured default SSH identity key for new servers
 }
 
 const (
@@ -1190,7 +1191,13 @@ func (sf *ServerForm) getDefaultValues() ServerFormData {
 			Host:  server.Host,
 			User:  server.User,
 			Port:  fmt.Sprint(server.Port),
-			Key:   strings.Join(server.IdentityFiles, ", "),
+			Key: func() string {
+				k := strings.Join(server.IdentityFiles, ", ")
+				if k == "" && sf.mode == ServerFormAdd {
+					return sf.defaultIdentityKey
+				}
+				return k
+			}(),
 			Tags:  strings.Join(server.Tags, ", "),
 			Group: server.Group,
 			Hidden: func() string {
@@ -1269,11 +1276,11 @@ func (sf *ServerForm) getDefaultValues() ServerFormData {
 	// For new servers, use empty values instead of SSH defaults
 	// SSH defaults will be applied by the SSH client if values are not specified
 	return ServerFormData{
-		Alias:  "",   // Explicitly empty for new servers
-		Host:   "",   // Explicitly empty for new servers
-		User:   "",   // Empty for new servers (SSH will use current username)
-		Port:   "22", // Keep port 22 as it's the standard SSH port
-		Key:    "",   // Empty for new servers (SSH will try default keys)
+		Alias:  "",                    // Explicitly empty for new servers
+		Host:   "",                    // Explicitly empty for new servers
+		User:   "",                    // Empty for new servers (SSH will use current username)
+		Port:   "22",                  // Keep port 22 as it's the standard SSH port
+		Key:    sf.defaultIdentityKey, // Configured default identity key if present
 		Tags:   "",
 		Group:  "",
 		Hidden: "no",
@@ -2511,5 +2518,10 @@ func (sf *ServerForm) SetVersionInfo(version, commit string) *ServerForm {
 
 func (sf *ServerForm) SetExistingGroups(groups []string) *ServerForm {
 	sf.existingGroups = groups
+	return sf
+}
+
+func (sf *ServerForm) SetDefaultIdentityKey(key string) *ServerForm {
+	sf.defaultIdentityKey = key
 	return sf
 }

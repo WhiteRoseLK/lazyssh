@@ -172,6 +172,12 @@ func (g *GitSSHSetup) buildInfoText(currentConfig string) {
 		info += fmt.Sprintf("[green]%d key(s) loaded in ssh-agent[-]\n", keysInAgent)
 	}
 
+	if g.serverRepo != nil {
+		if defKey, err := g.serverRepo.GetDefaultIdentityKey(); err == nil && defKey != "" {
+			info += fmt.Sprintf("[cyan]Default Server Key:[-] %s\n", defKey)
+		}
+	}
+
 	g.infoText.SetText(info)
 }
 
@@ -225,6 +231,10 @@ func (g *GitSSHSetup) buildForm(currentConfig string) {
 
 	g.form.AddButton("Configure", g.handleConfigure)
 
+	if g.serverRepo != nil {
+		g.form.AddButton("Set Default Key", g.handleSetDefaultKey)
+	}
+
 	if currentConfig != "" {
 		g.form.AddButton("Clear Config", g.handleClearConfig)
 	}
@@ -234,6 +244,33 @@ func (g *GitSSHSetup) buildForm(currentConfig string) {
 			g.onCancel()
 		}
 	})
+}
+
+func (g *GitSSHSetup) handleSetDefaultKey() {
+	if g.selectedKey == "" {
+		return
+	}
+	if err := g.serverRepo.SaveDefaultIdentityKey(g.selectedKey); err != nil {
+		errorModal := tview.NewModal().
+			SetText(fmt.Sprintf("Failed to save default key:\n\n%v", err)).
+			AddButtons([]string{"OK"}).
+			SetDoneFunc(func(_ int, _ string) {
+				g.app.SetRoot(g, true)
+				g.app.SetFocus(g.form)
+			})
+		g.app.SetRoot(errorModal, true)
+		return
+	}
+
+	successModal := tview.NewModal().
+		SetText(fmt.Sprintf("Default SSH key for new servers set to:\n\n%s", g.selectedKey)).
+		AddButtons([]string{"OK"}).
+		SetDoneFunc(func(_ int, _ string) {
+			if g.onDone != nil {
+				g.onDone()
+			}
+		})
+	g.app.SetRoot(successModal, true)
 }
 
 func (g *GitSSHSetup) handleConfigure() {

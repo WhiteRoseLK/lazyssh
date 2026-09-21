@@ -463,6 +463,7 @@ func (t *tui) handlePasteCommand() {
 	// Note: For Add mode, original should be nil. We'll set initial data separately.
 	form := NewServerForm(ServerFormAdd, nil).
 		SetInitialData(server).
+		SetDefaultIdentityKey(t.getDefaultIdentityKey()).
 		SetApp(t.app).
 		SetVersionInfo(t.version, t.commit).
 		OnSave(t.handleServerSave).
@@ -824,6 +825,7 @@ func (t *tui) handleServerAdd() {
 		t.showReadonlyModal()
 		return
 	}
+	defaultKey := t.getDefaultIdentityKey()
 	if t.isActiveListFocused() {
 		if server, ok := t.activeList.GetSelectedServer(); ok {
 			prefill := server
@@ -831,6 +833,7 @@ func (t *tui) handleServerAdd() {
 			prefill.Tags = nil
 			form := NewServerForm(ServerFormAdd, nil).
 				SetInitialData(&prefill).
+				SetDefaultIdentityKey(defaultKey).
 				SetApp(t.app).
 				SetVersionInfo(t.version, t.commit).
 				OnSave(t.handleServerSave).
@@ -842,6 +845,7 @@ func (t *tui) handleServerAdd() {
 		}
 	}
 	form := NewServerForm(ServerFormAdd, nil).
+		SetDefaultIdentityKey(defaultKey).
 		SetApp(t.app).
 		SetVersionInfo(t.version, t.commit).
 		OnSave(t.handleServerSave).

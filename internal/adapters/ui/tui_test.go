@@ -88,6 +88,14 @@ func (m *mockServerService) ResolveConfigServer(server domain.Server) (domain.Se
 	return server, true, nil
 }
 
+func (m *mockServerService) GetDefaultIdentityKey() (string, error) {
+	return "", nil
+}
+
+func (m *mockServerService) SaveDefaultIdentityKey(string) error {
+	return nil
+}
+
 func TestNewTUI_ExitOnDisconnectConfig(t *testing.T) {
 	logger := zap.NewNop().Sugar()
 	svc := &mockServerService{}
