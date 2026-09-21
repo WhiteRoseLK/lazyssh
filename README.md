@@ -61,6 +61,7 @@ If you are coming from **lazyssh**, here is a concrete summary of everything **n
 | **Duplicate / Clone Server** | Instantly clones any existing server configuration into the Add form with automatic alias deduplication (`srv_1`, `srv_2`), eliminating manual re-typing. | <kbd>y</kbd> / <kbd>C</kbd> |
 | **Zero-Friction Migration** | Automatically detects and migrates your favorites, tags, and connection history from `~/.lazyssh` to `~/.neossh`. | *Automatic* |
 | **Custom Config Path** | Loads any alternative SSH config file without modifying `~/.ssh/config`. | `--sshconfig <path>` |
+| **Windows Scoop Manifest** | Native Scoop package recipe allowing effortless installation and updates on Windows without administrator rights. | `scoop install ...` |
 | **Active SSH Sessions Panel** | Dedicated live panel tracking running SSH and background sessions with process inspection (PID, forwarded ports, identity keys), one-touch process termination (<kbd>K</kbd>), and instant configuration generation (<kbd>a</kbd>) directly from running connections. | <kbd>2</kbd> / <kbd>K</kbd> |
 | **Focus Borders & UI Navigation** | Distinct focus borders highlight the currently active panel (Search, Servers, Active Sessions, Details), with smooth <kbd>Tab</kbd> / <kbd>Shift+Tab</kbd> cycling across panels and form fields, active field highlights, and robust destructive confirmation dialogs. | <kbd>Tab</kbd> / <kbd>Shift+Tab</kbd> |
 | **Quick Panel Jump** | Instant focus switching between Search, Servers, Active Sessions, and Details panels using numeric keys. | <kbd>0</kbd> / <kbd>1</kbd> / <kbd>2</kbd> / <kbd>3</kbd> |
@@ -205,8 +206,19 @@ sudo mv neossh /usr/local/bin/
 ```
 
 #### Windows:
-1. Download the `.zip` archive from the [Releases page](https://github.com/WhiteRoseLK/neossh/releases/latest).
-2. Extract `neossh.exe` to a folder in your `PATH` (e.g. `C:\Windows\System32` or a dedicated tools directory).
+
+- **Via Scoop (Recommended)**:
+  ```powershell
+  # Install directly via repository manifest:
+  scoop install https://raw.githubusercontent.com/WhiteRoseLK/neossh/main/scoop/neossh.json
+
+  # Or add the official scoop bucket:
+  scoop bucket add neossh https://github.com/WhiteRoseLK/scoop-bucket
+  scoop install neossh
+  ```
+- **Manual Zip Download**:
+  1. Download the `.zip` archive from the [Releases page](https://github.com/WhiteRoseLK/neossh/releases/latest).
+  2. Extract `neossh.exe` to a folder in your `PATH` (e.g. `C:\Windows\System32` or a dedicated tools directory).
 
 ---
 
@@ -492,7 +504,7 @@ This project is licensed under the [Apache-2.0 License](LICENSE).
   - `@leleobhz` — CLI filter, direct connect options, and Arch Linux AUR package maintenance
   - `@eznix86` — Import hosts from `~/.ssh/known_hosts` (CLI flag & bootstrap)
   - `@OleksandrKucherenko` — Git SSH key configuration, profile switcher, and SSH key management
-  - `@gonsalvesc` — XDG base directory specification support
+  - `@gonsalvesc` — XDG base directory specification support & Windows Scoop package manifest
   - `@levinion` — Copy SSH command shortcut
   - `@gaoyifan` — Persistent sort mode
   - `@k161196` — Panel focus shortcuts, active background SSH sessions panel, and process controls
