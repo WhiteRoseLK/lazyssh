@@ -28,4 +28,6 @@ type ServerRepository interface {
 	GetConfigFile() string
 	DiscoverKnownHosts(knownHostsPath string) ([]domain.Server, domain.ImportResult, error)
 	ImportKnownHosts(knownHostsPath string) (domain.ImportResult, error)
+	GetTheme() (string, error)
+	SaveTheme(theme string) error
 }

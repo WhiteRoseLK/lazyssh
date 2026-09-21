@@ -25,6 +25,11 @@ import (
 	"go.uber.org/zap"
 )
 
+// Settings contains application-level settings stored in the metadata file.
+type Settings struct {
+	Theme string `json:"theme,omitempty"`
+}
+
 type ServerMetadata struct {
 	Tags     []string `json:"tags,omitempty"`
 	LastSeen string   `json:"last_seen,omitempty"`
@@ -38,6 +43,12 @@ type ServerMetadata struct {
 	File string `json:"file,omitempty"`
 }
 
+// MetadataFile is the top-level structure of the metadata JSON file.
+type MetadataFile struct {
+	Settings Settings                  `json:"settings,omitempty"`
+	Servers  map[string]ServerMetadata `json:"servers,omitempty"`
+}
+
 type metadataManager struct {
 	filePath string
 	logger   *zap.SugaredLogger
@@ -47,11 +58,13 @@ func newMetadataManager(filePath string, logger *zap.SugaredLogger) *metadataMan
 	return &metadataManager{filePath: filePath, logger: logger}
 }
 
-func (m *metadataManager) loadAll() (map[string]ServerMetadata, error) {
-	metadata := make(map[string]ServerMetadata)
+func (m *metadataManager) loadFile() (*MetadataFile, error) {
+	result := &MetadataFile{
+		Servers: make(map[string]ServerMetadata),
+	}
 
 	if _, err := os.Stat(m.filePath); os.IsNotExist(err) {
-		return metadata, nil
+		return result, nil
 	}
 
 	data, err := os.ReadFile(m.filePath)
@@ -60,34 +73,92 @@ func (m *metadataManager) loadAll() (map[string]ServerMetadata, error) {
 	}
 
 	if len(data) == 0 {
-		return metadata, nil
+		return result, nil
 	}
 
-	if err := json.Unmarshal(data, &metadata); err != nil {
+	if err := json.Unmarshal(data, result); err != nil {
 		return nil, fmt.Errorf("parse metadata JSON '%s': %w", m.filePath, err)
 	}
 
-	return metadata, nil
+	if len(result.Servers) == 0 {
+		var oldFormat map[string]ServerMetadata
+		if err := json.Unmarshal(data, &oldFormat); err == nil && len(oldFormat) > 0 {
+			for _, v := range oldFormat {
+				if len(v.Tags) > 0 || v.LastSeen != "" || v.PinnedAt != "" || v.Hidden || v.SSHCount > 0 || v.File != "" {
+					result.Servers = oldFormat
+					break
+				}
+			}
+		}
+	}
+
+	if result.Servers == nil {
+		result.Servers = make(map[string]ServerMetadata)
+	}
+
+	return result, nil
 }
 
-func (m *metadataManager) saveAll(metadata map[string]ServerMetadata) error {
+func (m *metadataManager) saveFile(file *MetadataFile) error {
 	if err := m.ensureDirectory(); err != nil {
-		m.logger.Errorw("failed to ensure metadata directory", "path", m.filePath, "error", err)
-
+		if m.logger != nil {
+			m.logger.Errorw("failed to ensure metadata directory", "path", m.filePath, "error", err)
+		}
 		return fmt.Errorf("ensure metadata directory for '%s': %w", m.filePath, err)
 	}
 
-	data, err := json.MarshalIndent(metadata, "", "  ")
+	data, err := json.MarshalIndent(file, "", "  ")
 	if err != nil {
-		m.logger.Errorw("failed to marshal metadata", "path", m.filePath, "error", err)
+		if m.logger != nil {
+			m.logger.Errorw("failed to marshal metadata", "path", m.filePath, "error", err)
+		}
 		return fmt.Errorf("marshal metadata for '%s': %w", m.filePath, err)
 	}
 
 	if err := os.WriteFile(m.filePath, data, 0o600); err != nil {
-		m.logger.Errorw("failed to write metadata file", "path", m.filePath, "error", err)
+		if m.logger != nil {
+			m.logger.Errorw("failed to write metadata file", "path", m.filePath, "error", err)
+		}
 		return fmt.Errorf("write metadata '%s': %w", m.filePath, err)
 	}
 	return nil
+}
+
+func (m *metadataManager) loadAll() (map[string]ServerMetadata, error) {
+	file, err := m.loadFile()
+	if err != nil {
+		return nil, err
+	}
+	return file.Servers, nil
+}
+
+func (m *metadataManager) saveAll(metadata map[string]ServerMetadata) error {
+	file, err := m.loadFile()
+	if err != nil {
+		file = &MetadataFile{}
+	}
+	file.Servers = metadata
+	return m.saveFile(file)
+}
+
+func (m *metadataManager) GetSettings() (Settings, error) {
+	file, err := m.loadFile()
+	if err != nil {
+		return Settings{}, err
+	}
+	return file.Settings, nil
+}
+
+func (m *metadataManager) SaveSettings(settings Settings) error {
+	file, err := m.loadFile()
+	if err != nil {
+		if m.logger != nil {
+			m.logger.Errorw("failed to load metadata in SaveSettings", "path", m.filePath, "error", err)
+		}
+		return fmt.Errorf("load metadata: %w", err)
+	}
+	file.Settings = settings
+	return m.saveFile(file)
 }
 
 func (m *metadataManager) updateServer(server domain.Server, oldAlias string) error {

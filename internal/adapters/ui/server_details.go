@@ -50,8 +50,8 @@ func (sd *ServerDetails) build() {
 		SetBorder(true).
 		SetTitle(" 2 Details ").
 		SetTitleAlign(tview.AlignCenter).
-		SetBorderColor(BorderColorUnfocused).
-		SetTitleColor(TitleColorUnfocused)
+		SetBorderColor(CurrentTheme.BorderColorUnfocused).
+		SetTitleColor(CurrentTheme.TitleColorUnfocused)
 
 	sd.TextView.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		//nolint:exhaustive // We only handle navigation keys and pass through others
@@ -83,7 +83,8 @@ func renderTagChips(tags []string) string {
 	}
 	chips := make([]string, 0, len(tags))
 	for _, t := range tags {
-		chips = append(chips, fmt.Sprintf("[black:#5FAFFF] %s [-:-:-]", t))
+		chips = append(chips, fmt.Sprintf("[%s:%s] %s [-:-:-]",
+			CurrentTheme.TagChipText, CurrentTheme.TagChipBg, t))
 	}
 	return strings.Join(chips, " ")
 }

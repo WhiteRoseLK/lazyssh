@@ -59,6 +59,10 @@ func (m *mockServerRepository) SetHidden(string, bool) error { return nil }
 
 func (m *mockServerRepository) GetConfigFile() string { return "~/.ssh/config" }
 
+func (m *mockServerRepository) GetTheme() (string, error) { return "dark", nil }
+
+func (m *mockServerRepository) SaveTheme(string) error { return nil }
+
 func (m *mockServerRepository) RecordSSH(alias string) error {
 	m.recordCalls++
 	m.lastAlias = alias

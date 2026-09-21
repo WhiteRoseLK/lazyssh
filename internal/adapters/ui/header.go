@@ -15,6 +15,7 @@
 package ui
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
@@ -47,7 +48,7 @@ func NewAppHeader(version, gitCommit, repoURL string, readonly ...bool) *AppHead
 }
 
 func (h *AppHeader) build() {
-	headerBg := tcell.Color234
+	headerBg := CurrentTheme.HeaderBackground
 
 	left := h.buildLeftSection(headerBg)
 	center := h.buildCenterSection(headerBg)
@@ -70,7 +71,8 @@ func (h *AppHeader) buildLeftSection(bg tcell.Color) *tview.TextView {
 		SetDynamicColors(true).
 		SetTextAlign(tview.AlignLeft)
 	left.SetBackgroundColor(bg)
-	stylizedName := "🚀 [#FFFFFF::b]neo[-][#55D7FF::b]ssh[-]"
+	stylizedName := fmt.Sprintf("🚀 [%s::b]neo[-][%s::b]ssh[-]",
+		CurrentTheme.BrandPrimary, CurrentTheme.BrandSecondary)
 	if h.readonly {
 		stylizedName += " [#EF4444::b][READONLY][-]"
 	}
@@ -87,10 +89,10 @@ func (h *AppHeader) buildCenterSection(bg tcell.Color) *tview.TextView {
 	commit := shortCommit(h.gitCommit)
 
 	// Build tag-like chips for version, commit, and build time
-	versionTag := makeTag(h.version, "#22C55E") // green
+	versionTag := makeTag(h.version, CurrentTheme.VersionTag)
 	commitTag := ""
 	if commit != "" {
-		commitTag = makeTag(commit, "#A78BFA") // violet
+		commitTag = makeTag(commit, CurrentTheme.CommitTag)
 	}
 
 	text := versionTag
@@ -111,14 +113,15 @@ func (h *AppHeader) buildRightSection(bg tcell.Color) *tview.TextView {
 		SetTextAlign(tview.AlignRight)
 	right.SetBackgroundColor(bg)
 	currentTime := time.Now().Format("Mon, 02 Jan 2006 15:04")
-	right.SetText("[#55AAFF::u]🔗 " + h.repoURL + "[-]  [#AAAAAA]• " + currentTime + "[-]")
+	right.SetText(fmt.Sprintf("[%s::u]🔗 %s[-]  [%s]• %s[-]",
+		CurrentTheme.LinkColor, h.repoURL, CurrentTheme.MutedText, currentTime))
 	return right
 }
 
 func (h *AppHeader) createSeparator() *tview.TextView {
 	separator := tview.NewTextView().SetDynamicColors(true)
-	separator.SetBackgroundColor(tcell.Color235)
-	separator.SetText("[#444444]" + strings.Repeat("─", 200) + "[-]")
+	separator.SetBackgroundColor(CurrentTheme.ContrastBackground)
+	separator.SetText(fmt.Sprintf("[%s]%s[-]", CurrentTheme.Separator, strings.Repeat("─", 200)))
 	return separator
 }
 

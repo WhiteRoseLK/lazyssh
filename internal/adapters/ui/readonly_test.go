@@ -99,6 +99,14 @@ func (m *mockReadOnlyService) ImportKnownHosts(string) (domain.ImportResult, err
 	return domain.ImportResult{}, nil
 }
 
+func (m *mockReadOnlyService) GetTheme() (string, error) {
+	return "dark", nil
+}
+
+func (m *mockReadOnlyService) SaveTheme(string) error {
+	return nil
+}
+
 func TestTUI_ReadOnlyState(t *testing.T) {
 	logger := zap.NewNop().Sugar()
 	mockSvc := &mockReadOnlyService{}

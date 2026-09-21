@@ -43,6 +43,7 @@ var (
 	importKnownHosts  bool
 	knownHostsFile    string
 	showHidden        bool
+	themeFlag         string
 
 	rootCmd = newRootCmd()
 )
@@ -147,11 +148,17 @@ func newRootCmd() *cobra.Command {
 				// If multiple matches without exact match, launch interactive TUI pre-filtered so user can choose
 			}
 
+			theme := themeFlag
+			if t, err := cmd.Flags().GetString("theme"); err == nil && t != "" {
+				theme = t
+			}
+
 			tui := ui.NewTUI(log, serverService, version, gitCommit, ui.Config{
 				ExitOnDisconnect: exitOnDisconnect,
 				ReadOnly:         isReadonly,
 				InitialFilter:    filter,
 				ShowHidden:       showHidden,
+				Theme:            theme,
 			})
 
 			return tui.Run()
@@ -187,6 +194,9 @@ func newRootCmd() *cobra.Command {
 	)
 	cmd.PersistentFlags().BoolVarP(
 		&showHidden, "show-hidden", "H", false, "display hidden servers in UI list",
+	)
+	cmd.PersistentFlags().StringVarP(
+		&themeFlag, "theme", "t", "", "set color theme: dark, light, or system",
 	)
 
 	cmd.SilenceUsage = true

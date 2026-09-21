@@ -36,6 +36,7 @@ type Config struct {
 	ReadOnly         bool
 	InitialFilter    string
 	ShowHidden       bool
+	Theme            string
 }
 
 type tui struct {
@@ -60,10 +61,12 @@ type tui struct {
 	content *tview.Flex
 
 	sortMode         SortMode
+	themeWatcher     *ThemeWatcher
 	pingStatuses     map[string]domain.Server
 	exitOnDisconnect bool
 	initialFilter    string
 	showHidden       bool
+	themeFlag        string
 }
 
 func NewTUI(logger *zap.SugaredLogger, ss ports.ServerService, version, commit string, cfg ...Config) App {
@@ -71,11 +74,13 @@ func NewTUI(logger *zap.SugaredLogger, ss ports.ServerService, version, commit s
 	var readonly bool
 	var initialFilter string
 	var showHidden bool
+	var themeFlag string
 	if len(cfg) > 0 {
 		exitOnDisconnect = cfg[0].ExitOnDisconnect
 		readonly = cfg[0].ReadOnly
 		initialFilter = cfg[0].InitialFilter
 		showHidden = cfg[0].ShowHidden
+		themeFlag = cfg[0].Theme
 	}
 	return &tui{
 		logger:           logger,
@@ -89,6 +94,7 @@ func NewTUI(logger *zap.SugaredLogger, ss ports.ServerService, version, commit s
 		exitOnDisconnect: exitOnDisconnect,
 		initialFilter:    initialFilter,
 		showHidden:       showHidden,
+		themeFlag:        themeFlag,
 	}
 }
 
@@ -130,6 +136,7 @@ func (t *tui) Run() error {
 	}()
 	t.app.EnableMouse(true)
 	t.initializeTheme()
+	t.initializeThemeWatcher()
 	t.buildComponents()
 	t.loadPreferences()
 	t.buildLayout()
@@ -141,6 +148,7 @@ func (t *tui) Run() error {
 		t.logger.Errorw("application run error", "error", err)
 		return err
 	}
+	t.stopThemeWatcher()
 	return nil
 }
 
@@ -158,14 +166,55 @@ func configureCursor(screen tcell.Screen) {
 }
 
 func (t *tui) initializeTheme() {
-	tview.Styles.PrimitiveBackgroundColor = tcell.Color232
-	tview.Styles.ContrastBackgroundColor = tcell.Color235
-	tview.Styles.BorderColor = BorderColorUnfocused
-	tview.Styles.TitleColor = TitleColorUnfocused
-	tview.Styles.PrimaryTextColor = tcell.Color252
-	tview.Styles.TertiaryTextColor = tcell.Color245
-	tview.Styles.SecondaryTextColor = tcell.Color245
-	tview.Styles.GraphicsColor = BorderColorUnfocused
+	switch {
+	case t.themeFlag != "":
+		SetTheme(t.themeFlag)
+	case t.settings != nil:
+		if th, err := t.settings.LoadTheme(); err == nil && th != "" {
+			SetTheme(th)
+		} else if t.serverService != nil {
+			if th, err := t.serverService.GetTheme(); err == nil && th != "" {
+				SetTheme(th)
+			}
+		}
+	case t.serverService != nil:
+		if th, err := t.serverService.GetTheme(); err == nil && th != "" {
+			SetTheme(th)
+		}
+	}
+	ApplyTheme()
+}
+
+func (t *tui) initializeThemeWatcher() {
+	t.themeWatcher = NewThemeWatcher(func(newTheme string) {
+		if CurrentThemeMode != ThemeSystem {
+			return
+		}
+		if newTheme == CurrentTheme.Name {
+			return
+		}
+		if t.app != nil {
+			t.app.QueueUpdateDraw(func() {
+				if newTheme == ThemeLight {
+					CurrentTheme = &LightTheme
+				} else {
+					CurrentTheme = &DarkTheme
+				}
+				ApplyTheme()
+				t.rebuildUI()
+				t.showStatusTemp("Theme: " + newTheme + " (system)")
+			})
+		}
+	})
+	if CurrentThemeMode == ThemeSystem {
+		t.themeWatcher.Start()
+	}
+}
+
+func (t *tui) stopThemeWatcher() {
+	if t.themeWatcher != nil {
+		t.themeWatcher.Stop()
+	}
 }
 
 func (t *tui) buildComponents() {
@@ -242,27 +291,59 @@ func (t *tui) updateFocusBorders() {
 
 	if t.searchBar != nil {
 		if searchFocused {
-			t.searchBar.SetBorderColor(BorderColorFocused).SetTitleColor(TitleColorFocused)
+			t.searchBar.SetBorderColor(CurrentTheme.BorderColorFocused).SetTitleColor(CurrentTheme.TitleColorFocused)
 		} else {
-			t.searchBar.SetBorderColor(BorderColorUnfocused).SetTitleColor(TitleColorUnfocused)
+			t.searchBar.SetBorderColor(CurrentTheme.BorderColorUnfocused).SetTitleColor(CurrentTheme.TitleColorUnfocused)
 		}
 	}
 
 	if t.serverList != nil {
 		if listFocused {
-			t.serverList.SetBorderColor(BorderColorFocused).SetTitleColor(TitleColorFocused)
+			t.serverList.SetBorderColor(CurrentTheme.BorderColorFocused).SetTitleColor(CurrentTheme.TitleColorFocused)
 		} else {
-			t.serverList.SetBorderColor(BorderColorUnfocused).SetTitleColor(TitleColorUnfocused)
+			t.serverList.SetBorderColor(CurrentTheme.BorderColorUnfocused).SetTitleColor(CurrentTheme.TitleColorUnfocused)
 		}
 	}
 
 	if t.details != nil {
 		if detailsFocused {
-			t.details.SetBorderColor(BorderColorFocused).SetTitleColor(TitleColorFocused)
+			t.details.SetBorderColor(CurrentTheme.BorderColorFocused).SetTitleColor(CurrentTheme.TitleColorFocused)
 		} else {
-			t.details.SetBorderColor(BorderColorUnfocused).SetTitleColor(TitleColorUnfocused)
+			t.details.SetBorderColor(CurrentTheme.BorderColorUnfocused).SetTitleColor(CurrentTheme.TitleColorUnfocused)
 		}
 	}
+}
+
+// rebuildUI rebuilds all UI components to apply theme changes.
+// It preserves the current state (search query, selection, sort mode).
+func (t *tui) rebuildUI() {
+	query := ""
+	if t.searchBar != nil {
+		query = t.searchBar.InputField.GetText()
+	}
+	currentIdx := 0
+	if t.serverList != nil {
+		currentIdx = t.serverList.GetCurrentItem()
+	}
+
+	t.buildComponents()
+	t.buildLayout()
+	t.bindEvents()
+
+	if query != "" {
+		t.searchBar.InputField.SetText(query)
+	}
+	t.loadInitialData()
+	if currentIdx >= 0 && currentIdx < t.serverList.GetItemCount() {
+		t.serverList.SetCurrentItem(currentIdx)
+	}
+	if srv, ok := t.serverList.GetSelectedServer(); ok {
+		t.details.UpdateServer(srv)
+	}
+
+	t.app.SetRoot(t.root, true)
+	t.app.SetFocus(t.serverList)
+	t.updateFocusBorders()
 }
 
 func (t *tui) filterServersForDisplay(servers []domain.Server) []domain.Server {

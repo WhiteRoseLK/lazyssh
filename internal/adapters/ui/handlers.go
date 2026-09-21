@@ -89,8 +89,10 @@ func normalizeGlobalHotkey(key rune) rune {
 		return 'G'
 	case 'r', 'R':
 		return 'r'
-	case 't', 'T':
+	case 't':
 		return 't'
+	case 'T':
+		return 'T'
 	case 'f', 'F':
 		return 'f'
 	case 'x', 'X':
@@ -232,6 +234,9 @@ func (t *tui) handleGlobalKeys(event *tcell.EventKey) *tcell.EventKey {
 	case 'i', 'I':
 		t.handleImportKnownHosts()
 		return nil
+	case 'T':
+		t.handleThemeToggle()
+		return nil
 	}
 
 	return event
@@ -239,6 +244,43 @@ func (t *tui) handleGlobalKeys(event *tcell.EventKey) *tcell.EventKey {
 
 func (t *tui) handleQuit() {
 	t.app.Stop()
+}
+
+func (t *tui) handleThemeToggle() {
+	var newTheme string
+	switch CurrentThemeMode {
+	case ThemeDark:
+		newTheme = ThemeLight
+	case ThemeLight:
+		newTheme = ThemeSystem
+	default:
+		newTheme = ThemeDark
+	}
+
+	if t.settings != nil {
+		_ = t.settings.SaveTheme(newTheme)
+	}
+	if t.serverService != nil {
+		_ = t.serverService.SaveTheme(newTheme)
+	}
+
+	if t.themeWatcher != nil {
+		if newTheme == ThemeSystem {
+			t.themeWatcher.Start()
+		} else {
+			t.themeWatcher.Stop()
+		}
+	}
+
+	SetTheme(newTheme)
+	ApplyTheme()
+	t.rebuildUI()
+
+	modeLabel := newTheme
+	if newTheme == ThemeSystem {
+		modeLabel = fmt.Sprintf("system (%s)", CurrentTheme.Name)
+	}
+	t.showStatusTemp("Theme: " + modeLabel)
 }
 
 func (t *tui) handleServerPin() {

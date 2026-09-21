@@ -15,16 +15,21 @@
 package ui
 
 import (
-	"github.com/gdamore/tcell/v2"
+	"fmt"
+
 	"github.com/rivo/tview"
 )
 
 func DefaultStatusText() string {
-	return "[white]Tab[-] Panels  • [white]↑↓[-] Navigate  • [white]Enter[-] SSH  • [white]f[-] Forward  • [white]x[-] Stop Forward  • [white]c[-] Copy SSH  • [white]v[-] Paste SSH  • [white]y[-] Clone  • [white]h[-] Copy Host  • [white]m[-] Hide  • [white]H[-] Toggle Hidden  • [white]a[-] Add  • [white]e[-] Edit  • [white]g/G[-] Ping (All)  • [white]K[-] Install Key  • [white]d[-] Delete  • [white]p[-] Pin/Unpin  • [white]i[-] Import  • [white]/[-] Search  • [white]q[-] Quit"
+	k := CurrentTheme.HintKey
+	return fmt.Sprintf("[%s]Tab[-] Panels  • [%s]↑↓[-] Navigate  • [%s]Enter[-] SSH  • [%s]f[-] Forward  • [%s]x[-] Stop Forward  • [%s]c[-] Copy SSH  • [%s]v[-] Paste SSH  • [%s]y[-] Clone  • [%s]h[-] Copy Host  • [%s]m[-] Hide  • [%s]H[-] Toggle Hidden  • [%s]a[-] Add  • [%s]e[-] Edit  • [%s]g/G[-] Ping (All)  • [%s]K[-] Install Key  • [%s]d[-] Delete  • [%s]p[-] Pin/Unpin  • [%s]T[-] Theme  • [%s]i[-] Import  • [%s]/[-] Search  • [%s]q[-] Quit",
+		k, k, k, k, k, k, k, k, k, k, k, k, k, k, k, k, k, k, k, k, k)
 }
 
 func ReadonlyStatusText() string {
-	return "[white]Tab[-] Panels  • [white]↑↓[-] Navigate  • [white]Enter[-] SSH  • [white]f[-] Forward  • [white]x[-] Stop Forward  • [white]c[-] Copy SSH  • [white]h[-] Copy Host  • [white]H[-] Toggle Hidden  • [white]g/G[-] Ping (All)  • [white]p[-] Pin/Unpin  • [white]/[-] Search  • [white]q[-] Quit  • [red::b][READONLY][-]"
+	k := CurrentTheme.HintKey
+	return fmt.Sprintf("[%s]Tab[-] Panels  • [%s]↑↓[-] Navigate  • [%s]Enter[-] SSH  • [%s]f[-] Forward  • [%s]x[-] Stop Forward  • [%s]c[-] Copy SSH  • [%s]h[-] Copy Host  • [%s]H[-] Toggle Hidden  • [%s]g/G[-] Ping (All)  • [%s]p[-] Pin/Unpin  • [%s]T[-] Theme  • [%s]/[-] Search  • [%s]q[-] Quit  • [red::b][READONLY][-]",
+		k, k, k, k, k, k, k, k, k, k, k, k, k)
 }
 
 func StatusText(readonly bool) string {
@@ -40,7 +45,7 @@ func NewStatusBar(readonly ...bool) *tview.TextView {
 		ro = readonly[0]
 	}
 	status := tview.NewTextView().SetDynamicColors(true)
-	status.SetBackgroundColor(tcell.Color235)
+	status.SetBackgroundColor(CurrentTheme.StatusBarBackground)
 	status.SetTextAlign(tview.AlignCenter)
 	status.SetText(StatusText(ro))
 	return status

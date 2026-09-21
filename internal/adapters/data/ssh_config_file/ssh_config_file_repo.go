@@ -259,3 +259,39 @@ func (r *Repository) RecordSSH(alias string) error {
 func (r *Repository) GetConfigFile() string {
 	return r.configPath
 }
+
+// GetSettings returns the application settings.
+func (r *Repository) GetSettings() (Settings, error) {
+	return r.metadataManager.GetSettings()
+}
+
+// SaveSettings saves the application settings.
+func (r *Repository) SaveSettings(settings Settings) error {
+	return r.metadataManager.SaveSettings(settings)
+}
+
+// GetTheme returns the current theme name from settings.
+func (r *Repository) GetTheme() (string, error) {
+	settings, err := r.metadataManager.GetSettings()
+	if err != nil {
+		return "", err
+	}
+	return settings.Theme, nil
+}
+
+// SaveTheme saves the theme name to settings.
+func (r *Repository) SaveTheme(theme string) error {
+	settings, err := r.metadataManager.GetSettings()
+	if err != nil {
+		settings = Settings{}
+	}
+	settings.Theme = theme
+	return r.metadataManager.SaveSettings(settings)
+}
+
+// LoadSettings loads application settings from the metadata file at the given path.
+// This is a standalone function for use during app initialization before the repository is created.
+func LoadSettings(metaDataPath string) (Settings, error) {
+	mm := newMetadataManager(metaDataPath, nil)
+	return mm.GetSettings()
+}

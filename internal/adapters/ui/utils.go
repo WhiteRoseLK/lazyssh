@@ -54,11 +54,12 @@ func renderTagBadgesForList(tags []string) string {
 	}
 	parts := make([]string, 0, len(shown)+1)
 	for _, t := range shown {
-		// Light blue background chip, similar to details view.
-		parts = append(parts, fmt.Sprintf("[black:#5FAFFF] %s [-:-:-]", t))
+		// Chip styling from CurrentTheme
+		parts = append(parts, fmt.Sprintf("[%s:%s] %s [-:-:-]",
+			CurrentTheme.TagChipText, CurrentTheme.TagChipBg, t))
 	}
 	if extra := len(tags) - len(shown); extra > 0 {
-		parts = append(parts, fmt.Sprintf("[#8A8A8A]+%d[-]", extra))
+		parts = append(parts, fmt.Sprintf("[%s]+%d[-]", CurrentTheme.TagExtra, extra))
 	}
 	return strings.Join(parts, " ")
 }
@@ -114,7 +115,7 @@ func formatServerLine(s domain.Server, maxAliasWidth int, width int) (primary, s
 	}
 	fCol := cellPad(fGlyph, 2)
 	if isFwd {
-		fCol = "[#A0FFA0]" + fCol + "[-]"
+		fCol = fmt.Sprintf("[%s]%s[-]", CurrentTheme.ForwardingActive, fCol)
 	}
 	// Calculate the actual display width of the alias
 	aliasWidth := runewidth.StringWidth(s.Alias)
@@ -143,7 +144,9 @@ func formatServerLine(s domain.Server, maxAliasWidth int, width int) (primary, s
 	}
 
 	// Use a consistent color for alias; host/IP fixed width; then forwarding column
-	mainText := fmt.Sprintf("%s [white::b]%s[-] [#AAAAAA]%-18s[-] %s [#888888]Last SSH: %-8s[-]  %s", icon, paddedAlias, s.Host, fCol, humanizeDuration(s.LastSeen), tagBadges)
+	mainText := fmt.Sprintf("%s [%s::b]%s[-] [%s]%-18s[-] %s [%s]Last SSH: %-8s[-]  %s",
+		icon, CurrentTheme.AliasText, paddedAlias, CurrentTheme.MutedText, s.Host,
+		fCol, CurrentTheme.DimText, humanizeDuration(s.LastSeen), tagBadges)
 
 	// Format ping status
 	pingIndicator := ""

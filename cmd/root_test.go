@@ -521,3 +521,49 @@ func TestRootCmd_ShowHiddenFlag(t *testing.T) {
 		})
 	}
 }
+
+func TestRootCmd_ThemeFlag(t *testing.T) {
+	tests := []struct {
+		name     string
+		args     []string
+		expected string
+	}{
+		{
+			name:     "default is empty",
+			args:     []string{},
+			expected: "",
+		},
+		{
+			name:     "flag --theme light",
+			args:     []string{"--theme", "light"},
+			expected: "light",
+		},
+		{
+			name:     "flag shorthand -t system",
+			args:     []string{"-t", "system"},
+			expected: "system",
+		},
+		{
+			name:     "flag --theme dark",
+			args:     []string{"--theme", "dark"},
+			expected: "dark",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			themeFlag = ""
+			cmd := newRootCmd()
+			cmd.SetArgs(tt.args)
+			_ = cmd.ParseFlags(tt.args)
+
+			val, err := cmd.Flags().GetString("theme")
+			if err != nil {
+				t.Fatalf("failed to get theme flag: %v", err)
+			}
+			if val != tt.expected {
+				t.Errorf("expected theme=%q, got %q", tt.expected, val)
+			}
+		})
+	}
+}

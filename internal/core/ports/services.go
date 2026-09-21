@@ -36,4 +36,6 @@ type ServerService interface {
 	Ping(server domain.Server) (bool, time.Duration, error)
 	DiscoverKnownHosts(knownHostsPath string) ([]domain.Server, domain.ImportResult, error)
 	ImportKnownHosts(knownHostsPath string) (domain.ImportResult, error)
+	GetTheme() (string, error)
+	SaveTheme(theme string) error
 }
