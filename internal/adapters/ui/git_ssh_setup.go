@@ -22,6 +22,7 @@ import (
 	"github.com/WhiteRoseLK/neossh/internal/core/domain"
 	"github.com/WhiteRoseLK/neossh/internal/core/ports"
 	"github.com/WhiteRoseLK/neossh/internal/core/services"
+	"github.com/WhiteRoseLK/neossh/internal/i18n"
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 )
@@ -34,18 +35,23 @@ type GitSSHSetup struct {
 	serverRepo ports.ServerRepository
 	form       *tview.Form
 	infoText   *tview.TextView
-	onDone     func()
-	onCancel   func()
 
-	selectedKey   string
-	selectedScope string
 	keys          []domain.SSHKey
 	repoPath      string
 	isRepo        bool
+	selectedKey   string
+	selectedScope string
+
+	onDone   func()
+	onCancel func()
 }
 
-// NewGitSSHSetup creates a new GitSSHSetup dialog.
-func NewGitSSHSetup(app *tview.Application, gitService ports.GitService, serverRepo ports.ServerRepository) *GitSSHSetup {
+// NewGitSSHSetup creates a new Git SSH setup dialog.
+func NewGitSSHSetup(
+	app *tview.Application,
+	gitService ports.GitService,
+	serverRepo ports.ServerRepository,
+) *GitSSHSetup {
 	setup := &GitSSHSetup{
 		Flex:       tview.NewFlex().SetDirection(tview.FlexRow),
 		app:        app,
@@ -66,7 +72,7 @@ func NewGitSSHSetup(app *tview.Application, gitService ports.GitService, serverR
 		AddItem(setup.form, 0, 2, true)
 
 	setup.SetBorder(true).
-		SetTitle(" Configure Git SSH Key & Profiles ").
+		SetTitle(i18n.T("git.title")).
 		SetTitleAlign(tview.AlignLeft)
 
 	return setup

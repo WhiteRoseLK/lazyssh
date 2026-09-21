@@ -22,6 +22,7 @@ import (
 
 	"github.com/WhiteRoseLK/neossh/internal/core/domain"
 	"github.com/WhiteRoseLK/neossh/internal/core/ports"
+	"github.com/WhiteRoseLK/neossh/internal/i18n"
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 )
@@ -60,7 +61,7 @@ func (sd *ServerDetails) build() {
 	sd.TextView.SetDynamicColors(true).
 		SetWrap(true).
 		SetBorder(true).
-		SetTitle(" 2 Details ").
+		SetTitle(i18n.T("app.title_details")).
 		SetTitleAlign(tview.AlignCenter).
 		SetBorderColor(CurrentTheme.BorderColorUnfocused).
 		SetTitleColor(CurrentTheme.TitleColorUnfocused)
@@ -135,7 +136,7 @@ func (sd *ServerDetails) getSSHKeyForServer(server domain.Server) *domain.SSHKey
 func (sd *ServerDetails) UpdateServer(server domain.Server) {
 	lastSeen := server.LastSeen.Format("2006-01-02 15:04:05")
 	if server.LastSeen.IsZero() {
-		lastSeen = "Never"
+		lastSeen = i18n.T("details.never")
 	}
 	serverKey := strings.Join(server.IdentityFiles, ", ")
 
@@ -182,14 +183,14 @@ func (sd *ServerDetails) UpdateServer(server domain.Server) {
 	}
 
 	text := fmt.Sprintf(
-		"[::b]%s[-]\n\n[::b]Basic Settings:[-]\n  Host: [white]%s[-]\n  User: [white]%s[-]\n  Port: [white]%s[-]\n  Key:  [white]%s[-]\n  Group: [white]%s[-]\n  Tags: %s\n  Pinned: [white]%s[-]\n  Hidden: [white]%s[-]\n  Last SSH: %s\n  SSH Count: [white]%d[-]\n",
-		aliasText, hostText, userText, portText,
+		"[::b]%s[-]\n\n[::b]%s[-]\n  Host: [white]%s[-]\n  User: [white]%s[-]\n  Port: [white]%s[-]\n  Key:  [white]%s[-]\n  Group: [white]%s[-]\n  Tags: %s\n  Pinned: [white]%s[-]\n  Hidden: [white]%s[-]\n  Last SSH: %s\n  SSH Count: [white]%d[-]\n",
+		aliasText, i18n.T("details.label.basic"), hostText, userText, portText,
 		serverKey, groupText, tagsText, pinnedStr, hiddenStr,
 		lastSeen, server.SSHCount)
 
 	// Add SSH Key Details section if key is configured
 	if sshKey := sd.getSSHKeyForServer(server); sshKey != nil {
-		text += "\n[::b]SSH Key Details:[-]\n"
+		text += fmt.Sprintf("\n[::b]%s[-]\n", i18n.T("details.label.sshkey"))
 		text += fmt.Sprintf("  Path: [white]%s[-]\n", sshKey.Path)
 		text += fmt.Sprintf("  Type: [white]%s[-]\n", sshKey.Type)
 		if sshKey.Size > 0 {
@@ -322,7 +323,7 @@ func (sd *ServerDetails) UpdateServer(server domain.Server) {
 
 	// Build advanced settings text without group labels for cleaner display
 	hasAdvanced := false
-	advancedText := "\n[::b]Advanced Settings:[-]\n"
+	advancedText := fmt.Sprintf("\n[::b]%s[-]\n", i18n.T("details.label.advanced"))
 
 	for _, group := range groups {
 		for _, field := range group.fields {
@@ -338,17 +339,18 @@ func (sd *ServerDetails) UpdateServer(server domain.Server) {
 	}
 
 	// Commands list
+	cmdHeader := i18n.T("details.label.commands")
 	if sd.readonly {
-		text += "\n[::b]Commands:[-]\n  Enter: SSH connect\n  f: Port forward\n  x: Stop forwarding\n  c: Copy SSH command\n  h: Copy Host\n  g: Ping server\n  G: Ping all servers\n  P: Git SSH profile\n  r: Refresh list\n  p: Pin/Unpin\n  [#888888]Modifications disabled (readonly mode)[-]"
+		text += fmt.Sprintf("\n[::b]%s[-]\n  Enter: SSH connect\n  f: Port forward\n  x: Stop forwarding\n  c: Copy SSH command\n  h: Copy Host\n  g: Ping server\n  G: Ping all servers\n  P: Git SSH profile\n  r: Refresh list\n  p: Pin/Unpin\n  [#888888]Modifications disabled (readonly mode)[-]", cmdHeader)
 	} else {
-		text += "\n[::b]Commands:[-]\n  Enter: SSH connect\n  f: Port forward\n  x: Stop forwarding\n  c: Copy SSH command\n  v: Paste SSH command\n  y: Clone server\n  h: Copy Host\n  g: Ping server\n  G: Ping all servers\n  P: Git SSH profile\n  C: Edit Key Comment\n  l/u: Load/Unload agent key\n  K: Install SSH Key\n  r: Refresh list\n  a: Add new server\n  e: Edit entry\n  t: Edit tags\n  d: Delete entry\n  p: Pin/Unpin"
+		text += fmt.Sprintf("\n[::b]%s[-]\n  Enter: SSH connect\n  f: Port forward\n  x: Stop forwarding\n  c: Copy SSH command\n  v: Paste SSH command\n  y: Clone server\n  h: Copy Host\n  g: Ping server\n  G: Ping all servers\n  P: Git SSH profile\n  C: Edit Key Comment\n  l/u: Load/Unload agent key\n  K: Install SSH Key\n  r: Refresh list\n  a: Add new server\n  e: Edit entry\n  t: Edit tags\n  d: Delete entry\n  p: Pin/Unpin", cmdHeader)
 	}
 
 	sd.TextView.SetText(text)
 }
 
 func (sd *ServerDetails) ShowEmpty() {
-	sd.TextView.SetText("No servers match the current filter.")
+	sd.TextView.SetText(i18n.T("details.no_match"))
 }
 
 func (sd *ServerDetails) OnTab(fn func()) *ServerDetails {

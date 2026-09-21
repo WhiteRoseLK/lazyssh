@@ -15,6 +15,7 @@
 package ui
 
 import (
+	"github.com/WhiteRoseLK/neossh/internal/i18n"
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 )
@@ -37,12 +38,12 @@ func NewSearchBar() *SearchBar {
 }
 
 func (s *SearchBar) build() {
-	s.InputField.SetLabel(" 🔍 Search: ").
+	s.InputField.SetLabel(i18n.T("search.label")).
 		SetFieldBackgroundColor(CurrentTheme.SearchFieldBg).
 		SetFieldTextColor(CurrentTheme.SearchFieldText).
 		SetFieldWidth(30).
 		SetBorder(true).
-		SetTitle(" 0 Search ").
+		SetTitle(i18n.T("search.title")).
 		SetTitleAlign(tview.AlignCenter).
 		SetBorderColor(CurrentTheme.BorderColorUnfocused).
 		SetTitleColor(CurrentTheme.TitleColorUnfocused)

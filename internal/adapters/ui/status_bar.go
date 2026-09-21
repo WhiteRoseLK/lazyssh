@@ -17,19 +17,26 @@ package ui
 import (
 	"fmt"
 
+	"github.com/WhiteRoseLK/neossh/internal/i18n"
 	"github.com/rivo/tview"
 )
 
 func DefaultStatusText() string {
+	if i18n.GetLanguage() != i18n.LangEn {
+		return i18n.T("statusbar.normal")
+	}
 	k := CurrentTheme.HintKey
-	return fmt.Sprintf("[%s]Tab[-] Panels  • [%s]↑↓[-] Navigate  • [%s]Enter[-] SSH  • [%s]f[-] Forward  • [%s]x[-] Stop Forward  • [%s]c[-] Copy SSH  • [%s]v[-] Paste SSH  • [%s]y[-] Clone  • [%s]h[-] Copy Host  • [%s]m[-] Hide  • [%s]H[-] Toggle Hidden  • [%s]a[-] Add  • [%s]e[-] Edit  • [%s]g/G[-] Ping (All)  • [%s]K[-] Install Key  • [%s]d[-] Delete  • [%s]p[-] Pin/Unpin  • [%s]T[-] Theme  • [%s]i[-] Import  • [%s]/[-] Search  • [%s]q[-] Quit",
-		k, k, k, k, k, k, k, k, k, k, k, k, k, k, k, k, k, k, k, k, k)
+	return fmt.Sprintf("[%s]Tab[-] Panels  • [%s]↑↓[-] Navigate  • [%s]Enter[-] SSH  • [%s]f[-] Forward  • [%s]x[-] Stop Forward  • [%s]c[-] Copy SSH  • [%s]v[-] Paste SSH  • [%s]y[-] Clone  • [%s]h[-] Copy Host  • [%s]m[-] Hide  • [%s]H[-] Toggle Hidden  • [%s]a[-] Add  • [%s]e[-] Edit  • [%s]g/G[-] Ping (All)  • [%s]K[-] Install Key  • [%s]d[-] Delete  • [%s]p[-] Pin/Unpin  • [%s]P[-] Git SSH  • [%s]C[-] Comment  • [%s]T[-] Theme  • [%s]i[-] Import  • [%s]/[-] Search  • [%s]q[-] Quit",
+		k, k, k, k, k, k, k, k, k, k, k, k, k, k, k, k, k, k, k, k, k, k, k)
 }
 
 func ReadonlyStatusText() string {
+	if i18n.GetLanguage() != i18n.LangEn {
+		return i18n.T("statusbar.readonly")
+	}
 	k := CurrentTheme.HintKey
-	return fmt.Sprintf("[%s]Tab[-] Panels  • [%s]↑↓[-] Navigate  • [%s]Enter[-] SSH  • [%s]f[-] Forward  • [%s]x[-] Stop Forward  • [%s]c[-] Copy SSH  • [%s]h[-] Copy Host  • [%s]H[-] Toggle Hidden  • [%s]g/G[-] Ping (All)  • [%s]p[-] Pin/Unpin  • [%s]T[-] Theme  • [%s]/[-] Search  • [%s]q[-] Quit  • [red::b][READONLY][-]",
-		k, k, k, k, k, k, k, k, k, k, k, k, k)
+	return fmt.Sprintf("[%s]Tab[-] Panels  • [%s]↑↓[-] Navigate  • [%s]Enter[-] SSH  • [%s]f[-] Forward  • [%s]x[-] Stop Forward  • [%s]c[-] Copy SSH  • [%s]h[-] Copy Host  • [%s]H[-] Toggle Hidden  • [%s]g/G[-] Ping (All)  • [%s]p[-] Pin/Unpin  • [%s]P[-] Git SSH  • [%s]T[-] Theme  • [%s]/[-] Search  • [%s]q[-] Quit  • [red::b][READONLY][-]",
+		k, k, k, k, k, k, k, k, k, k, k, k, k, k)
 }
 
 func StatusText(readonly bool) string {

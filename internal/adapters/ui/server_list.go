@@ -19,6 +19,7 @@ import (
 	"strings"
 
 	"github.com/WhiteRoseLK/neossh/internal/core/domain"
+	"github.com/WhiteRoseLK/neossh/internal/i18n"
 	"github.com/gdamore/tcell/v2"
 	"github.com/mattn/go-runewidth"
 	"github.com/rivo/tview"
@@ -51,7 +52,7 @@ func NewServerList() *ServerList {
 func (sl *ServerList) build() {
 	sl.List.ShowSecondaryText(false)
 	sl.List.SetBorder(true).
-		SetTitle(" 1 Servers ").
+		SetTitle(i18n.T("app.title_servers")).
 		SetTitleAlign(tview.AlignCenter).
 		SetBorderColor(CurrentTheme.BorderColorUnfocused).
 		SetTitleColor(CurrentTheme.TitleColorUnfocused)

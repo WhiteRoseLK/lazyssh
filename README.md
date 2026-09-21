@@ -39,6 +39,7 @@ If you are coming from **lazyssh**, here is a concrete summary of everything **n
 | Feature | Description | Shortcut / Usage |
 | :--- | :--- | :---: |
 | **Color Themes (Dark, Light, System)** | Customize TUI appearance with dedicated Dark and Light palettes or automatic OS system appearance detection across macOS, Linux, and Windows, toggleable at runtime. | <kbd>T</kbd> / `--theme` |
+| **Internationalization (i18n)** | Multilingual UI support with runtime localization (English, French, Simplified Chinese). Seamlessly configured via CLI flag (`--lang`), `NEOSSH_LANG`, or compile-time defaults. | `--lang` / `-l` |
 | **Import Known Hosts** | Quickly bootstrap your SSH config by discovering and importing unconfigured hosts from `~/.ssh/known_hosts` with automatic deduplication, standard port parsing (`[host]:port`), and safe skipping of hashed entries. | `--import-known-hosts` / <kbd>i</kbd> |
 | **Hidden Hosts Support** | Hide jump hosts, proxy targets, or internal nodes from the primary server list (<kbd>m</kbd> or form), reveal on demand with <kbd>H</kbd>, or launch with hidden servers visible. | <kbd>m</kbd> / <kbd>H</kbd> / `-H` |
 | **CLI Pre-filtering & Direct Connect** | Launch pre-filtered (`neossh prod` or `-f prod`) to prevent exposing your entire server fleet during screen shares, or connect directly (`neossh -c <alias>`). | `neossh <filter>` / `-c` |
@@ -134,6 +135,11 @@ If you are coming from **lazyssh**, here is a concrete summary of everything **n
 - 🐙 **Git SSH key configuration & profile switcher** (<kbd>P</kbd> or <kbd>Ctrl+G</kbd>): configure per-repository or global Git SSH keys via `core.sshCommand` for GitHub, GitLab, and Bitbucket.
 - 💬 **SSH key comment editor** (<kbd>C</kbd>): inspect and directly edit public/private key comments.
 - ⚡ **SSH Agent integration** (<kbd>l</kbd> / <kbd>u</kbd>): load or unload server identity keys directly into/from `ssh-agent`.
+
+### Internationalization & Localization (i18n)
+- 🌐 Multilingual user interface with native support for English (`en`), French (`fr`), and Simplified Chinese (`zh-CN`).
+- 🔄 Dynamic language selection via CLI flag `--lang` / `-l` (e.g. `neossh --lang fr`) or `NEOSSH_LANG` environment variable.
+- 🔤 Graceful fallback mechanism: missing translations automatically fall back to standard English keys.
 
 ---
 
@@ -241,6 +247,7 @@ neossh [filter] [flags]
 | `--known-hosts <path>` | | Specify custom path to `known_hosts` file | `~/.ssh/known_hosts` |
 | `--git-ssh <key>` | | Configure Git SSH key for current repo (or globally) or view current setting | `""` |
 | `--theme <mode>` | `-t` | Set color theme: `dark`, `light`, or `system` | `""` *(stored preference or dark)* |
+| `--lang <code>` | `-l` | Set interface language: `en`, `fr`, `zh-CN` (or via `NEOSSH_LANG`) | `""` *(English default)* |
 | `--show-hidden` | `-H` | Display hidden servers in UI list | `false` |
 | `--sshconfig <path>` | | Specify custom path to SSH config file | `~/.ssh/config` |
 | `--readonly`, `--ssh-config-readonly` | `-r` | Run in read-only / viewer mode (prevents writing or modifying SSH configuration) | `false` |
@@ -251,6 +258,12 @@ neossh [filter] [flags]
 ```bash
 # Launch normal interactive TUI:
 neossh
+
+# Launch TUI with French localization:
+neossh --lang fr
+
+# Launch TUI with Simplified Chinese localization:
+neossh -l zh-CN
 
 # Configure Git SSH key for the current repository:
 neossh --git-ssh ~/.ssh/id_ed25519_work
@@ -420,4 +433,5 @@ This project is licensed under the [Apache-2.0 License](LICENSE).
   - `@shekel588` — Keyboard navigation improvements, focus borders, active field styling, and confirmation dialogs
   - `@vtmocanu` — Hidden hosts support, visibility toggling, and filtering
   - `@davidszp` — Dark, Light, and System color theme support with runtime toggle
+  - `@maxadc` — Internationalization framework and localization support (English, French, Chinese)
   - `@arniom`, `@leoncamel`, `@breakersun`, `@OlalalalaO`, `@manato-tajiri`, `@komapro` — Bug fixes & documentation improvements

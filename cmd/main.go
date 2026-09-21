@@ -45,6 +45,7 @@ var (
 	showHidden        bool
 	themeFlag         string
 	gitSSHFlag        string
+	langFlag          string
 
 	rootCmd = newRootCmd()
 )
@@ -141,12 +142,18 @@ func newRootCmd() *cobra.Command {
 				theme = t
 			}
 
+			lang := langFlag
+			if l, err := cmd.Flags().GetString("lang"); err == nil && l != "" {
+				lang = l
+			}
+
 			tui := ui.NewTUI(log, serverService, version, gitCommit, ui.Config{
 				ExitOnDisconnect: exitOnDisconnect,
 				ReadOnly:         isReadonly,
 				InitialFilter:    filter,
 				ShowHidden:       showHidden,
 				Theme:            theme,
+				Language:         lang,
 				ServerRepo:       serverRepo,
 				GitService:       gitService,
 			})
@@ -190,6 +197,9 @@ func newRootCmd() *cobra.Command {
 	)
 	cmd.PersistentFlags().StringVarP(
 		&themeFlag, "theme", "t", "", "set color theme: dark, light, or system",
+	)
+	cmd.PersistentFlags().StringVarP(
+		&langFlag, "lang", "l", "", "set interface language: en, fr, zh-CN (or via NEOSSH_LANG)",
 	)
 
 	cmd.SilenceUsage = true
