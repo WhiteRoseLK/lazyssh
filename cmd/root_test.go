@@ -15,7 +15,13 @@
 package main
 
 import (
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
+
+	"github.com/WhiteRoseLK/neossh/internal/core/domain"
+	"github.com/WhiteRoseLK/neossh/internal/core/ports"
 )
 
 func TestRootCmd_ExitOnDisconnectFlags(t *testing.T) {
@@ -226,5 +232,104 @@ func TestRootCmd_FilterParsing(t *testing.T) {
 				t.Errorf("connectDirectly = %v, want %v", connectDirectly, tt.expectedConnect)
 			}
 		})
+	}
+}
+
+type mockDirectConnectService struct {
+	ports.ServerService
+	servers   []domain.Server
+	sshCalled string
+}
+
+func (m *mockDirectConnectService) ListServers(query string) ([]domain.Server, error) {
+	var res []domain.Server
+	for _, s := range m.servers {
+		if strings.Contains(s.Alias, query) {
+			res = append(res, s)
+		}
+	}
+	return res, nil
+}
+
+func (m *mockDirectConnectService) SSH(alias string) error {
+	m.sshCalled = alias
+	return nil
+}
+
+func TestHandleDirectConnect(t *testing.T) {
+	svc := &mockDirectConnectService{
+		servers: []domain.Server{
+			{Alias: "web-prod", Host: "10.0.0.1"},
+			{Alias: "web-staging", Host: "10.0.0.2"},
+			{Alias: "*.corp", Host: "*.corp", IsWildcard: true},
+		},
+	}
+
+	// Empty filter
+	connected, err := handleDirectConnect("", svc)
+	if err == nil || connected {
+		t.Errorf("expected error for empty filter, got connected=%v, err=%v", connected, err)
+	}
+
+	// Non-existent server
+	connected, err = handleDirectConnect("database", svc)
+	if err == nil || connected {
+		t.Errorf("expected error for non-existent server, got connected=%v, err=%v", connected, err)
+	}
+
+	// Exact match
+	connected, err = handleDirectConnect("web-prod", svc)
+	if err != nil || !connected {
+		t.Fatalf("expected successful connect to web-prod, got connected=%v, err=%v", connected, err)
+	}
+	if svc.sshCalled != "web-prod" {
+		t.Errorf("expected SSH called with 'web-prod', got %q", svc.sshCalled)
+	}
+
+	// Wildcard pattern match
+	connected, err = handleDirectConnect("*.corp", svc)
+	if err == nil || connected {
+		t.Errorf("expected error when connecting to wildcard pattern block, got connected=%v, err=%v", connected, err)
+	}
+
+	// Ambiguous matches (multiple results, no exact match) - should not error, but return false to launch TUI
+	svc.sshCalled = ""
+	connected, err = handleDirectConnect("web", svc)
+	if err != nil {
+		t.Fatalf("expected nil error for ambiguous match, got %v", err)
+	}
+	if connected {
+		t.Errorf("expected connected=false for ambiguous match, got true")
+	}
+}
+
+func TestResolveSSHConfigFile_Default(t *testing.T) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	path, cleanup, err := resolveSSHConfigFile(home, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	defer cleanup()
+
+	expected := filepath.Join(home, ".ssh", "config")
+	if path != expected {
+		t.Errorf("expected %q, got %q", expected, path)
+	}
+}
+
+func TestEnsureMetadataFile(t *testing.T) {
+	tmpDir := t.TempDir()
+	metaFile, err := ensureMetadataFile(tmpDir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	expected := filepath.Join(tmpDir, ".neossh", "metadata.json")
+	if metaFile != expected {
+		t.Errorf("expected %q, got %q", expected, metaFile)
 	}
 }

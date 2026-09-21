@@ -243,7 +243,11 @@ func TestNewTUI_InitialFilterConfig(t *testing.T) {
 		t.Errorf("expected InitialFilter to be 'srv-prod', got %q", app.InitialFilter())
 	}
 
-	app.buildComponents().loadPreferences().buildLayout().bindEvents().loadInitialData()
+	app.buildComponents()
+	app.loadPreferences()
+	app.buildLayout()
+	app.bindEvents()
+	app.loadInitialData()
 
 	// Verify searchBar text is set
 	if app.searchBar.GetText() != "srv-prod" {
