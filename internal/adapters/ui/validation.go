@@ -159,8 +159,8 @@ func GetFieldValidatorsWithContext(originalAlias string, existingAliases []strin
 		Message:  "Port must be between 1 and 65535",
 	}
 	validators["User"] = fieldValidator{
-		Pattern: regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9.@:_-]*$`),
-		Message: "User must start with a letter and contain only letters, numbers, dots, hyphens, at, colon, and underscores",
+		Pattern: regexp.MustCompile(`^[a-zA-Z0-9_][a-zA-Z0-9.@:_-]*$`),
+		Message: "User must contain only letters, numbers, dots, hyphens, at, colon, and underscores",
 	}
 	validators["Keys"] = fieldValidator{
 		Validate: validateKeyPaths,
