@@ -23,6 +23,7 @@ import (
 
 	"github.com/WhiteRoseLK/neossh/internal/core/domain"
 	"github.com/WhiteRoseLK/neossh/internal/core/ports"
+	"github.com/WhiteRoseLK/neossh/internal/i18n"
 	"github.com/rivo/tview"
 )
 
@@ -37,6 +38,7 @@ type Config struct {
 	InitialFilter    string
 	ShowHidden       bool
 	Theme            string
+	Language         string
 	ServerRepo       ports.ServerRepository
 	GitService       ports.GitService
 }
@@ -72,6 +74,7 @@ type tui struct {
 	initialFilter    string
 	showHidden       bool
 	themeFlag        string
+	language         string
 }
 
 func NewTUI(logger *zap.SugaredLogger, ss ports.ServerService, version, commit string, cfg ...Config) App {
@@ -80,6 +83,7 @@ func NewTUI(logger *zap.SugaredLogger, ss ports.ServerService, version, commit s
 	var initialFilter string
 	var showHidden bool
 	var themeFlag string
+	var language string
 	var serverRepo ports.ServerRepository
 	var gitService ports.GitService
 	if len(cfg) > 0 {
@@ -88,6 +92,7 @@ func NewTUI(logger *zap.SugaredLogger, ss ports.ServerService, version, commit s
 		initialFilter = cfg[0].InitialFilter
 		showHidden = cfg[0].ShowHidden
 		themeFlag = cfg[0].Theme
+		language = cfg[0].Language
 		serverRepo = cfg[0].ServerRepo
 		gitService = cfg[0].GitService
 	}
@@ -106,6 +111,7 @@ func NewTUI(logger *zap.SugaredLogger, ss ports.ServerService, version, commit s
 		initialFilter:    initialFilter,
 		showHidden:       showHidden,
 		themeFlag:        themeFlag,
+		language:         language,
 	}
 }
 
@@ -146,6 +152,7 @@ func (t *tui) Run() error {
 		}
 	}()
 	t.app.EnableMouse(true)
+	t.initializeI18n()
 	t.initializeTheme()
 	t.initializeThemeWatcher()
 	t.buildComponents()
@@ -161,6 +168,10 @@ func (t *tui) Run() error {
 	}
 	t.stopThemeWatcher()
 	return nil
+}
+
+func (t *tui) initializeI18n() {
+	i18n.Init(t.language)
 }
 
 const (
@@ -249,7 +260,7 @@ func (t *tui) buildComponents() {
 		OnReturnToSearch(t.handleReturnToSearch).
 		OnTab(t.handleDetailsFocus).
 		OnBacktab(t.handleServerListFocus)
-	t.activeList.SetTitle(" 2 Active Sessions (K: Terminate) ")
+	t.activeList.SetTitle(i18n.T("app.title_active"))
 	t.details = NewServerDetails(t.readonly).
 		SetGitService(t.gitService, t.serverRepo).
 		OnTab(t.handleSearchFocus).
@@ -429,7 +440,8 @@ func (t *tui) updateListTitle() {
 		if t.showHidden {
 			hiddenIndicator = " [SHOW HIDDEN]"
 		}
-		t.serverList.SetTitle(fmt.Sprintf(" 1 Servers%s%s — Sort: %s ", roIndicator, hiddenIndicator, t.sortMode.String()))
+		serversTitle := strings.TrimSpace(i18n.T("app.title_servers"))
+		t.serverList.SetTitle(fmt.Sprintf(" %s%s%s — Sort: %s ", serversTitle, roIndicator, hiddenIndicator, t.sortMode.String()))
 	}
 }
 
