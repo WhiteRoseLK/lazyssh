@@ -15,6 +15,8 @@
 package ui
 
 import (
+	"fmt"
+
 	"github.com/gdamore/tcell/v2"
 	"go.uber.org/zap"
 
@@ -30,13 +32,15 @@ type App interface {
 // Config holds configuration options for the TUI application.
 type Config struct {
 	ExitOnDisconnect bool
+	ReadOnly         bool
 }
 
 type tui struct {
 	logger *zap.SugaredLogger
 
-	version string
-	commit  string
+	version  string
+	commit   string
+	readonly bool
 
 	app           *tview.Application
 	serverService ports.ServerService
@@ -59,8 +63,10 @@ type tui struct {
 
 func NewTUI(logger *zap.SugaredLogger, ss ports.ServerService, version, commit string, cfg ...Config) App {
 	var exitOnDisconnect bool
+	var readonly bool
 	if len(cfg) > 0 {
 		exitOnDisconnect = cfg[0].ExitOnDisconnect
+		readonly = cfg[0].ReadOnly
 	}
 	return &tui{
 		logger:           logger,
@@ -68,10 +74,29 @@ func NewTUI(logger *zap.SugaredLogger, ss ports.ServerService, version, commit s
 		serverService:    ss,
 		version:          version,
 		commit:           commit,
+		readonly:         readonly,
 		settings:         newSettingsManager(logger),
 		pingStatuses:     make(map[string]domain.Server),
 		exitOnDisconnect: exitOnDisconnect,
 	}
+}
+
+func (t *tui) IsReadOnly() bool {
+	return t.readonly
+}
+
+func (t *tui) SetReadOnly(ro bool) {
+	t.readonly = ro
+	if t.header != nil {
+		t.header.readonly = ro
+	}
+	if t.details != nil {
+		t.details.readonly = ro
+	}
+	if t.statusBar != nil {
+		t.statusBar.SetText(StatusText(ro))
+	}
+	t.updateListTitle()
 }
 
 func (t *tui) ExitOnDisconnect() bool {
@@ -108,7 +133,7 @@ func (t *tui) initializeTheme() *tui {
 }
 
 func (t *tui) buildComponents() *tui {
-	t.header = NewAppHeader(t.version, t.commit, RepoURL)
+	t.header = NewAppHeader(t.version, t.commit, RepoURL, t.readonly)
 	t.searchBar = NewSearchBar().
 		OnSearch(t.handleSearchInput).
 		OnEscape(t.blurSearchBar).
@@ -118,8 +143,8 @@ func (t *tui) buildComponents() *tui {
 	t.serverList = NewServerList().
 		OnSelectionChange(t.handleServerSelectionChange).
 		OnReturnToSearch(t.handleReturnToSearch)
-	t.details = NewServerDetails()
-	t.statusBar = NewStatusBar()
+	t.details = NewServerDetails(t.readonly)
+	t.statusBar = NewStatusBar(t.readonly)
 
 	// default sort mode
 	t.sortMode = SortByAliasAsc
@@ -182,7 +207,11 @@ func (t *tui) loadInitialData() *tui {
 
 func (t *tui) updateListTitle() {
 	if t.serverList != nil {
-		t.serverList.SetTitle(" 1 Servers — Sort: " + t.sortMode.String() + " ")
+		roIndicator := ""
+		if t.readonly {
+			roIndicator = " [READONLY]"
+		}
+		t.serverList.SetTitle(fmt.Sprintf(" 1 Servers%s — Sort: %s ", roIndicator, t.sortMode.String()))
 	}
 }
 

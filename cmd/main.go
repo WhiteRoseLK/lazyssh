@@ -21,27 +21,37 @@ import (
 	"path/filepath"
 
 	"github.com/WhiteRoseLK/neossh/internal/adapters/data/ssh_config_file"
-	"github.com/WhiteRoseLK/neossh/internal/logger"
-
 	"github.com/WhiteRoseLK/neossh/internal/adapters/ui"
 	"github.com/WhiteRoseLK/neossh/internal/core/services"
+	"github.com/WhiteRoseLK/neossh/internal/logger"
 	"github.com/spf13/cobra"
 )
 
 var (
-	version          = "develop"
-	gitCommit        = "unknown"
-	sshConfigFile    string
-	exitOnDisconnect bool
+	version   = "develop"
+	gitCommit = "unknown"
+
+	sshConfigFile     string
+	exitOnDisconnect  bool
+	sshConfigReadonly bool
 
 	rootCmd = newRootCmd()
 )
 
 func newRootCmd() *cobra.Command {
+
 	cmd := &cobra.Command{
 		Use:   ui.AppName,
 		Short: "NeoSSH server picker TUI",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			isReadonly := sshConfigReadonly
+			if ro, err := cmd.Flags().GetBool("readonly"); err == nil && ro {
+				isReadonly = true
+			}
+			if ro, err := cmd.Flags().GetBool("ssh-config-readonly"); err == nil && ro {
+				isReadonly = true
+			}
+
 			log, err := logger.New("NEOSSH")
 			if err != nil {
 				fmt.Println(err)
@@ -124,9 +134,10 @@ func newRootCmd() *cobra.Command {
 			}
 
 			serverRepo := ssh_config_file.NewRepository(log, sshConfigFile, metaDataFile)
-			serverService := services.NewServerService(log, serverRepo)
+			serverService := services.NewServerService(log, serverRepo, services.WithReadOnly(isReadonly))
 			tui := ui.NewTUI(log, serverService, version, gitCommit, ui.Config{
 				ExitOnDisconnect: exitOnDisconnect,
+				ReadOnly:         isReadonly,
 			})
 
 			return tui.Run()
@@ -141,6 +152,12 @@ func newRootCmd() *cobra.Command {
 	)
 	cmd.PersistentFlags().BoolVar(
 		&exitOnDisconnect, "auto-exit", false, "exit neossh after SSH session finishes",
+	)
+	cmd.PersistentFlags().BoolVar(
+		&sshConfigReadonly, "ssh-config-readonly", false, "run in read-only mode (prevent modifying ~/.ssh/config)",
+	)
+	cmd.PersistentFlags().BoolVarP(
+		&sshConfigReadonly, "readonly", "r", false, "run in read-only mode (alias for --ssh-config-readonly)",
 	)
 
 	cmd.SilenceUsage = true

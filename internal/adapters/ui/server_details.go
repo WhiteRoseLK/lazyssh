@@ -25,11 +25,17 @@ import (
 
 type ServerDetails struct {
 	*tview.TextView
+	readonly bool
 }
 
-func NewServerDetails() *ServerDetails {
+func NewServerDetails(readonly ...bool) *ServerDetails {
+	ro := false
+	if len(readonly) > 0 {
+		ro = readonly[0]
+	}
 	details := &ServerDetails{
 		TextView: tview.NewTextView(),
+		readonly: ro,
 	}
 	details.build()
 	return details
@@ -216,7 +222,11 @@ func (sd *ServerDetails) UpdateServer(server domain.Server) {
 	}
 
 	// Commands list
-	text += "\n[::b]Commands:[-]\n  Enter: SSH connect\n  f: Port forward\n  x: Stop forwarding\n  c: Copy SSH command\n  v: Paste SSH command\n  y: Clone server\n  h: Copy Host\n  g: Ping server\n  G: Ping all servers\n  K: Install SSH Key\n  r: Refresh list\n  a: Add new server\n  e: Edit entry\n  t: Edit tags\n  d: Delete entry\n  p: Pin/Unpin"
+	if sd.readonly {
+		text += "\n[::b]Commands:[-]\n  Enter: SSH connect\n  f: Port forward\n  x: Stop forwarding\n  c: Copy SSH command\n  h: Copy Host\n  g: Ping server\n  G: Ping all servers\n  r: Refresh list\n  p: Pin/Unpin\n  [#888888]Modifications disabled (readonly mode)[-]"
+	} else {
+		text += "\n[::b]Commands:[-]\n  Enter: SSH connect\n  f: Port forward\n  x: Stop forwarding\n  c: Copy SSH command\n  v: Paste SSH command\n  y: Clone server\n  h: Copy Host\n  g: Ping server\n  G: Ping all servers\n  K: Install SSH Key\n  r: Refresh list\n  a: Add new server\n  e: Edit entry\n  t: Edit tags\n  d: Delete entry\n  p: Pin/Unpin"
+	}
 
 	sd.TextView.SetText(text)
 }

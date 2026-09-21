@@ -37,12 +37,22 @@ const (
 
 	ForwardModeOnlyForward = "Only forward"
 	ForwardModeForwardSSH  = "Forward + SSH"
+
+	ReadonlyMessage = "Readonly mode: SSH configuration modifications are disabled."
 )
 
 func (t *tui) handleGlobalKeys(event *tcell.EventKey) *tcell.EventKey {
 	// Don't handle global keys when search has focus
 	if t.app.GetFocus() == t.searchBar {
 		return event
+	}
+
+	if t.readonly {
+		switch event.Rune() {
+		case 'a', 'e', 'd', 'c', 'C', 'y', 'p', 'v', 'K', 't':
+			t.showReadonlyModal()
+			return nil
+		}
 	}
 
 	switch event.Rune() {
@@ -179,6 +189,11 @@ func (t *tui) handleCopyHost() {
 }
 
 func (t *tui) handlePasteCommand() {
+	if t.readonly {
+		t.showReadonlyModal()
+		return
+	}
+
 	// Read from clipboard
 	clipContent, err := clipboard.ReadAll()
 	if err != nil {
@@ -249,6 +264,10 @@ func (t *tui) getExistingAliasesExcept(exclude domain.Server) []string {
 }
 
 func (t *tui) handleTagsEdit() {
+	if t.readonly {
+		t.showReadonlyModal()
+		return
+	}
 	if server, ok := t.serverList.GetSelectedServer(); ok {
 		t.showEditTagsForm(server)
 	}
@@ -373,6 +392,10 @@ func (t *tui) handleServerConnect() {
 }
 
 func (t *tui) handleInstallSSHKey() {
+	if t.readonly {
+		t.showReadonlyModal()
+		return
+	}
 	if server, ok := t.serverList.GetSelectedServer(); ok {
 		alias := server.Alias
 		t.showStatusTemp(fmt.Sprintf("Installing key to %s…", alias))
@@ -396,6 +419,10 @@ func (t *tui) handleServerSelectionChange(server domain.Server) {
 }
 
 func (t *tui) handleServerAdd() {
+	if t.readonly {
+		t.showReadonlyModal()
+		return
+	}
 	form := NewServerForm(ServerFormAdd, nil).
 		SetApp(t.app).
 		SetVersionInfo(t.version, t.commit).
@@ -406,6 +433,10 @@ func (t *tui) handleServerAdd() {
 }
 
 func (t *tui) handleServerEdit() {
+	if t.readonly {
+		t.showReadonlyModal()
+		return
+	}
 	if server, ok := t.serverList.GetSelectedServer(); ok {
 		form := NewServerForm(ServerFormEdit, &server).
 			SetApp(t.app).
@@ -418,6 +449,10 @@ func (t *tui) handleServerEdit() {
 }
 
 func (t *tui) handleServerClone() {
+	if t.readonly {
+		t.showReadonlyModal()
+		return
+	}
 	if server, ok := t.serverList.GetSelectedServer(); ok {
 		cloned := cloneServer(server)
 		existingAliases := t.getExistingAliases()
@@ -474,6 +509,10 @@ func cloneServer(s domain.Server) domain.Server {
 }
 
 func (t *tui) handleServerSave(server domain.Server, original *domain.Server) {
+	if t.readonly {
+		t.showReadonlyModal()
+		return
+	}
 	var err error
 	if original != nil {
 		// Edit mode
@@ -521,6 +560,10 @@ func (t *tui) handleServerSave(server domain.Server, original *domain.Server) {
 }
 
 func (t *tui) handleServerDelete() {
+	if t.readonly {
+		t.showReadonlyModal()
+		return
+	}
 	if server, ok := t.serverList.GetSelectedServer(); ok {
 		t.showDeleteConfirmModal(server)
 	}
@@ -688,7 +731,32 @@ func (t *tui) handleRefreshBackground() {
 // UI Display Functions (show UI elements/modals)
 // =============================================================================
 
+func (t *tui) showReadonlyModal() {
+	modal := tview.NewModal().
+		SetText(ReadonlyMessage).
+		AddButtons([]string{"Close"}).
+		SetDoneFunc(func(buttonIndex int, buttonLabel string) {
+			t.handleModalClose()
+		})
+	modal.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		if event.Key() == tcell.KeyEscape || event.Rune() == 'q' {
+			t.handleModalClose()
+			return nil
+		}
+		return event
+	})
+	if t.app != nil {
+		t.app.SetRoot(modal, true)
+		t.app.SetFocus(modal)
+	}
+	t.showStatusTempColor(ReadonlyMessage, "#FF6B6B")
+}
+
 func (t *tui) showDeleteConfirmModal(server domain.Server) {
+	if t.readonly {
+		t.showReadonlyModal()
+		return
+	}
 	msg := fmt.Sprintf("Delete server %s (%s@%s:%d)?\n\nThis action cannot be undone.",
 		server.Alias, server.User, server.Host, server.Port)
 
@@ -1023,6 +1091,10 @@ func (t *tui) showStatusTemp(msg string) {
 	t.showStatusTempColor(msg, "#A0FFA0")
 }
 
+func (t *tui) defaultStatusText() string {
+	return StatusText(t.readonly)
+}
+
 // showStatusTempColor displays a temporary colored message in the status bar and restores default text after 2s.
 func (t *tui) showStatusTempColor(msg string, color string) {
 	if t.statusBar == nil {
@@ -1033,7 +1105,7 @@ func (t *tui) showStatusTempColor(msg string, color string) {
 		if t.app != nil {
 			t.app.QueueUpdateDraw(func() {
 				if t.statusBar != nil {
-					t.statusBar.SetText(DefaultStatusText())
+					t.statusBar.SetText(t.defaultStatusText())
 				}
 			})
 		}
