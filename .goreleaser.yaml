@@ -62,6 +62,16 @@ brews:
       If you previously used lazyssh, neossh automatically migrates your
       metadata and settings from ~/.lazyssh to ~/.neossh. Your SSH config is unchanged.
 
+scoops:
+  - repository:
+      owner: WhiteRoseLK
+      name: scoop-bucket
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    directory: bucket
+    homepage: "https://github.com/WhiteRoseLK/neossh"
+    description: "An actively maintained fork and continuation of lazyssh"
+    license: "Apache-2.0"
+
 checksum:
   name_template: "checksums.txt"
 
