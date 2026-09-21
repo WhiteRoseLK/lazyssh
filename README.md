@@ -57,6 +57,7 @@ If you are coming from **lazyssh**, here is a concrete summary of everything **n
 | **Pre-Connect Command Hooks** | Run automated local scripts/hooks (VPN bring-up, Wake-on-LAN, bastion tunnels, token refresh) before connecting. Supports token expansions (`%h`, `%p`, `%r`, `%n`), environment variables, and config comment persistence (`# pre-connect: ...`). | `--pre-connect <cmd>` / UI form |
 | **Default SSH Identity Key** | Configure a global default private key (via CLI `--default-key <path>`, Git & SSH Keys Setup dialog, or `NEOSSH_DEFAULT_KEY`), automatically prefilling the identity file on new servers while allowing manual overrides. | `--default-key <path>` / UI form |
 | **SCP Command Generator** | Generates and copies ready-to-use `scp` upload and download command templates with port, identity key, and proxy jump arguments directly to your clipboard. | <kbd>o</kbd> / `--scp <alias>` |
+| **SSHFS Remote Mounts** | Mount remote server filesystems locally with full SSH configuration (ports, identity files, jump proxies, auto-reconnect, and read-only flags) and copy ready-to-run mount/unmount commands. | <kbd>M</kbd> / `--sshfs <alias>` |
 | **Paste SSH Command** | Parses any SSH command from system clipboard (flags, identity keys, ports, jump hosts) into an add-server modal with intelligent alias deduction and deduplication. | <kbd>v</kbd> |
 | **Duplicate / Clone Server** | Instantly clones any existing server configuration into the Add form with automatic alias deduplication (`srv_1`, `srv_2`), eliminating manual re-typing. | <kbd>y</kbd> / <kbd>C</kbd> |
 | **Zero-Friction Migration** | Automatically detects and migrates your favorites, tags, and connection history from `~/.lazyssh` to `~/.neossh`. | *Automatic* |
@@ -141,6 +142,9 @@ If you are coming from **lazyssh**, here is a concrete summary of everything **n
 - 💬 **SSH key comment editor** (<kbd>C</kbd>): inspect and directly edit public/private key comments.
 - ⚡ **SSH Agent integration** (<kbd>l</kbd> / <kbd>u</kbd>): load or unload server identity keys directly into/from `ssh-agent`.
 - 🗝️ **Configurable Default Identity Key**: designate a default SSH private key (via CLI `--default-key <path>`, Git & SSH Keys Setup dialog, or `NEOSSH_DEFAULT_KEY`), automatically prefilling new servers.
+
+### Remote Filesystem Mounts (SSHFS)
+- 📂 **SSHFS Remote Mounts** (<kbd>M</kbd>): mount remote server filesystems locally with full SSH configuration (ports, identity files, jump proxies, auto-reconnect, and read-only flags) and copy ready-to-run mount/unmount commands.
 
 ### Internationalization & Localization (i18n)
 - 🌐 Multilingual user interface with native support for English (`en`), French (`fr`), and Simplified Chinese (`zh-CN`).
@@ -281,6 +285,7 @@ neossh [filter] [flags]
 | `--lang <code>` | `-l` | Set interface language: `en`, `fr`, `zh-CN` (or via `NEOSSH_LANG`) | `""` *(English default)* |
 | `--show-hidden` | `-H` | Display hidden servers in UI list | `false` |
 | `--scp <alias>` | | Generate SCP upload/download command templates for a server alias and copy to clipboard | `""` |
+| `--sshfs <alias>` | | Generate SSHFS remote mount and unmount command templates for a server alias and copy to clipboard | `""` |
 | `--pre-connect <cmd>` | | Run local hook command before SSH connect (supports `%h`, `%p`, `%r`, `%n`) | `""` |
 | `--default-key <path>` | | Get or set default SSH identity key prefilled for new server entries | `""` |
 | `--sshconfig <path>` | | Specify custom path to SSH config file | `~/.ssh/config` |
@@ -301,6 +306,9 @@ neossh --default-key ""
 
 # Generate SCP command templates for a server alias:
 neossh --scp web-prod
+
+# Generate SSHFS remote filesystem mount commands:
+neossh --sshfs web-prod
 
 # Launch TUI with French localization:
 neossh --lang fr
@@ -371,6 +379,7 @@ neossh --sshconfig ~/.ssh/config_work -r
 | `T` | Toggle color theme (Dark → Light → System) |
 | `c` | Copy SSH connection command to clipboard |
 | `o` | Open SCP command generator modal to configure and copy upload/download commands |
+| `M` | Open SSHFS remote mount command generator modal to configure and copy mount/unmount commands |
 | `C` | Edit SSH key comment *(on server with identity file)* *(disabled in read-only mode)* |
 | `l` | Load selected server's key into `ssh-agent` *(disabled in read-only mode)* |
 | `u` | Unload selected server's key from `ssh-agent` *(disabled in read-only mode)* |
@@ -517,4 +526,5 @@ This project is licensed under the [Apache-2.0 License](LICENSE).
   - `@vetash` — Automatic terminal and tab title integration
   - `@piRGoif` — SCP command generator modal and CLI helper
   - `@pranav79` — Configurable default identity SSH key for new servers
+  - `@mas-kon` — SSHFS remote filesystem mount integration
   - `@arniom`, `@leoncamel`, `@breakersun`, `@OlalalalaO`, `@manato-tajiri`, `@komapro` — Bug fixes & documentation improvements
