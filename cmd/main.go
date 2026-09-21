@@ -48,6 +48,7 @@ var (
 	gitSSHFlag        string
 	langFlag          string
 	scpFlag           string
+	sshfsFlag         string
 	preConnectFlag    string
 	defaultKeyFlag    string
 
@@ -173,6 +174,10 @@ func newRootCmd() *cobra.Command {
 				return handleSCPFlag(serverService, scpFlag)
 			}
 
+			if sshfsFlag != "" {
+				return handleSSHFSFlag(serverService, sshfsFlag)
+			}
+
 			if preConnectFlag != "" {
 				_ = os.Setenv("NEOSSH_PRE_CONNECT_HOOK", preConnectFlag)
 			}
@@ -249,6 +254,9 @@ func newRootCmd() *cobra.Command {
 	)
 	cmd.PersistentFlags().StringVar(
 		&scpFlag, "scp", "", "generate SCP command templates for server alias (e.g. --scp myserver)",
+	)
+	cmd.PersistentFlags().StringVar(
+		&sshfsFlag, "sshfs", "", "generate SSHFS remote mount command for server alias (e.g. --sshfs myserver)",
 	)
 	cmd.PersistentFlags().StringVar(
 		&preConnectFlag, "pre-connect", "", "run local hook command before SSH connect (supports %h, %p, %r, %n)",
@@ -456,6 +464,42 @@ func handleSCPFlag(serverService ports.ServerService, alias string) error {
 
 	if err := clipboard.WriteAll(uploadCmd); err == nil {
 		fmt.Println("\n✓ Copied default upload command to system clipboard.")
+	}
+	return nil
+}
+
+func handleSSHFSFlag(serverService ports.ServerService, alias string) error {
+	servers, err := serverService.ListServers("")
+	if err != nil {
+		return fmt.Errorf("failed to list servers: %w", err)
+	}
+
+	var found *domain.Server
+	for i := range servers {
+		if strings.EqualFold(servers[i].Alias, alias) {
+			found = &servers[i]
+			break
+		}
+	}
+
+	if found == nil {
+		return fmt.Errorf("server alias %q not found", alias)
+	}
+
+	mountPoint := fmt.Sprintf("~/mounts/%s", found.Alias)
+	mountCmd := ui.BuildSSHFSCommand(*found, "/", mountPoint, false, true, false)
+	aliasMountCmd := ui.BuildSSHFSCommand(*found, "/", mountPoint, false, true, true)
+	roMountCmd := ui.BuildSSHFSCommand(*found, "/", mountPoint, true, true, false)
+	unmountCmd := ui.BuildSSHFSUnmountCommand(mountPoint)
+
+	fmt.Printf("SSHFS Remote Mount Commands for [%s]:\n\n", found.Alias)
+	fmt.Printf("• Mount Remote Root (Full Config):\n  %s\n\n", mountCmd)
+	fmt.Printf("• Mount via SSH Config Alias:\n  %s\n\n", aliasMountCmd)
+	fmt.Printf("• Mount Read-Only:\n  %s\n\n", roMountCmd)
+	fmt.Printf("• Unmount Remote Filesystem:\n  %s\n", unmountCmd)
+
+	if err := clipboard.WriteAll(mountCmd); err == nil {
+		fmt.Println("\n✓ Copied default mount command to system clipboard.")
 	}
 	return nil
 }

@@ -201,6 +201,9 @@ func (t *tui) handleClipboardKeys(cmd rune) bool {
 	case 'o':
 		t.handleSCPCommandGenerator()
 		return true
+	case 'M':
+		t.handleSSHFSCommandGenerator()
+		return true
 	case 'v':
 		t.handlePasteCommand()
 		return true
@@ -426,6 +429,27 @@ func (t *tui) handleSCPCommandGenerator() {
 			t.app.SetRoot(t.root, true)
 			t.app.SetFocus(t.serverList)
 			t.showStatusTemp("Copied SCP: " + cmd)
+		}).
+		OnCancel(func() {
+			t.app.SetRoot(t.root, true)
+			t.app.SetFocus(t.serverList)
+		})
+
+	_ = modal.Show()
+}
+
+func (t *tui) handleSSHFSCommandGenerator() {
+	server, ok := t.serverList.GetSelectedServer()
+	if !ok {
+		t.showStatusTemp("No server selected")
+		return
+	}
+
+	modal := NewSSHFSModal(t.app, server).
+		OnCopied(func(cmd string) {
+			t.app.SetRoot(t.root, true)
+			t.app.SetFocus(t.serverList)
+			t.showStatusTemp("Copied SSHFS: " + cmd)
 		}).
 		OnCancel(func() {
 			t.app.SetRoot(t.root, true)

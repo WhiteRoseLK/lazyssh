@@ -615,6 +615,43 @@ func TestHandleSCPFlag(t *testing.T) {
 	}
 }
 
+func TestRootCmd_SSHFSFlag(t *testing.T) {
+	sshfsFlag = ""
+	cmd := newRootCmd()
+	err := cmd.ParseFlags([]string{"--sshfs", "myserver"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if sshfsFlag != "myserver" {
+		t.Errorf("expected sshfsFlag=%q, got %q", "myserver", sshfsFlag)
+	}
+}
+
+func TestHandleSSHFSFlag(t *testing.T) {
+	svc := &mockDirectConnectService{
+		servers: []domain.Server{
+			{
+				Alias: "web-prod",
+				Host:  "10.0.0.1",
+				User:  "ubuntu",
+				Port:  2202,
+			},
+		},
+	}
+
+	// Test found
+	err := handleSSHFSFlag(svc, "web-prod")
+	if err != nil {
+		t.Errorf("expected no error for valid server alias, got %v", err)
+	}
+
+	// Test not found
+	err = handleSSHFSFlag(svc, "nonexistent")
+	if err == nil || !strings.Contains(err.Error(), "not found") {
+		t.Errorf("expected not found error, got %v", err)
+	}
+}
+
 func TestRootCmd_PreConnectFlag(t *testing.T) {
 	preConnectFlag = ""
 	cmd := newRootCmd()
