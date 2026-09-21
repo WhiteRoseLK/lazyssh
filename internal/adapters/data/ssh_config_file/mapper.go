@@ -398,6 +398,9 @@ func (r *Repository) mergeMetadata(servers []domain.Server, metadata map[string]
 			if len(servers[i].Tags) == 0 {
 				servers[i].Tags = meta.Tags
 			}
+			if servers[i].Group == "" {
+				servers[i].Group = meta.Group
+			}
 			servers[i].SSHCount = meta.SSHCount
 			if meta.File != "" {
 				servers[i].SourceFile = meta.File

@@ -27,6 +27,7 @@ type Server struct {
 	Port          int
 	IdentityFiles []string
 	Tags          []string
+	Group         string
 	LastSeen      time.Time
 	PinnedAt      time.Time
 	SSHCount      int

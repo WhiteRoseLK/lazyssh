@@ -18,8 +18,10 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
+	"sort"
 	"strings"
 	"time"
 
@@ -771,7 +773,8 @@ func (t *tui) handleServerAdd() {
 				SetVersionInfo(t.version, t.commit).
 				OnSave(t.handleServerSave).
 				OnCancel(t.handleFormCancel).
-				SetExistingAliases(t.getExistingAliases())
+				SetExistingAliases(t.getExistingAliases()).
+				SetExistingGroups(t.getUniqueGroups())
 			t.app.SetRoot(form, true)
 			return
 		}
@@ -781,7 +784,8 @@ func (t *tui) handleServerAdd() {
 		SetVersionInfo(t.version, t.commit).
 		OnSave(t.handleServerSave).
 		OnCancel(t.handleFormCancel).
-		SetExistingAliases(t.getExistingAliases())
+		SetExistingAliases(t.getExistingAliases()).
+		SetExistingGroups(t.getUniqueGroups())
 	t.app.SetRoot(form, true)
 }
 
@@ -800,7 +804,8 @@ func (t *tui) handleServerEdit() {
 			SetVersionInfo(t.version, t.commit).
 			OnSave(t.handleServerSave).
 			OnCancel(t.handleFormCancel).
-			SetExistingAliases(t.getExistingAliasesExcept(server))
+			SetExistingAliases(t.getExistingAliasesExcept(server)).
+			SetExistingGroups(t.getUniqueGroups())
 		t.app.SetRoot(form, true)
 	}
 }
@@ -826,7 +831,8 @@ func (t *tui) handleServerClone() {
 			SetVersionInfo(t.version, t.commit).
 			OnSave(t.handleServerSave).
 			OnCancel(t.handleFormCancel).
-			SetExistingAliases(existingAliases)
+			SetExistingAliases(existingAliases).
+			SetExistingGroups(t.getUniqueGroups())
 		t.app.SetRoot(form, true)
 	}
 }
@@ -1612,4 +1618,117 @@ func (t *tui) handleStopForwarding() {
 			})
 		}()
 	}
+}
+
+func (t *tui) getUniqueGroups() []string {
+	servers, err := t.serverService.ListServers("")
+	if err != nil {
+		return nil
+	}
+	uniqueGroups := make(map[string]bool)
+	var groups []string
+	for _, s := range servers {
+		if s.Group != "" && !uniqueGroups[s.Group] {
+			uniqueGroups[s.Group] = true
+			groups = append(groups, s.Group)
+		}
+	}
+	sort.Strings(groups)
+	return groups
+}
+
+func (t *tui) handleGroupAction(groupName string, action string) {
+	if action == "menu" {
+		t.showGroupContextMenu(groupName)
+	} else if action == "tmux-all" {
+		t.handleConnectGroupTmux(groupName)
+	}
+}
+
+func (t *tui) showGroupContextMenu(groupName string) {
+	menu := tview.NewModal().
+		SetText(fmt.Sprintf("Group Actions: %s", groupName)).
+		AddButtons([]string{"Connect to All (tmux)", "Cancel"}).
+		SetDoneFunc(func(buttonIndex int, buttonLabel string) {
+			if buttonLabel == "Connect to All (tmux)" {
+				t.handleConnectGroupTmux(groupName)
+			}
+			t.handleModalClose()
+		})
+	t.app.SetRoot(menu, true)
+}
+
+func (t *tui) handleConnectGroupTmux(groupName string) {
+	if _, err := exec.LookPath("tmux"); err != nil {
+		t.showStatusTempColor("tmux is not installed or not found in PATH", "#FF6B6B")
+		return
+	}
+
+	servers, _ := t.serverService.ListServers("")
+	var groupServers []domain.Server
+
+	for _, s := range servers {
+		if s.Group == groupName || strings.HasPrefix(s.Group, groupName+"/") {
+			groupServers = append(groupServers, s)
+		}
+	}
+
+	if len(groupServers) == 0 {
+		t.showStatusTempColor("No servers in group "+groupName, "#FF6B6B")
+		return
+	}
+
+	sort.Slice(groupServers, func(i, j int) bool {
+		return groupServers[i].Alias < groupServers[j].Alias
+	})
+
+	sessionName := fmt.Sprintf("neossh-%s-%d", strings.ReplaceAll(groupName, "/", "-"), time.Now().Unix())
+	fullCmd := buildTmuxCommand(sessionName, groupServers)
+
+	t.app.Suspend(func() {
+		//nolint:gosec // fullCmd is safely built from quoted session and server parameters for tmux
+		cmd := exec.Command("sh", "-c", fullCmd)
+		cmd.Stdin = os.Stdin
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+
+		if err := cmd.Run(); err != nil {
+			fmt.Printf("Error launching tmux: %v\n", err)
+			fmt.Println("Press Enter to continue...")
+			var dummy string
+			_, _ = fmt.Scanln(&dummy)
+		}
+	})
+}
+
+func buildTmuxCommand(sessionName string, groupServers []domain.Server) string {
+	quote := func(s string) string {
+		return "'" + strings.ReplaceAll(s, "'", "'\\''") + "'"
+	}
+
+	var cmdParts []string
+	sshCmd0 := BuildSSHCommand(groupServers[0])
+
+	cmdParts = append(cmdParts,
+		fmt.Sprintf("tmux new-session -d -s %s %s", quote(sessionName), quote(sshCmd0)),
+		fmt.Sprintf("tmux select-pane -t %s -T %s", quote(sessionName), quote(groupServers[0].Alias)),
+		fmt.Sprintf("tmux set-option -t %s pane-border-status top", quote(sessionName)),
+		fmt.Sprintf("tmux set-option -t %s pane-border-format %s", quote(sessionName), quote(" #{pane_title} ")),
+		fmt.Sprintf("tmux set-option -t %s mouse on", quote(sessionName)),
+	)
+
+	for i := 1; i < len(groupServers); i++ {
+		sshCmdI := BuildSSHCommand(groupServers[i])
+		cmdParts = append(cmdParts,
+			fmt.Sprintf("tmux split-window -t %s %s", quote(sessionName), quote(sshCmdI)),
+			fmt.Sprintf("tmux select-pane -t %s -T %s", quote(sessionName), quote(groupServers[i].Alias)),
+		)
+	}
+
+	cmdParts = append(cmdParts,
+		fmt.Sprintf("tmux select-layout -t %s tiled", quote(sessionName)),
+		fmt.Sprintf("tmux attach-session -t %s", quote(sessionName)),
+	)
+
+	return strings.Join(cmdParts, " ; ")
 }

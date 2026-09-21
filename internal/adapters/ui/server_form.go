@@ -57,6 +57,7 @@ type ServerForm struct {
 	original        *domain.Server
 	initialData     *domain.Server // Initial data for pre-filling form (used in Add mode)
 	existingAliases []string       // List of existing aliases for validation
+	existingGroups  []string       // List of existing groups for autocomplete
 	onSave          func(domain.Server, *domain.Server)
 	onCancel        func()
 	app             *tview.Application // Reference to app for showing modals
@@ -1191,6 +1192,7 @@ func (sf *ServerForm) getDefaultValues() ServerFormData {
 			Port:  fmt.Sprint(server.Port),
 			Key:   strings.Join(server.IdentityFiles, ", "),
 			Tags:  strings.Join(server.Tags, ", "),
+			Group: server.Group,
 			Hidden: func() string {
 				if server.Hidden {
 					return "yes"
@@ -1272,6 +1274,7 @@ func (sf *ServerForm) getDefaultValues() ServerFormData {
 		Port:   "22", // Keep port 22 as it's the standard SSH port
 		Key:    "",   // Empty for new servers (SSH will try default keys)
 		Tags:   "",
+		Group:  "",
 		Hidden: "no",
 
 		// All other fields should be empty for new servers
@@ -1362,6 +1365,33 @@ func (sf *ServerForm) getDefaultValues() ServerFormData {
 	}
 }
 
+// createGroupAutocomplete creates an autocomplete function for the Group field
+func (sf *ServerForm) createGroupAutocomplete() func(string) []string {
+	return func(currentText string) []string {
+		// Don't show suggestions if the field is empty to allow Tab navigation
+		if currentText == "" || len(sf.existingGroups) == 0 {
+			return nil
+		}
+
+		var filtered []string
+		searchTerm := strings.ToLower(currentText)
+
+		for _, group := range sf.existingGroups {
+			if group == "" {
+				continue
+			}
+			if matchesSequence(strings.ToLower(group), searchTerm) {
+				filtered = append(filtered, group)
+			}
+		}
+
+		if len(filtered) == 0 {
+			return nil
+		}
+		return filtered
+	}
+}
+
 // createBasicForm creates the Basic configuration tab
 func (sf *ServerForm) createBasicForm() {
 	form := tview.NewForm()
@@ -1379,6 +1409,10 @@ func (sf *ServerForm) createBasicForm() {
 
 	// Tags field
 	sf.addValidatedInputField(form, "Tags:", "Tags", defaultValues.Tags, 30, GetFieldPlaceholder("Tags"))
+
+	// Group field
+	groupField := sf.addValidatedInputField(form, "Group:", "Group", defaultValues.Group, 30, GetFieldPlaceholder("Group"))
+	groupField.SetAutocompleteFunc(sf.createGroupAutocomplete())
 
 	// Hidden dropdown
 	hiddenOptions := []string{"no", "yes"}
@@ -1779,6 +1813,7 @@ type ServerFormData struct {
 	Port   string
 	Key    string
 	Tags   string
+	Group  string
 	Hidden string
 
 	// Connection and proxy settings
@@ -1915,6 +1950,7 @@ func (sf *ServerForm) getFormData() ServerFormData {
 		Port:   getFieldText("Port:"),
 		Key:    getFieldText("Keys:"),
 		Tags:   getFieldText("Tags:"),
+		Group:  getFieldText("Group:"),
 		Hidden: getDropdownValue("Hidden:"),
 		// Connection and proxy settings
 		ProxyJump:            getFieldText("ProxyJump:"),
@@ -2334,6 +2370,7 @@ func (sf *ServerForm) dataToServer(data ServerFormData) domain.Server {
 		Port:                 port,
 		IdentityFiles:        keys,
 		Tags:                 tags,
+		Group:                data.Group,
 		Hidden:               strings.EqualFold(data.Hidden, "yes"),
 		ProxyJump:            data.ProxyJump,
 		ProxyCommand:         data.ProxyCommand,
@@ -2463,5 +2500,10 @@ func (sf *ServerForm) SetVersionInfo(version, commit string) *ServerForm {
 		// Rebuild header if already exists
 		sf.header = NewAppHeader(sf.version, sf.commit, RepoURL)
 	}
+	return sf
+}
+
+func (sf *ServerForm) SetExistingGroups(groups []string) *ServerForm {
+	sf.existingGroups = groups
 	return sf
 }
