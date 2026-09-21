@@ -128,9 +128,12 @@ If you are coming from **lazyssh**, here is a concrete summary of everything **n
 - 🌐 Proxy settings (`ProxyJump`, `ProxyCommand`).
 - ⚙️ Full SSH config options organized in a tabbed interface.
 
-### Key Management
-- 🔑 SSH key autocomplete with automatic detection of available keys in `~/.ssh/`.
+### Key Management & Git SSH Profiles
+- 🔑 SSH key autocomplete with automatic detection of available keys in `~/.ssh/` and SSH config.
 - 📝 Smart key selection with support for multiple identity files.
+- 🐙 **Git SSH key configuration & profile switcher** (<kbd>P</kbd> or <kbd>Ctrl+G</kbd>): configure per-repository or global Git SSH keys via `core.sshCommand` for GitHub, GitLab, and Bitbucket.
+- 💬 **SSH key comment editor** (<kbd>C</kbd>): inspect and directly edit public/private key comments.
+- ⚡ **SSH Agent integration** (<kbd>l</kbd> / <kbd>u</kbd>): load or unload server identity keys directly into/from `ssh-agent`.
 
 ---
 
@@ -236,6 +239,7 @@ neossh [filter] [flags]
 | `--connect` | `-c` | Connect directly to matching server without launching full TUI picker | `false` |
 | `--import-known-hosts` | | Import newly discovered hosts from `known_hosts` into SSH config | `false` |
 | `--known-hosts <path>` | | Specify custom path to `known_hosts` file | `~/.ssh/known_hosts` |
+| `--git-ssh <key>` | | Configure Git SSH key for current repo (or globally) or view current setting | `""` |
 | `--theme <mode>` | `-t` | Set color theme: `dark`, `light`, or `system` | `""` *(stored preference or dark)* |
 | `--show-hidden` | `-H` | Display hidden servers in UI list | `false` |
 | `--sshconfig <path>` | | Specify custom path to SSH config file | `~/.ssh/config` |
@@ -247,6 +251,12 @@ neossh [filter] [flags]
 ```bash
 # Launch normal interactive TUI:
 neossh
+
+# Configure Git SSH key for the current repository:
+neossh --git-ssh ~/.ssh/id_ed25519_work
+
+# Check current Git SSH configuration for the current directory:
+neossh --git-ssh ""
 
 # Launch with light theme:
 neossh --theme light
@@ -300,11 +310,15 @@ neossh --sshconfig ~/.ssh/config_work -r
 | `m` | Mark server hidden/visible *(on server)* / Group menu: Tmux connect all, collapse/expand all *(on group header)* |
 | `H` | Toggle displaying hidden servers in the list |
 | `p` | Pin / unpin server |
+| `P` / `Ctrl+G` | Open Git SSH Key Configuration & Profile Switcher dialog *(disabled in read-only mode)* |
 | `t` | Edit tags *(disabled in read-only mode)* |
 | `T` | Toggle color theme (Dark → Light → System) |
 | `c` | Copy SSH connection command to clipboard |
+| `C` | Edit SSH key comment *(on server with identity file)* *(disabled in read-only mode)* |
+| `l` | Load selected server's key into `ssh-agent` *(disabled in read-only mode)* |
+| `u` | Unload selected server's key from `ssh-agent` *(disabled in read-only mode)* |
 | `v` | Paste SSH command from clipboard *(disabled in read-only mode)* |
-| `y` / `C` | Duplicate / clone selected server entry *(disabled in read-only mode)* |
+| `y` | Duplicate / clone selected server entry *(disabled in read-only mode)* |
 | `K` | Terminate active SSH session (when on Active Sessions) / Push SSH key via `ssh-copy-id` (when on Servers) *(disabled in read-only mode)* |
 | `f` | Configure SSH port forwarding (Local / Remote / Dynamic) |
 | `s` | Toggle sort mode (alias, last SSH, reverse) |
@@ -316,7 +330,7 @@ neossh --sshconfig ~/.ssh/config_work -r
 | `q` / `Ctrl+C` | Quit |
 
 > [!NOTE]
-> When launched with `--readonly` / `-r`, all modifying operations (`a`, `e`, `d`, `y`, `C`, `v`, `t`, `K`, `i`, `m`) are locked with clear informational dialogs, making it completely safe for shared or production environments.
+> When launched with `--readonly` / `-r`, all modifying operations (`a`, `e`, `d`, `y`, `C`, `v`, `t`, `K`, `i`, `m`, `l`, `u`, `P`) are locked with clear informational dialogs, making it completely safe for shared or production environments.
 
 
 ---
@@ -398,6 +412,7 @@ This project is licensed under the [Apache-2.0 License](LICENSE).
   - `@Mehrdad-Farshi` — SSH error diagnostics display
   - `@leleobhz` — CLI filter and direct connect options
   - `@eznix86` — Import hosts from `~/.ssh/known_hosts` (CLI flag & bootstrap)
+  - `@OleksandrKucherenko` — Git SSH key configuration, profile switcher, and SSH key management
   - `@gonsalvesc` — XDG base directory specification support
   - `@levinion` — Copy SSH command shortcut
   - `@gaoyifan` — Persistent sort mode

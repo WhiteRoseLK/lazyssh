@@ -37,6 +37,8 @@ type Config struct {
 	InitialFilter    string
 	ShowHidden       bool
 	Theme            string
+	ServerRepo       ports.ServerRepository
+	GitService       ports.GitService
 }
 
 type tui struct {
@@ -48,6 +50,8 @@ type tui struct {
 
 	app           *tview.Application
 	serverService ports.ServerService
+	serverRepo    ports.ServerRepository
+	gitService    ports.GitService
 	settings      *settingsManager
 
 	header     *AppHeader
@@ -76,17 +80,23 @@ func NewTUI(logger *zap.SugaredLogger, ss ports.ServerService, version, commit s
 	var initialFilter string
 	var showHidden bool
 	var themeFlag string
+	var serverRepo ports.ServerRepository
+	var gitService ports.GitService
 	if len(cfg) > 0 {
 		exitOnDisconnect = cfg[0].ExitOnDisconnect
 		readonly = cfg[0].ReadOnly
 		initialFilter = cfg[0].InitialFilter
 		showHidden = cfg[0].ShowHidden
 		themeFlag = cfg[0].Theme
+		serverRepo = cfg[0].ServerRepo
+		gitService = cfg[0].GitService
 	}
 	return &tui{
 		logger:           logger,
 		app:              tview.NewApplication(),
 		serverService:    ss,
+		serverRepo:       serverRepo,
+		gitService:       gitService,
 		version:          version,
 		commit:           commit,
 		readonly:         readonly,
@@ -241,6 +251,7 @@ func (t *tui) buildComponents() {
 		OnBacktab(t.handleServerListFocus)
 	t.activeList.SetTitle(" 2 Active Sessions (K: Terminate) ")
 	t.details = NewServerDetails(t.readonly).
+		SetGitService(t.gitService, t.serverRepo).
 		OnTab(t.handleSearchFocus).
 		OnBacktab(t.handleActiveListFocus).
 		OnEscape(t.handleServerListFocus)

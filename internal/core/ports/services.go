@@ -42,3 +42,26 @@ type ServerService interface {
 	KillActiveSessions(server domain.Server) (int, error)
 	ResolveConfigServer(server domain.Server) (domain.Server, bool, error)
 }
+
+// GitService provides Git and SSH key management operations.
+type GitService interface {
+	IsGitRepository(path string) bool
+	GetGitRootPath(path string) (string, error)
+	GetPushRemoteURL(repoPath string) (remoteName, remoteURL string, err error)
+	ListSSHKeys(sshDir string, serverRepo ServerRepository) ([]domain.SSHKey, error)
+	ConfigureGitSSHKey(repoPath string, keyPath string, scope string) error
+	GetCurrentGitSSHConfig(repoPath string) (string, error)
+	ClearGitSSHConfig(repoPath string, scope string) error
+	GetLoadedAgentKeys() ([]string, error)
+
+	// SSH Key management
+	ListAllSSHKeys(serverRepo ServerRepository) ([]domain.SSHKey, error)
+	ListSSHKeysFromConfig(serverRepo ServerRepository) ([]domain.SSHKey, error)
+	ListSSHKeysFromAgent() ([]domain.SSHKey, error)
+	LoadKeyToAgent(keyPath string) error
+	UnloadKeyFromAgent(publicKeyLine string) error
+	UpdateKeyComment(keyPath, comment string) error
+
+	// Server repository resolution
+	SetServerRepository(repo ServerRepository)
+}
