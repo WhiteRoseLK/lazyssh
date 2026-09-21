@@ -334,6 +334,10 @@ func (t *tui) handleServerConnect() {
 				t.logger.Errorw("ssh session error", "alias", server.Alias, "error", err)
 			}
 		})
+		if t.exitOnDisconnect {
+			t.app.Stop()
+			return
+		}
 		t.app.Sync()
 		t.refreshServerList()
 		if sshErr != nil {
@@ -809,7 +813,7 @@ func (t *tui) handlePortForward() {
 	}
 }
 
-func (t *tui) showPortForwardForm(server domain.Server) {
+func (t *tui) showPortForwardForm(server domain.Server) *tview.Form {
 	typeChoices := []string{ForwardTypeLocal, ForwardTypeRemote, ForwardTypeDynamic}
 	modeChoices := []string{ForwardModeOnlyForward, ForwardModeForwardSSH}
 
@@ -934,6 +938,10 @@ func (t *tui) showPortForwardForm(server domain.Server) {
 				t.logger.Errorw("ssh session error", "alias", alias, "error", err)
 			}
 		})
+		if t.exitOnDisconnect {
+			t.app.Stop()
+			return
+		}
 		t.app.Sync()
 		t.returnToMain()
 		if sshErr != nil {
@@ -945,6 +953,7 @@ func (t *tui) showPortForwardForm(server domain.Server) {
 
 	t.app.SetRoot(form, true)
 	t.app.SetFocus(form)
+	return form
 }
 
 // =============================================================================

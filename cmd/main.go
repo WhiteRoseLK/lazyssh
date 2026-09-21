@@ -29,11 +29,16 @@ import (
 )
 
 var (
-	version       = "develop"
-	gitCommit     = "unknown"
-	sshConfigFile string
+	version          = "develop"
+	gitCommit        = "unknown"
+	sshConfigFile    string
+	exitOnDisconnect bool
 
-	rootCmd = &cobra.Command{
+	rootCmd = newRootCmd()
+)
+
+func newRootCmd() *cobra.Command {
+	cmd := &cobra.Command{
 		Use:   ui.AppName,
 		Short: "NeoSSH server picker TUI",
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -120,24 +125,31 @@ var (
 
 			serverRepo := ssh_config_file.NewRepository(log, sshConfigFile, metaDataFile)
 			serverService := services.NewServerService(log, serverRepo)
-			tui := ui.NewTUI(log, serverService, version, gitCommit)
+			tui := ui.NewTUI(log, serverService, version, gitCommit, ui.Config{
+				ExitOnDisconnect: exitOnDisconnect,
+			})
 
 			return tui.Run()
 		},
 	}
-)
+
+	cmd.PersistentFlags().StringVar(
+		&sshConfigFile, "sshconfig", "", "path to ssh config file (default: ~/.ssh/config)",
+	)
+	cmd.PersistentFlags().BoolVarP(
+		&exitOnDisconnect, "exit-on-disconnect", "x", false, "exit neossh after SSH session finishes",
+	)
+	cmd.PersistentFlags().BoolVar(
+		&exitOnDisconnect, "auto-exit", false, "exit neossh after SSH session finishes",
+	)
+
+	cmd.SilenceUsage = true
+	return cmd
+}
 
 func main() {
 	if err := rootCmd.Execute(); err != nil {
 		_, _ = fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-}
-
-func init() {
-	rootCmd.PersistentFlags().StringVar(
-		&sshConfigFile, "sshconfig", "", "path to ssh config file (default: ~/.ssh/config)",
-	)
-
-	rootCmd.SilenceUsage = true
 }
