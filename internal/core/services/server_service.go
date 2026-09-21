@@ -24,6 +24,8 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
+	"runtime"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -50,6 +52,7 @@ type serverService struct {
 
 	newSSHCommand         func(alias string) *exec.Cmd
 	newSSHCommandWithArgs func(alias string, extraArgs []string) *exec.Cmd
+	newHookCommand        func(cmdStr string) *exec.Cmd
 }
 
 // ServerServiceOption allows configuring a serverService instance.
@@ -76,6 +79,14 @@ func NewServerService(logger *zap.SugaredLogger, sr ports.ServerRepository, opts
 			args = append(args, "-F", sr.GetConfigFile(), alias)
 			//nolint:gosec // G204: intentional SSH command
 			return exec.Command("ssh", args...)
+		},
+		newHookCommand: func(cmdStr string) *exec.Cmd {
+			if runtime.GOOS == "windows" {
+				//nolint:gosec // G204: intentional user pre-connect command hook
+				return exec.Command("cmd.exe", "/c", cmdStr)
+			}
+			//nolint:gosec // G204: intentional user pre-connect command hook
+			return exec.Command("sh", "-c", cmdStr)
 		},
 	}
 	for _, opt := range opts {
@@ -425,11 +436,127 @@ func (s *serverService) formatTerminalTitle(alias string) string {
 	return title
 }
 
+// interpolateHookCommand substitutes OpenSSH-style expansion tokens (%h, %p, %r, %n, %%) in the hook template.
+func interpolateHookCommand(template string, s domain.Server) string {
+	portStr := strconv.Itoa(s.Port)
+	if s.Port == 0 {
+		portStr = "22"
+	}
+	r := strings.NewReplacer(
+		"%h", s.Host,
+		"%p", portStr,
+		"%r", s.User,
+		"%n", s.Alias,
+		"%%", "%",
+	)
+	return r.Replace(template)
+}
+
+func (s *serverService) runPreConnectHook(alias string) error {
+	servers, err := s.serverRepository.ListServers("")
+	if err != nil {
+		s.logger.Warnw("failed to list servers for pre-connect hook lookup", "error", err)
+	}
+
+	var target *domain.Server
+	for i := range servers {
+		if strings.EqualFold(servers[i].Alias, alias) {
+			target = &servers[i]
+			break
+		}
+	}
+
+	var hooks []string
+
+	// 1. Global hook from environment variable
+	if envHook := strings.TrimSpace(os.Getenv("NEOSSH_PRE_CONNECT_HOOK")); envHook != "" {
+		hooks = append(hooks, envHook)
+	}
+
+	// 2. Global hook from repository settings
+	if globalHook, err := s.serverRepository.GetPreConnectCommand(); err == nil && strings.TrimSpace(globalHook) != "" {
+		gh := strings.TrimSpace(globalHook)
+		if !slices.Contains(hooks, gh) {
+			hooks = append(hooks, gh)
+		}
+	}
+
+	// 3. Server-specific hook
+	if target != nil && strings.TrimSpace(target.PreConnectCommand) != "" {
+		sh := strings.TrimSpace(target.PreConnectCommand)
+		if !slices.Contains(hooks, sh) {
+			hooks = append(hooks, sh)
+		}
+	}
+
+	if len(hooks) == 0 {
+		return nil
+	}
+
+	srv := domain.Server{Alias: alias, Host: alias, Port: 22}
+	if target != nil {
+		srv = *target
+		if srv.Port == 0 {
+			srv.Port = 22
+		}
+	}
+
+	for _, hookTemplate := range hooks {
+		cmdStr := interpolateHookCommand(hookTemplate, srv)
+		s.logger.Infow("executing pre-connect hook", "alias", alias, "command", cmdStr)
+
+		hookCmdFactory := s.newHookCommand
+		if hookCmdFactory == nil {
+			hookCmdFactory = func(c string) *exec.Cmd {
+				if runtime.GOOS == "windows" {
+					//nolint:gosec // G204: intentional user pre-connect command hook
+					return exec.Command("cmd.exe", "/c", c)
+				}
+				//nolint:gosec // G204: intentional user pre-connect command hook
+				return exec.Command("sh", "-c", c)
+			}
+		}
+
+		cmd := hookCmdFactory(cmdStr)
+		if cmd == nil {
+			return fmt.Errorf("pre-connect hook factory returned nil")
+		}
+
+		cmd.Env = append(cmd.Environ(),
+			"NEOSSH_ALIAS="+srv.Alias,
+			"NEOSSH_HOST="+srv.Host,
+			"NEOSSH_USER="+srv.User,
+			"NEOSSH_PORT="+strconv.Itoa(srv.Port),
+			"NEOSSH_CONFIG="+s.serverRepository.GetConfigFile(),
+		)
+
+		stderrBuf := newLimitedBuffer(2048)
+		cmd.Stdin = os.Stdin
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = io.MultiWriter(os.Stderr, stderrBuf)
+
+		if err := cmd.Run(); err != nil {
+			s.logger.Errorw("pre-connect hook failed", "alias", alias, "command", cmdStr, "error", err)
+			msg := strings.TrimSpace(stderrBuf.String())
+			if msg != "" {
+				return fmt.Errorf("pre-connect hook failed (%s): %s", cmdStr, msg)
+			}
+			return fmt.Errorf("pre-connect hook failed (%s): %w", cmdStr, err)
+		}
+	}
+
+	return nil
+}
+
 // SSH starts an interactive SSH session to the given alias using the system's ssh client.
 func (s *serverService) SSH(alias string) error {
 	s.logger.Infow("ssh start", "alias", alias)
 	if strings.ContainsAny(alias, "*?") {
 		return fmt.Errorf("cannot initiate direct SSH connection to a wildcard pattern block")
+	}
+
+	if err := s.runPreConnectHook(alias); err != nil {
+		return err
 	}
 
 	title := s.formatTerminalTitle(alias)
@@ -479,6 +606,10 @@ func (s *serverService) SSHWithArgs(alias string, extraArgs []string) error {
 	s.logger.Infow("ssh start (with args)", "alias", alias, "args", extraArgs)
 	if strings.ContainsAny(alias, "*?") {
 		return fmt.Errorf("cannot initiate direct SSH connection to a wildcard pattern block")
+	}
+
+	if err := s.runPreConnectHook(alias); err != nil {
+		return err
 	}
 
 	title := s.formatTerminalTitle(alias)

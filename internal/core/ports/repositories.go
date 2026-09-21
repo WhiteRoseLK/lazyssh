@@ -30,4 +30,6 @@ type ServerRepository interface {
 	ImportKnownHosts(knownHostsPath string) (domain.ImportResult, error)
 	GetTheme() (string, error)
 	SaveTheme(theme string) error
+	GetPreConnectCommand() (string, error)
+	SavePreConnectCommand(cmd string) error
 }

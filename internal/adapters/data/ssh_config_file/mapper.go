@@ -67,14 +67,15 @@ func (r *Repository) toDomainServer(lc *loadedConfig) []domain.Server {
 				primaryAlias := aliases[0]
 				isWildcard := strings.ContainsAny(primaryAlias, "*?")
 				servers = append(servers, domain.Server{
-					Alias:         primaryAlias,
-					Aliases:       aliases,
-					Port:          22,
-					IdentityFiles: []string{},
-					SourceFile:    cf.path,
-					SourceFiles:   []string{cf.path},
-					IsWildcard:    isWildcard,
-					Tags:          extractHostTags(host),
+					Alias:             primaryAlias,
+					Aliases:           aliases,
+					Port:              22,
+					IdentityFiles:     []string{},
+					SourceFile:        cf.path,
+					SourceFiles:       []string{cf.path},
+					IsWildcard:        isWildcard,
+					Tags:              extractHostTags(host),
+					PreConnectCommand: extractHostPreConnectCommand(host),
 				})
 				idx = len(servers) - 1
 				seenKeys[idx] = make(map[string]bool)
@@ -95,6 +96,9 @@ func (r *Repository) toDomainServer(lc *loadedConfig) []domain.Server {
 					if !slices.Contains(servers[idx].Tags, tag) {
 						servers[idx].Tags = append(servers[idx].Tags, tag)
 					}
+				}
+				if servers[idx].PreConnectCommand == "" {
+					servers[idx].PreConnectCommand = extractHostPreConnectCommand(host)
 				}
 			}
 
@@ -400,6 +404,9 @@ func (r *Repository) mergeMetadata(servers []domain.Server, metadata map[string]
 			}
 			if servers[i].Group == "" {
 				servers[i].Group = meta.Group
+			}
+			if servers[i].PreConnectCommand == "" && meta.PreConnectCommand != "" {
+				servers[i].PreConnectCommand = meta.PreConnectCommand
 			}
 			servers[i].SSHCount = meta.SSHCount
 			if meta.File != "" {

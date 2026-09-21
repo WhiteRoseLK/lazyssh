@@ -45,8 +45,10 @@ func (m *mockServerRepo) DiscoverKnownHosts(path string) ([]domain.Server, domai
 func (m *mockServerRepo) ImportKnownHosts(path string) (domain.ImportResult, error) {
 	return domain.ImportResult{}, nil
 }
-func (m *mockServerRepo) GetTheme() (string, error)    { return "", nil }
-func (m *mockServerRepo) SaveTheme(theme string) error { return nil }
+func (m *mockServerRepo) GetTheme() (string, error)              { return "", nil }
+func (m *mockServerRepo) SaveTheme(theme string) error           { return nil }
+func (m *mockServerRepo) GetPreConnectCommand() (string, error)  { return "", nil }
+func (m *mockServerRepo) SavePreConnectCommand(cmd string) error { return nil }
 
 func TestGitService_IsGitRepository(t *testing.T) {
 	logger := zap.NewNop().Sugar()

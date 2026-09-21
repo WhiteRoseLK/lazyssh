@@ -113,6 +113,7 @@ type Server struct {
 	VisualHostKey         string // yes, no
 
 	// Command execution
+	PreConnectCommand  string // hook or script executed locally before starting SSH session
 	LocalCommand       string
 	PermitLocalCommand string
 	EscapeChar         string // single character or "none"

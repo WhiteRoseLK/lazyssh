@@ -1257,6 +1257,7 @@ func (sf *ServerForm) getDefaultValues() ServerFormData {
 			UpdateHostKeys:              server.UpdateHostKeys,
 			HashKnownHosts:              server.HashKnownHosts,
 			VisualHostKey:               server.VisualHostKey,
+			PreConnectCommand:           server.PreConnectCommand,
 			LocalCommand:                server.LocalCommand,
 			PermitLocalCommand:          server.PermitLocalCommand,
 			EscapeChar:                  server.EscapeChar,
@@ -1352,6 +1353,7 @@ func (sf *ServerForm) getDefaultValues() ServerFormData {
 		VisualHostKey:         "",
 
 		// Command execution
+		PreConnectCommand:  "",
 		LocalCommand:       "",
 		PermitLocalCommand: "",
 		EscapeChar:         "",
@@ -1774,6 +1776,7 @@ func (sf *ServerForm) createAdvancedForm() {
 	hostKeyField.SetAutocompleteFunc(sf.createAlgorithmAutocomplete(hostKeyAlgorithms))
 
 	form.AddTextView("\n[yellow]▶ Command Execution[-]", "", 0, 1, true, false)
+	sf.addInputFieldWithHelp(form, "PreConnectCommand:", "PreConnectCommand", defaultValues.PreConnectCommand, 40, GetFieldPlaceholder("PreConnectCommand"))
 	sf.addInputFieldWithHelp(form, "LocalCommand:", "LocalCommand", defaultValues.LocalCommand, 40, GetFieldPlaceholder("LocalCommand"))
 
 	// PermitLocalCommand dropdown
@@ -1891,6 +1894,7 @@ type ServerFormData struct {
 	VisualHostKey               string
 
 	// Command execution
+	PreConnectCommand  string
 	LocalCommand       string
 	PermitLocalCommand string
 	EscapeChar         string
@@ -2009,6 +2013,7 @@ func (sf *ServerForm) getFormData() ServerFormData {
 		HashKnownHosts:           getDropdownValue("HashKnownHosts:"),
 		VisualHostKey:            getDropdownValue("VisualHostKey:"),
 		// Command execution
+		PreConnectCommand:  getFieldText("PreConnectCommand:"),
 		LocalCommand:       getFieldText("LocalCommand:"),
 		PermitLocalCommand: getDropdownValue("PermitLocalCommand:"),
 		EscapeChar:         getFieldText("EscapeChar:"),
@@ -2422,6 +2427,7 @@ func (sf *ServerForm) dataToServer(data ServerFormData) domain.Server {
 		UpdateHostKeys:              data.UpdateHostKeys,
 		HashKnownHosts:              data.HashKnownHosts,
 		VisualHostKey:               data.VisualHostKey,
+		PreConnectCommand:           data.PreConnectCommand,
 		LocalCommand:                data.LocalCommand,
 		PermitLocalCommand:          data.PermitLocalCommand,
 		EscapeChar:                  data.EscapeChar,

@@ -48,6 +48,7 @@ var (
 	gitSSHFlag        string
 	langFlag          string
 	scpFlag           string
+	preConnectFlag    string
 
 	rootCmd = newRootCmd()
 )
@@ -126,6 +127,10 @@ func newRootCmd() *cobra.Command {
 
 			if scpFlag != "" {
 				return handleSCPFlag(serverService, scpFlag)
+			}
+
+			if preConnectFlag != "" {
+				_ = os.Setenv("NEOSSH_PRE_CONNECT_HOOK", preConnectFlag)
 			}
 
 			if isImportKH {
@@ -209,6 +214,9 @@ func newRootCmd() *cobra.Command {
 	)
 	cmd.PersistentFlags().StringVar(
 		&scpFlag, "scp", "", "generate SCP command templates for server alias (e.g. --scp myserver)",
+	)
+	cmd.PersistentFlags().StringVar(
+		&preConnectFlag, "pre-connect", "", "run local hook command before SSH connect (supports %h, %p, %r, %n)",
 	)
 
 	cmd.SilenceUsage = true

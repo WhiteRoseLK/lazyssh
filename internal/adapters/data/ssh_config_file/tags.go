@@ -259,3 +259,32 @@ func (r *Repository) updateHostTags(host *ssh_config.Host, newTags []string) {
 		}
 	}
 }
+
+var preConnectCommentRegex = regexp.MustCompile(`(?i)(?:^|[\s#;|,(\[])(?:pre-connect|pre-ssh|hook)\s*[:=]\s*([^#;\r\n]+)`)
+
+func extractPreConnectFromComment(comment string) string {
+	match := preConnectCommentRegex.FindStringSubmatch(comment)
+	if len(match) >= 2 {
+		return strings.Trim(match[1], " \t\r\n)]}\"'")
+	}
+	return ""
+}
+
+func extractHostPreConnectCommand(host *ssh_config.Host) string {
+	if cmd := extractPreConnectFromComment(host.EOLComment); cmd != "" {
+		return cmd
+	}
+	for _, node := range host.Nodes {
+		switch n := node.(type) {
+		case *ssh_config.Empty:
+			if cmd := extractPreConnectFromComment(n.Comment); cmd != "" {
+				return cmd
+			}
+		case *ssh_config.KV:
+			if cmd := extractPreConnectFromComment(n.Comment); cmd != "" {
+				return cmd
+			}
+		}
+	}
+	return ""
+}

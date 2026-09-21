@@ -294,6 +294,25 @@ func (r *Repository) SaveTheme(theme string) error {
 	return r.metadataManager.SaveSettings(settings)
 }
 
+// GetPreConnectCommand returns the global pre-connect command from settings.
+func (r *Repository) GetPreConnectCommand() (string, error) {
+	settings, err := r.metadataManager.GetSettings()
+	if err != nil {
+		return "", err
+	}
+	return settings.PreConnectCommand, nil
+}
+
+// SavePreConnectCommand saves the global pre-connect command to settings.
+func (r *Repository) SavePreConnectCommand(cmd string) error {
+	settings, err := r.metadataManager.GetSettings()
+	if err != nil {
+		settings = Settings{}
+	}
+	settings.PreConnectCommand = cmd
+	return r.metadataManager.SaveSettings(settings)
+}
+
 // LoadSettings loads application settings from the metadata file at the given path.
 // This is a standalone function for use during app initialization before the repository is created.
 func LoadSettings(metaDataPath string) (Settings, error) {

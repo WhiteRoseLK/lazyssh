@@ -27,16 +27,18 @@ import (
 
 // Settings contains application-level settings stored in the metadata file.
 type Settings struct {
-	Theme string `json:"theme,omitempty"`
+	Theme             string `json:"theme,omitempty"`
+	PreConnectCommand string `json:"pre_connect_command,omitempty"`
 }
 
 type ServerMetadata struct {
-	Tags     []string `json:"tags,omitempty"`
-	Group    string   `json:"group,omitempty"`
-	LastSeen string   `json:"last_seen,omitempty"`
-	PinnedAt string   `json:"pinned_at,omitempty"`
-	Hidden   bool     `json:"hidden,omitempty"`
-	SSHCount int      `json:"ssh_count,omitempty"`
+	Tags              []string `json:"tags,omitempty"`
+	Group             string   `json:"group,omitempty"`
+	LastSeen          string   `json:"last_seen,omitempty"`
+	PinnedAt          string   `json:"pinned_at,omitempty"`
+	Hidden            bool     `json:"hidden,omitempty"`
+	SSHCount          int      `json:"ssh_count,omitempty"`
+	PreConnectCommand string   `json:"pre_connect_command,omitempty"`
 	// File is the absolute path of the SSH config file neossh should
 	// write to when editing or deleting this host. Populated lazily on
 	// the first successful write and used to suppress the ambiguity
@@ -196,6 +198,8 @@ func (m *metadataManager) updateServer(server domain.Server, oldAlias string) er
 	if server.SSHCount > 0 {
 		merged.SSHCount = server.SSHCount
 	}
+
+	merged.PreConnectCommand = server.PreConnectCommand
 
 	metadata[server.Alias] = merged
 	return m.saveAll(metadata)

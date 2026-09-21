@@ -306,6 +306,7 @@ func (sd *ServerDetails) UpdateServer(server domain.Server) {
 		{
 			name: "Environment & Execution",
 			fields: []fieldEntry{
+				{"PreConnectCommand", server.PreConnectCommand},
 				{"LocalCommand", server.LocalCommand},
 				{"PermitLocalCommand", server.PermitLocalCommand},
 				{"EscapeChar", server.EscapeChar},

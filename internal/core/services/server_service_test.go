@@ -20,6 +20,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"strings"
 	"testing"
 
 	"github.com/WhiteRoseLK/neossh/internal/core/domain"
@@ -64,6 +65,10 @@ func (m *mockServerRepository) GetConfigFile() string { return "~/.ssh/config" }
 func (m *mockServerRepository) GetTheme() (string, error) { return "dark", nil }
 
 func (m *mockServerRepository) SaveTheme(string) error { return nil }
+
+func (m *mockServerRepository) GetPreConnectCommand() (string, error) { return "", nil }
+
+func (m *mockServerRepository) SavePreConnectCommand(string) error { return nil }
 
 func (m *mockServerRepository) RecordSSH(alias string) error {
 	m.recordCalls++
@@ -288,6 +293,11 @@ func TestHelperProcess(t *testing.T) {
 				_, _ = os.Stderr.WriteString("ssh: connect to host " + alias + " port 22: Connection refused\n")
 				os.Exit(255)
 			case "success":
+				os.Exit(0)
+			case "hook-fail":
+				_, _ = os.Stderr.WriteString("hook error: connection refused\n")
+				os.Exit(1)
+			case "hook-success":
 				os.Exit(0)
 			default:
 				_, _ = os.Stderr.WriteString("unknown scenario\n")
@@ -589,5 +599,164 @@ func TestServerService_FormatTerminalTitle(t *testing.T) {
 	}
 	if got := svc.formatTerminalTitle("unknown"); got != "unknown" {
 		t.Errorf("expected 'unknown', got %q", got)
+	}
+}
+
+func TestInterpolateHookCommand(t *testing.T) {
+	s := domain.Server{
+		Alias: "prod-server",
+		Host:  "192.168.1.50",
+		User:  "admin",
+		Port:  2222,
+	}
+
+	template := "vpn-connect.sh --host %h --port %p --user %r --alias %n (%%)"
+	expected := "vpn-connect.sh --host 192.168.1.50 --port 2222 --user admin --alias prod-server (%)"
+	if got := interpolateHookCommand(template, s); got != expected {
+		t.Errorf("interpolateHookCommand() = %q, want %q", got, expected)
+	}
+
+	// Port fallback to 22
+	s0 := domain.Server{Host: "host.local", Port: 0}
+	if got := interpolateHookCommand("%h:%p", s0); got != "host.local:22" {
+		t.Errorf("interpolateHookCommand() port fallback = %q, want %q", got, "host.local:22")
+	}
+}
+
+func TestServerService_PreConnectHook_Success(t *testing.T) {
+	hookExecuted := false
+	sshExecuted := false
+
+	repo := &mockServerRepository{
+		servers: []domain.Server{
+			{
+				Alias:             "vpn-box",
+				Host:              "10.0.0.1",
+				User:              "dev",
+				Port:              22,
+				PreConnectCommand: "echo 'running vpn'",
+			},
+		},
+	}
+
+	svc := &serverService{
+		logger:           zap.NewNop().Sugar(),
+		serverRepository: repo,
+		newHookCommand: func(cmdStr string) *exec.Cmd {
+			hookExecuted = true
+			cs := []string{"-test.run=TestHelperProcess", "--", "hook-success"}
+			cmd := exec.Command(os.Args[0], cs...)
+			cmd.Env = append(os.Environ(), "GO_WANT_HELPER_PROCESS=1")
+			return cmd
+		},
+		newSSHCommand: func(alias string) *exec.Cmd {
+			sshExecuted = true
+			cs := []string{"-test.run=TestHelperProcess", "--", "success", alias}
+			cmd := exec.Command(os.Args[0], cs...)
+			cmd.Env = append(os.Environ(), "GO_WANT_HELPER_PROCESS=1")
+			return cmd
+		},
+	}
+
+	err := svc.SSH("vpn-box")
+	if err != nil {
+		t.Fatalf("expected nil error on hook success, got: %v", err)
+	}
+	if !hookExecuted {
+		t.Error("expected pre-connect hook to be executed")
+	}
+	if !sshExecuted {
+		t.Error("expected SSH command to be executed after hook")
+	}
+}
+
+func TestServerService_PreConnectHook_Failure(t *testing.T) {
+	hookExecuted := false
+	sshExecuted := false
+
+	repo := &mockServerRepository{
+		servers: []domain.Server{
+			{
+				Alias:             "vpn-box",
+				Host:              "10.0.0.1",
+				PreConnectCommand: "fail-script.sh",
+			},
+		},
+	}
+
+	svc := &serverService{
+		logger:           zap.NewNop().Sugar(),
+		serverRepository: repo,
+		newHookCommand: func(cmdStr string) *exec.Cmd {
+			hookExecuted = true
+			cs := []string{"-test.run=TestHelperProcess", "--", "hook-fail"}
+			cmd := exec.Command(os.Args[0], cs...)
+			cmd.Env = append(os.Environ(), "GO_WANT_HELPER_PROCESS=1")
+			return cmd
+		},
+		newSSHCommand: func(alias string) *exec.Cmd {
+			sshExecuted = true
+			cs := []string{"-test.run=TestHelperProcess", "--", "success", alias}
+			cmd := exec.Command(os.Args[0], cs...)
+			cmd.Env = append(os.Environ(), "GO_WANT_HELPER_PROCESS=1")
+			return cmd
+		},
+	}
+
+	err := svc.SSH("vpn-box")
+	if err == nil {
+		t.Fatal("expected error when pre-connect hook fails")
+	}
+	if !strings.Contains(err.Error(), "pre-connect hook failed") {
+		t.Errorf("expected error to mention pre-connect hook failure, got: %v", err)
+	}
+	if !hookExecuted {
+		t.Error("expected pre-connect hook to be executed")
+	}
+	if sshExecuted {
+		t.Error("expected SSH command NOT to be executed when hook fails")
+	}
+}
+
+func TestServerService_GlobalPreConnectHook(t *testing.T) {
+	t.Setenv("NEOSSH_PRE_CONNECT_HOOK", "global-check.sh %h")
+
+	hookExecuted := false
+	var executedCmd string
+
+	repo := &mockServerRepository{
+		servers: []domain.Server{
+			{Alias: "plain-box", Host: "10.0.0.5"},
+		},
+	}
+
+	svc := &serverService{
+		logger:           zap.NewNop().Sugar(),
+		serverRepository: repo,
+		newHookCommand: func(cmdStr string) *exec.Cmd {
+			hookExecuted = true
+			executedCmd = cmdStr
+			cs := []string{"-test.run=TestHelperProcess", "--", "hook-success"}
+			cmd := exec.Command(os.Args[0], cs...)
+			cmd.Env = append(os.Environ(), "GO_WANT_HELPER_PROCESS=1")
+			return cmd
+		},
+		newSSHCommand: func(alias string) *exec.Cmd {
+			cs := []string{"-test.run=TestHelperProcess", "--", "success", alias}
+			cmd := exec.Command(os.Args[0], cs...)
+			cmd.Env = append(os.Environ(), "GO_WANT_HELPER_PROCESS=1")
+			return cmd
+		},
+	}
+
+	err := svc.SSH("plain-box")
+	if err != nil {
+		t.Fatalf("expected nil error, got: %v", err)
+	}
+	if !hookExecuted {
+		t.Error("expected global pre-connect hook to be executed")
+	}
+	if executedCmd != "global-check.sh 10.0.0.5" {
+		t.Errorf("expected interpolated cmd 'global-check.sh 10.0.0.5', got %q", executedCmd)
 	}
 }
