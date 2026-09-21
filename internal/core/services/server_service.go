@@ -784,3 +784,13 @@ func (s *serverService) ImportKnownHosts(knownHostsPath string) (domain.ImportRe
 	}
 	return s.serverRepository.ImportKnownHosts(knownHostsPath)
 }
+
+// GetTheme returns the current theme name from settings.
+func (s *serverService) GetTheme() (string, error) {
+	return s.serverRepository.GetTheme()
+}
+
+// SaveTheme saves the theme name to settings.
+func (s *serverService) SaveTheme(theme string) error {
+	return s.serverRepository.SaveTheme(theme)
+}

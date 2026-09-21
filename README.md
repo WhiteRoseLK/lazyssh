@@ -38,6 +38,7 @@ If you are coming from **lazyssh**, here is a concrete summary of everything **n
 
 | Feature | Description | Shortcut / Usage |
 | :--- | :--- | :---: |
+| **Color Themes (Dark, Light, System)** | Customize TUI appearance with dedicated Dark and Light palettes or automatic OS system appearance detection across macOS, Linux, and Windows, toggleable at runtime. | <kbd>T</kbd> / `--theme` |
 | **Import Known Hosts** | Quickly bootstrap your SSH config by discovering and importing unconfigured hosts from `~/.ssh/known_hosts` with automatic deduplication, standard port parsing (`[host]:port`), and safe skipping of hashed entries. | `--import-known-hosts` / <kbd>i</kbd> |
 | **Hidden Hosts Support** | Hide jump hosts, proxy targets, or internal nodes from the primary server list (<kbd>m</kbd> or form), reveal on demand with <kbd>H</kbd>, or launch with hidden servers visible. | <kbd>m</kbd> / <kbd>H</kbd> / `-H` |
 | **CLI Pre-filtering & Direct Connect** | Launch pre-filtered (`neossh prod` or `-f prod`) to prevent exposing your entire server fleet during screen shares, or connect directly (`neossh -c <alias>`). | `neossh <filter>` / `-c` |
@@ -229,6 +230,7 @@ neossh [filter] [flags]
 | `--connect` | `-c` | Connect directly to matching server without launching full TUI picker | `false` |
 | `--import-known-hosts` | | Import newly discovered hosts from `known_hosts` into SSH config | `false` |
 | `--known-hosts <path>` | | Specify custom path to `known_hosts` file | `~/.ssh/known_hosts` |
+| `--theme <mode>` | `-t` | Set color theme: `dark`, `light`, or `system` | `""` *(stored preference or dark)* |
 | `--show-hidden` | `-H` | Display hidden servers in UI list | `false` |
 | `--sshconfig <path>` | | Specify custom path to SSH config file | `~/.ssh/config` |
 | `--readonly`, `--ssh-config-readonly` | `-r` | Run in read-only / viewer mode (prevents writing or modifying SSH configuration) | `false` |
@@ -239,6 +241,12 @@ neossh [filter] [flags]
 ```bash
 # Launch normal interactive TUI:
 neossh
+
+# Launch with light theme:
+neossh --theme light
+
+# Launch following OS system appearance (auto dark/light):
+neossh --theme system
 
 # Launch TUI revealing all hidden hosts:
 neossh -H
@@ -286,6 +294,7 @@ neossh --sshconfig ~/.ssh/config_work -r
 | `H` | Toggle displaying hidden servers in the list |
 | `p` | Pin / unpin server |
 | `t` | Edit tags *(disabled in read-only mode)* |
+| `T` | Toggle color theme (Dark → Light → System) |
 | `c` | Copy SSH connection command to clipboard |
 | `v` | Paste SSH command from clipboard *(disabled in read-only mode)* |
 | `y` / `C` | Duplicate / clone selected server entry *(disabled in read-only mode)* |
@@ -387,4 +396,5 @@ This project is licensed under the [Apache-2.0 License](LICENSE).
   - `@k161196` — Panel focus shortcuts
   - `@shekel588` — Keyboard navigation improvements, focus borders, active field styling, and confirmation dialogs
   - `@vtmocanu` — Hidden hosts support, visibility toggling, and filtering
+  - `@davidszp` — Dark, Light, and System color theme support with runtime toggle
   - `@arniom`, `@leoncamel`, `@breakersun`, `@OlalalalaO`, `@manato-tajiri`, `@komapro` — Bug fixes & documentation improvements
