@@ -354,4 +354,3 @@ Host bastion
 		t.Errorf("bastion was not deleted:\n%s", savedAfterDelete)
 	}
 }
-
