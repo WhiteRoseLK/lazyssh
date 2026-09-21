@@ -16,6 +16,7 @@ package ssh_config_file
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/WhiteRoseLK/neossh/internal/core/domain"
 	"github.com/WhiteRoseLK/neossh/internal/core/ports"
@@ -158,14 +159,16 @@ func (r *Repository) UpdateServer(server domain.Server, newServer domain.Server)
 	if len(newServer.Aliases) > 0 {
 		aliases := make([]string, 0, len(newServer.Aliases)+1)
 		seen := make(map[string]bool)
-		if newServer.Alias != "" {
-			aliases = append(aliases, newServer.Alias)
-			seen[newServer.Alias] = true
+		cleanPrimary := strings.Trim(strings.TrimSpace(newServer.Alias), "\"'")
+		if cleanPrimary != "" {
+			aliases = append(aliases, cleanPrimary)
+			seen[cleanPrimary] = true
 		}
 		for _, a := range newServer.Aliases {
-			if a != "" && !seen[a] {
-				aliases = append(aliases, a)
-				seen[a] = true
+			cleanA := strings.Trim(strings.TrimSpace(a), "\"'")
+			if cleanA != "" && !seen[cleanA] {
+				aliases = append(aliases, cleanA)
+				seen[cleanA] = true
 			}
 		}
 		newPatterns := make([]*ssh_config.Pattern, 0, len(aliases))
@@ -174,10 +177,12 @@ func (r *Repository) UpdateServer(server domain.Server, newServer domain.Server)
 		}
 		host.Patterns = newPatterns
 	} else if server.Alias != newServer.Alias {
+		cleanOld := strings.Trim(strings.TrimSpace(server.Alias), "\"'")
+		cleanNew := strings.Trim(strings.TrimSpace(newServer.Alias), "\"'")
 		newPatterns := make([]*ssh_config.Pattern, 0, len(host.Patterns))
 		for _, pattern := range host.Patterns {
-			if pattern.Str == server.Alias {
-				newPatterns = append(newPatterns, &ssh_config.Pattern{Str: newServer.Alias})
+			if strings.Trim(strings.TrimSpace(pattern.Str), "\"'") == cleanOld {
+				newPatterns = append(newPatterns, &ssh_config.Pattern{Str: cleanNew})
 			} else {
 				newPatterns = append(newPatterns, pattern)
 			}

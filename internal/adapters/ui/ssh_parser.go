@@ -107,7 +107,7 @@ func ParseSSHCommand(cmd string) (*domain.Server, error) {
 
 	// Override alias and tags if extracted from comment
 	if extractedAlias != "" {
-		server.Alias = extractedAlias
+		server.Alias = strings.Trim(strings.TrimSpace(extractedAlias), "\"'")
 	}
 	if extractedTags != "" {
 		// Split tags by comma

@@ -354,3 +354,61 @@ Host bastion
 		t.Errorf("bastion was not deleted:\n%s", savedAfterDelete)
 	}
 }
+
+func TestListServers_QuotedHostAliases(t *testing.T) {
+	fs := newMemFS(t)
+	defer fs.cleanup()
+
+	main := "/home/u/.ssh/config"
+	content := `Host "TEST-Testing" 'staging-box'
+    HostName 172.16.1.1
+    User my-user
+    Port 22
+    IdentityFile ~/.ssh/my_file.pem
+
+Host "single-quoted-server"
+    HostName 10.0.0.1
+    User dev
+`
+	fs.write(main, content)
+	tmpMeta := filepath.Join(t.TempDir(), "metadata.json")
+	r := newRepoForFS(t, fs, tmpMeta)
+
+	servers, err := r.ListServers("")
+	if err != nil {
+		t.Fatalf("ListServers failed: %v", err)
+	}
+
+	if len(servers) != 2 {
+		t.Fatalf("expected 2 servers, got %d", len(servers))
+	}
+
+	s1 := servers[0]
+	if s1.Alias != "TEST-Testing" {
+		t.Errorf("expected clean primary alias 'TEST-Testing', got %q", s1.Alias)
+	}
+	if len(s1.Aliases) != 2 || s1.Aliases[0] != "TEST-Testing" || s1.Aliases[1] != "staging-box" {
+		t.Errorf("unexpected aliases: %+v", s1.Aliases)
+	}
+	if s1.Host != "172.16.1.1" {
+		t.Errorf("unexpected Host: %q", s1.Host)
+	}
+
+	s2 := servers[1]
+	if s2.Alias != "single-quoted-server" {
+		t.Errorf("expected clean alias 'single-quoted-server', got %q", s2.Alias)
+	}
+
+	// Verify update works properly on quoted host
+	s1Updated := s1
+	s1Updated.Host = "172.16.1.2"
+	s1Updated.User = "updated-user"
+	if err := r.UpdateServer(s1, s1Updated); err != nil {
+		t.Fatalf("UpdateServer on originally quoted host failed: %v", err)
+	}
+
+	saved := fs.read(main)
+	if !strings.Contains(saved, "172.16.1.2") || !strings.Contains(saved, "updated-user") {
+		t.Errorf("expected updated values in saved config:\n%s", saved)
+	}
+}
