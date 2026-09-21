@@ -15,6 +15,7 @@
 package services
 
 import (
+	"bytes"
 	"errors"
 	"io"
 	"os"
@@ -28,13 +29,14 @@ import (
 
 type mockServerRepository struct {
 	ports.ServerRepository
+	servers     []domain.Server
 	recordCalls int
 	lastAlias   string
 	recordErr   error
 }
 
 func (m *mockServerRepository) ListServers(string) ([]domain.Server, error) {
-	return nil, nil
+	return m.servers, nil
 }
 
 func (m *mockServerRepository) UpdateServer(domain.Server, domain.Server) error { return nil }
@@ -540,5 +542,52 @@ func TestListActiveSessions_And_KillActiveSessions(t *testing.T) {
 	}
 	if len(killedPIDs) != 1 || killedPIDs[0] != 9999 {
 		t.Fatalf("expected killed PID 9999, got %v", killedPIDs)
+	}
+}
+
+func TestTerminalTitle_SetAndRestore(t *testing.T) {
+	buf := &bytes.Buffer{}
+	oldWriter := terminalTitleWriter
+	terminalTitleWriter = buf
+	defer func() {
+		terminalTitleWriter = oldWriter
+	}()
+
+	SetTerminalTitle("prod-db (192.168.1.1)")
+	expectedSet := "\033]0;prod-db (192.168.1.1)\007"
+	if buf.String() != expectedSet {
+		t.Errorf("expected %q, got %q", expectedSet, buf.String())
+	}
+
+	buf.Reset()
+	RestoreTerminalTitle()
+	expectedRestore := "\033]0;\007"
+	if buf.String() != expectedRestore {
+		t.Errorf("expected %q, got %q", expectedRestore, buf.String())
+	}
+}
+
+func TestServerService_FormatTerminalTitle(t *testing.T) {
+	logger := zap.NewNop().Sugar()
+	mockRepo := &mockServerRepository{
+		servers: []domain.Server{
+			{Alias: "web-server", Host: "10.0.0.1"},
+			{Alias: "same-host", Host: "same-host"},
+			{Alias: "no-host"},
+		},
+	}
+	svc := NewServerService(logger, mockRepo).(*serverService)
+
+	if got := svc.formatTerminalTitle("web-server"); got != "web-server (10.0.0.1)" {
+		t.Errorf("expected 'web-server (10.0.0.1)', got %q", got)
+	}
+	if got := svc.formatTerminalTitle("same-host"); got != "same-host" {
+		t.Errorf("expected 'same-host', got %q", got)
+	}
+	if got := svc.formatTerminalTitle("no-host"); got != "no-host" {
+		t.Errorf("expected 'no-host', got %q", got)
+	}
+	if got := svc.formatTerminalTitle("unknown"); got != "unknown" {
+		t.Errorf("expected 'unknown', got %q", got)
 	}
 }

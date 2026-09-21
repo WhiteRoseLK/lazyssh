@@ -39,6 +39,7 @@ If you are coming from **lazyssh**, here is a concrete summary of everything **n
 | Feature | Description | Shortcut / Usage |
 | :--- | :--- | :---: |
 | **Color Themes (Dark, Light, System)** | Customize TUI appearance with dedicated Dark and Light palettes or automatic OS system appearance detection across macOS, Linux, and Windows, toggleable at runtime. | <kbd>T</kbd> / `--theme` |
+| **Automatic Terminal / Tab Title** | Automatically updates terminal window and tab titles to `ServerAlias (HostName)` on SSH connection across modern terminal emulators (iTerm2, Alacritty, Kitty, Konsole, Windows Terminal) and restores it upon exit. | *Automatic* |
 | **Internationalization (i18n)** | Multilingual UI support with runtime localization (English, French, Simplified Chinese). Seamlessly configured via CLI flag (`--lang`), `NEOSSH_LANG`, or compile-time defaults. | `--lang` / `-l` |
 | **Import Known Hosts** | Quickly bootstrap your SSH config by discovering and importing unconfigured hosts from `~/.ssh/known_hosts` with automatic deduplication, standard port parsing (`[host]:port`), and safe skipping of hashed entries. | `--import-known-hosts` / <kbd>i</kbd> |
 | **Hidden Hosts Support** | Hide jump hosts, proxy targets, or internal nodes from the primary server list (<kbd>m</kbd> or form), reveal on demand with <kbd>H</kbd>, or launch with hidden servers visible. | <kbd>m</kbd> / <kbd>H</kbd> / `-H` |
@@ -438,4 +439,5 @@ This project is licensed under the [Apache-2.0 License](LICENSE).
   - `@maxadc` — Internationalization framework and localization support (English, French, Chinese)
   - `@franksl` — Quoted `Host` aliases sanitization
   - `@mahyarmirrashed` — Numeric username validation support
+  - `@vetash` — Automatic terminal and tab title integration
   - `@arniom`, `@leoncamel`, `@breakersun`, `@OlalalalaO`, `@manato-tajiri`, `@komapro` — Bug fixes & documentation improvements

@@ -23,6 +23,7 @@ import (
 
 	"github.com/WhiteRoseLK/neossh/internal/core/domain"
 	"github.com/WhiteRoseLK/neossh/internal/core/ports"
+	"github.com/WhiteRoseLK/neossh/internal/core/services"
 	"github.com/WhiteRoseLK/neossh/internal/i18n"
 	"github.com/rivo/tview"
 )
@@ -151,6 +152,8 @@ func (t *tui) Run() error {
 			t.logger.Errorw("panic recovered", "error", r)
 		}
 	}()
+	services.SetTerminalTitle("neossh")
+	defer services.RestoreTerminalTitle()
 	t.app.EnableMouse(true)
 	t.initializeI18n()
 	t.initializeTheme()

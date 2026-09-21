@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/WhiteRoseLK/neossh/internal/core/domain"
+	"github.com/WhiteRoseLK/neossh/internal/core/services"
 	"github.com/atotto/clipboard"
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
@@ -677,6 +678,7 @@ func (t *tui) handleServerConnect() {
 		t.app.Stop()
 		return
 	}
+	services.SetTerminalTitle("neossh")
 	t.app.Sync()
 	t.refreshServerList()
 	if sshErr != nil {
