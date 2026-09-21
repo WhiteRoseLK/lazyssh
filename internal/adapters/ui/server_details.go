@@ -16,19 +16,24 @@ package ui
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/WhiteRoseLK/neossh/internal/core/domain"
+	"github.com/WhiteRoseLK/neossh/internal/core/ports"
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 )
 
 type ServerDetails struct {
 	*tview.TextView
-	readonly  bool
-	onTab     func()
-	onBacktab func()
-	onEscape  func()
+	readonly   bool
+	gitService ports.GitService
+	serverRepo ports.ServerRepository
+	onTab      func()
+	onBacktab  func()
+	onEscape   func()
 }
 
 func NewServerDetails(readonly ...bool) *ServerDetails {
@@ -42,6 +47,13 @@ func NewServerDetails(readonly ...bool) *ServerDetails {
 	}
 	details.build()
 	return details
+}
+
+// SetGitService configures git service and server repository for SSH key details.
+func (sd *ServerDetails) SetGitService(gs ports.GitService, sr ports.ServerRepository) *ServerDetails {
+	sd.gitService = gs
+	sd.serverRepo = sr
+	return sd
 }
 
 func (sd *ServerDetails) build() {
@@ -87,6 +99,37 @@ func renderTagChips(tags []string) string {
 			CurrentTheme.TagChipText, CurrentTheme.TagChipBg, t))
 	}
 	return strings.Join(chips, " ")
+}
+
+// getSSHKeyForServer attempts to fetch SSH key details for the server's identity file.
+func (sd *ServerDetails) getSSHKeyForServer(server domain.Server) *domain.SSHKey {
+	if sd.gitService == nil || sd.serverRepo == nil {
+		return nil
+	}
+	if len(server.IdentityFiles) == 0 {
+		return nil
+	}
+	identityFile := server.IdentityFiles[0]
+	if strings.HasPrefix(identityFile, "~/") {
+		if homeDir, err := os.UserHomeDir(); err == nil {
+			identityFile = filepath.Join(homeDir, identityFile[2:])
+		}
+	} else if identityFile == "~" {
+		if homeDir, err := os.UserHomeDir(); err == nil {
+			identityFile = homeDir
+		}
+	}
+
+	allKeys, err := sd.gitService.ListAllSSHKeys(sd.serverRepo)
+	if err != nil {
+		return nil
+	}
+	for _, key := range allKeys {
+		if key.Path == identityFile {
+			return &key
+		}
+	}
+	return nil
 }
 
 func (sd *ServerDetails) UpdateServer(server domain.Server) {
@@ -143,6 +186,32 @@ func (sd *ServerDetails) UpdateServer(server domain.Server) {
 		aliasText, hostText, userText, portText,
 		serverKey, groupText, tagsText, pinnedStr, hiddenStr,
 		lastSeen, server.SSHCount)
+
+	// Add SSH Key Details section if key is configured
+	if sshKey := sd.getSSHKeyForServer(server); sshKey != nil {
+		text += "\n[::b]SSH Key Details:[-]\n"
+		text += fmt.Sprintf("  Path: [white]%s[-]\n", sshKey.Path)
+		text += fmt.Sprintf("  Type: [white]%s[-]\n", sshKey.Type)
+		if sshKey.Size > 0 {
+			text += fmt.Sprintf("  Size: [white]%d bits[-]\n", sshKey.Size)
+		}
+		if sshKey.Fingerprint != "" {
+			text += fmt.Sprintf("  Fingerprint: [white]%s[-]\n", sshKey.Fingerprint)
+		}
+		if sshKey.Comment != "" {
+			text += fmt.Sprintf("  Comment: [white]%s[-]\n", sshKey.Comment)
+		}
+		if sshKey.LoadedInAgent {
+			text += "  Agent: [green]✓ Loaded in ssh-agent[-]\n"
+		} else {
+			text += "  Agent: [dim]○ Not loaded in ssh-agent[-]\n"
+		}
+		if sshKey.IsEncrypted {
+			text += "  Status: [yellow]🔒 Encrypted (passphrase)[-]\n"
+		} else {
+			text += "  Status: [dim]🔓 Unencrypted[-]\n"
+		}
+	}
 
 	// Advanced settings section (only show non-empty fields)
 	// Organized by logical grouping for better readability
@@ -270,9 +339,9 @@ func (sd *ServerDetails) UpdateServer(server domain.Server) {
 
 	// Commands list
 	if sd.readonly {
-		text += "\n[::b]Commands:[-]\n  Enter: SSH connect\n  f: Port forward\n  x: Stop forwarding\n  c: Copy SSH command\n  h: Copy Host\n  g: Ping server\n  G: Ping all servers\n  r: Refresh list\n  p: Pin/Unpin\n  [#888888]Modifications disabled (readonly mode)[-]"
+		text += "\n[::b]Commands:[-]\n  Enter: SSH connect\n  f: Port forward\n  x: Stop forwarding\n  c: Copy SSH command\n  h: Copy Host\n  g: Ping server\n  G: Ping all servers\n  P: Git SSH profile\n  r: Refresh list\n  p: Pin/Unpin\n  [#888888]Modifications disabled (readonly mode)[-]"
 	} else {
-		text += "\n[::b]Commands:[-]\n  Enter: SSH connect\n  f: Port forward\n  x: Stop forwarding\n  c: Copy SSH command\n  v: Paste SSH command\n  y: Clone server\n  h: Copy Host\n  g: Ping server\n  G: Ping all servers\n  K: Install SSH Key\n  r: Refresh list\n  a: Add new server\n  e: Edit entry\n  t: Edit tags\n  d: Delete entry\n  p: Pin/Unpin"
+		text += "\n[::b]Commands:[-]\n  Enter: SSH connect\n  f: Port forward\n  x: Stop forwarding\n  c: Copy SSH command\n  v: Paste SSH command\n  y: Clone server\n  h: Copy Host\n  g: Ping server\n  G: Ping all servers\n  P: Git SSH profile\n  C: Edit Key Comment\n  l/u: Load/Unload agent key\n  K: Install SSH Key\n  r: Refresh list\n  a: Add new server\n  e: Edit entry\n  t: Edit tags\n  d: Delete entry\n  p: Pin/Unpin"
 	}
 
 	sd.TextView.SetText(text)

@@ -44,6 +44,7 @@ var (
 	knownHostsFile    string
 	showHidden        bool
 	themeFlag         string
+	gitSSHFlag        string
 
 	rootCmd = newRootCmd()
 )
@@ -113,28 +114,15 @@ func newRootCmd() *cobra.Command {
 
 			serverRepo := ssh_config_file.NewRepository(log, resolvedConfig, metaDataFile)
 			serverService := services.NewServerService(log, serverRepo, services.WithReadOnly(isReadonly))
+			gitService := services.NewGitService(log)
+			gitService.SetServerRepository(serverRepo)
+
+			if handled, err := handleGitSSHFlag(cmd, gitService, isReadonly); handled {
+				return err
+			}
 
 			if isImportKH {
-				if isReadonly {
-					return fmt.Errorf("cannot import known_hosts in read-only mode")
-				}
-				khPath := knownHostsFile
-				if khPath == "" {
-					khPath = filepath.Join(home, ".ssh", "known_hosts")
-				}
-				result, err := serverService.ImportKnownHosts(khPath)
-				if err != nil {
-					return fmt.Errorf("failed to import known_hosts: %w", err)
-				}
-				if result.Imported == 0 {
-					fmt.Printf("No new hosts to import from %s (%d host(s) already configured or skipped).\n",
-						khPath, result.Skipped)
-				} else {
-					fmt.Printf("Successfully imported %d host(s) from %s (%d already configured or skipped).\n",
-						result.Imported, khPath, result.Skipped)
-				}
-				return nil
-
+				return handleImportKnownHostsFlag(serverService, isReadonly, home, knownHostsFile)
 			}
 
 			if isConnect {
@@ -159,6 +147,8 @@ func newRootCmd() *cobra.Command {
 				InitialFilter:    filter,
 				ShowHidden:       showHidden,
 				Theme:            theme,
+				ServerRepo:       serverRepo,
+				GitService:       gitService,
 			})
 
 			return tui.Run()
@@ -191,6 +181,9 @@ func newRootCmd() *cobra.Command {
 	)
 	cmd.PersistentFlags().StringVar(
 		&knownHostsFile, "known-hosts", "", "path to known_hosts file (default: ~/.ssh/known_hosts)",
+	)
+	cmd.PersistentFlags().StringVar(
+		&gitSSHFlag, "git-ssh", "", "configure Git SSH key for current repo (or globally) or view current setting",
 	)
 	cmd.PersistentFlags().BoolVarP(
 		&showHidden, "show-hidden", "H", false, "display hidden servers in UI list",
@@ -309,6 +302,62 @@ func handleDirectConnect(filter string, serverService ports.ServerService) (bool
 	}
 
 	return false, nil
+}
+
+func handleGitSSHFlag(cmd *cobra.Command, gitService ports.GitService, isReadonly bool) (bool, error) {
+	if !cmd.Flags().Changed("git-ssh") {
+		return false, nil
+	}
+
+	scope := services.ScopeLocal
+	cwd, _ := os.Getwd()
+	if !gitService.IsGitRepository(cwd) {
+		scope = services.ScopeGlobal
+	}
+	if gitSSHFlag == "" {
+		cfg, err := gitService.GetCurrentGitSSHConfig(cwd)
+		if err != nil {
+			return true, err
+		}
+		if cfg == "" {
+			fmt.Println("No Git SSH key currently configured.")
+		} else {
+			fmt.Printf("Current Git SSH configuration: %s\n", cfg)
+		}
+		return true, nil
+	}
+	if isReadonly {
+		return true, fmt.Errorf("cannot configure Git SSH key in read-only mode")
+	}
+	if err := gitService.ConfigureGitSSHKey(cwd, gitSSHFlag, scope); err != nil {
+		return true, err
+	}
+	fmt.Printf("Successfully configured Git to use SSH key: %s (scope: %s)\n", gitSSHFlag, scope)
+	return true, nil
+}
+
+func handleImportKnownHostsFlag(
+	serverService ports.ServerService, isReadonly bool, home, customPath string,
+) error {
+	if isReadonly {
+		return fmt.Errorf("cannot import known_hosts in read-only mode")
+	}
+	khPath := customPath
+	if khPath == "" {
+		khPath = filepath.Join(home, ".ssh", "known_hosts")
+	}
+	result, err := serverService.ImportKnownHosts(khPath)
+	if err != nil {
+		return fmt.Errorf("failed to import known_hosts: %w", err)
+	}
+	if result.Imported == 0 {
+		fmt.Printf("No new hosts to import from %s (%d host(s) already configured or skipped).\n",
+			khPath, result.Skipped)
+	} else {
+		fmt.Printf("Successfully imported %d host(s) from %s (%d already configured or skipped).\n",
+			result.Imported, khPath, result.Skipped)
+	}
+	return nil
 }
 
 func main() {
