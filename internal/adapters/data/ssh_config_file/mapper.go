@@ -45,8 +45,8 @@ func (r *Repository) toDomainServer(lc *loadedConfig) []domain.Server {
 			}
 			aliases := make([]string, 0, len(host.Patterns))
 			for _, pattern := range host.Patterns {
-				alias := pattern.String()
-				if strings.HasPrefix(alias, "!") {
+				alias := strings.Trim(strings.TrimSpace(pattern.String()), "\"'")
+				if strings.HasPrefix(alias, "!") || alias == "" {
 					continue
 				}
 				aliases = append(aliases, alias)

@@ -111,11 +111,13 @@ func matchPaths(ms []hostMatch) []string {
 
 // hostContainsPattern checks if a host contains a specific pattern.
 func (r *Repository) hostContainsPattern(host *ssh_config.Host, target string) bool {
-	if host.Implicit {
+	if host == nil || host.Implicit {
 		return false
 	}
+	cleanTarget := strings.Trim(strings.TrimSpace(target), "\"'")
 	for _, pattern := range host.Patterns {
-		if pattern.String() == target {
+		cleanPat := strings.Trim(strings.TrimSpace(pattern.String()), "\"'")
+		if cleanPat == cleanTarget {
 			return true
 		}
 	}
@@ -127,14 +129,16 @@ func (r *Repository) createHostFromServer(server domain.Server) *ssh_config.Host
 	patterns := make([]*ssh_config.Pattern, 0)
 	seen := make(map[string]bool)
 
-	if server.Alias != "" {
-		patterns = append(patterns, &ssh_config.Pattern{Str: server.Alias})
-		seen[server.Alias] = true
+	cleanAlias := strings.Trim(strings.TrimSpace(server.Alias), "\"'")
+	if cleanAlias != "" {
+		patterns = append(patterns, &ssh_config.Pattern{Str: cleanAlias})
+		seen[cleanAlias] = true
 	}
 	for _, alias := range server.Aliases {
-		if alias != "" && !seen[alias] {
-			patterns = append(patterns, &ssh_config.Pattern{Str: alias})
-			seen[alias] = true
+		clean := strings.Trim(strings.TrimSpace(alias), "\"'")
+		if clean != "" && !seen[clean] {
+			patterns = append(patterns, &ssh_config.Pattern{Str: clean})
+			seen[clean] = true
 		}
 	}
 	if len(patterns) == 0 {
