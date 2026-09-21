@@ -25,7 +25,10 @@ import (
 
 type ServerDetails struct {
 	*tview.TextView
-	readonly bool
+	readonly  bool
+	onTab     func()
+	onBacktab func()
+	onEscape  func()
 }
 
 func NewServerDetails(readonly ...bool) *ServerDetails {
@@ -47,8 +50,30 @@ func (sd *ServerDetails) build() {
 		SetBorder(true).
 		SetTitle(" 2 Details ").
 		SetTitleAlign(tview.AlignCenter).
-		SetBorderColor(tcell.Color238).
-		SetTitleColor(tcell.Color250)
+		SetBorderColor(BorderColorUnfocused).
+		SetTitleColor(TitleColorUnfocused)
+
+	sd.TextView.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		//nolint:exhaustive // We only handle navigation keys and pass through others
+		switch event.Key() {
+		case tcell.KeyTab:
+			if sd.onTab != nil {
+				sd.onTab()
+				return nil
+			}
+		case tcell.KeyBacktab:
+			if sd.onBacktab != nil {
+				sd.onBacktab()
+				return nil
+			}
+		case tcell.KeyEscape:
+			if sd.onEscape != nil {
+				sd.onEscape()
+				return nil
+			}
+		}
+		return event
+	})
 }
 
 // renderTagChips builds colored tag chips for details view.
@@ -244,4 +269,19 @@ func (sd *ServerDetails) UpdateServer(server domain.Server) {
 
 func (sd *ServerDetails) ShowEmpty() {
 	sd.TextView.SetText("No servers match the current filter.")
+}
+
+func (sd *ServerDetails) OnTab(fn func()) *ServerDetails {
+	sd.onTab = fn
+	return sd
+}
+
+func (sd *ServerDetails) OnBacktab(fn func()) *ServerDetails {
+	sd.onBacktab = fn
+	return sd
+}
+
+func (sd *ServerDetails) OnEscape(fn func()) *ServerDetails {
+	sd.onEscape = fn
+	return sd
 }

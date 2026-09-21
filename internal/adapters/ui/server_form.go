@@ -69,6 +69,68 @@ type ServerForm struct {
 	mainContainer   *tview.Flex        // Container for form and help panel
 }
 
+const (
+	activeFieldTextColor       = tcell.Color232
+	activeFieldBackgroundColor = tcell.Color252
+)
+
+// highlightedFormItem swaps field colors only while this item owns focus.
+// tview reapplies form attributes on every draw, so this keeps the highlight
+// stable without fighting the form's draw cycle.
+type highlightedFormItem struct {
+	tview.FormItem
+}
+
+func (item *highlightedFormItem) SetFormAttributes(labelWidth int, labelColor, bgColor, fieldTextColor, fieldBgColor tcell.Color) tview.FormItem {
+	if item.HasFocus() {
+		fieldTextColor = activeFieldTextColor
+		fieldBgColor = activeFieldBackgroundColor
+	}
+	item.FormItem.SetFormAttributes(labelWidth, labelColor, bgColor, fieldTextColor, fieldBgColor)
+	return item
+}
+
+func highlightFormItem(item tview.FormItem) tview.FormItem {
+	return &highlightedFormItem{FormItem: item}
+}
+
+func unwrapFormItem(item tview.FormItem) tview.FormItem {
+	if highlighted, ok := item.(*highlightedFormItem); ok {
+		return highlighted.FormItem
+	}
+	return item
+}
+
+func moveFormFocus(form *tview.Form, direction int) bool {
+	itemIndex, buttonIndex := form.GetFocusedItemIndex()
+	if itemIndex < 0 || buttonIndex >= 0 {
+		return false
+	}
+
+	// Arrow navigation is a form-level action for editable text cells. Keep
+	// dropdown arrows available for changing the selected option.
+	if _, ok := unwrapFormItem(form.GetFormItem(itemIndex)).(*tview.InputField); !ok {
+		return false
+	}
+
+	total := form.GetFormItemCount() + form.GetButtonCount()
+	if total == 0 {
+		return false
+	}
+	next := (itemIndex + direction) % total
+	if next < 0 {
+		next += total
+	}
+	form.SetFocus(next)
+	form.GetFormItem(itemIndex).Blur()
+	if next < form.GetFormItemCount() {
+		form.GetFormItem(next).Focus(func(p tview.Primitive) {})
+	} else if bIdx := next - form.GetFormItemCount(); bIdx < form.GetButtonCount() {
+		form.GetButton(bIdx).Focus(func(p tview.Primitive) {})
+	}
+	return true
+}
+
 func NewServerForm(mode ServerFormMode, original *domain.Server) *ServerForm {
 	// Create help panel
 	helpPanel := tview.NewTextView().
@@ -174,7 +236,7 @@ func (sf *ServerForm) build() {
 	hintBar := tview.NewTextView().SetDynamicColors(true)
 	hintBar.SetBackgroundColor(tcell.Color235)
 	hintBar.SetTextAlign(tview.AlignCenter)
-	hintBar.SetText("[white]^H/^L[-] Navigate  • [white]^S[-] Save  • [white]Esc[-] Cancel")
+	hintBar.SetText("[white]Tab/Shift+Tab[-] Fields  • [white]^H/^L[-] Tabs  • [white]^S[-] Save  • [white]Esc[-] Cancel")
 
 	// Setup main container - header at top, hint bar at bottom
 	sf.Flex.AddItem(sf.header, 2, 0, false).
@@ -526,13 +588,6 @@ func (sf *ServerForm) formatDetailedHelp(help *FieldHelp) string {
 func (sf *ServerForm) setupKeyboardShortcuts() {
 	// Set input capture for the main flex container
 	sf.Flex.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-		// Help panel is always visible - no toggle needed
-
-		// Check if user is focused on an input field - allow normal key handling
-		if sf.isInputFieldFocused() {
-			return event
-		}
-
 		// Check for Ctrl key combinations with regular keys
 		if event.Key() == tcell.KeyRune && event.Modifiers()&tcell.ModCtrl != 0 {
 			switch event.Rune() {
@@ -581,11 +636,6 @@ func (sf *ServerForm) setupKeyboardShortcuts() {
 // setupFormShortcuts sets up keyboard shortcuts for a form
 func (sf *ServerForm) setupFormShortcuts(form *tview.Form) {
 	form.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-		// Check if user is focused on an input field - allow normal key handling
-		if sf.isInputFieldFocused() {
-			return event
-		}
-
 		// Check for Ctrl key combinations
 		if event.Key() == tcell.KeyRune && event.Modifiers()&tcell.ModCtrl != 0 {
 			switch event.Rune() {
@@ -616,32 +666,20 @@ func (sf *ServerForm) setupFormShortcuts(form *tview.Form) {
 		case tcell.KeyCtrlS:
 			sf.handleSave()
 			return nil
+		case tcell.KeyDown:
+			if moveFormFocus(form, 1) {
+				return nil
+			}
+		case tcell.KeyUp:
+			if moveFormFocus(form, -1) {
+				return nil
+			}
 		default:
 			// Pass through all other keys
 		}
 
 		return event
 	})
-}
-
-// isInputFieldFocused checks if the current focus is on an input field
-// Returns true if the user is typing in an input field, false otherwise
-func (sf *ServerForm) isInputFieldFocused() bool {
-	if sf.app == nil {
-		return false
-	}
-
-	focused := sf.app.GetFocus()
-	if focused == nil {
-		return false
-	}
-
-	switch focused.(type) {
-	case *tview.InputField, *tview.TextArea:
-		return true
-	default:
-		return false
-	}
 }
 
 // createOptionsWithDefault creates dropdown options with default value indicated
@@ -1001,7 +1039,37 @@ func (sf *ServerForm) addDropDownWithHelp(form *tview.Form, label, fieldName str
 		sf.updateHelp(fieldName)
 	})
 
-	form.AddFormItem(dropdown)
+	// Keep option navigation cyclic while the dropdown list is open.
+	dropdown.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		if !dropdown.IsOpen() {
+			return event
+		}
+
+		var direction int
+		//nolint:exhaustive // We only handle arrow navigation
+		switch event.Key() {
+		case tcell.KeyDown:
+			direction = 1
+		case tcell.KeyUp:
+			direction = -1
+		default:
+			return event
+		}
+
+		count := dropdown.GetOptionCount()
+		if count == 0 {
+			return nil
+		}
+		current, _ := dropdown.GetCurrentOption()
+		next := (current + direction) % count
+		if next < 0 {
+			next += count
+		}
+		dropdown.SetCurrentOption(next)
+		return nil
+	})
+
+	form.AddFormItem(highlightFormItem(dropdown))
 }
 
 // addInputFieldWithHelp adds a regular input field with help support
@@ -1020,7 +1088,7 @@ func (sf *ServerForm) addInputFieldWithHelp(form *tview.Form, label, fieldName, 
 		sf.updateHelp(fieldName)
 	})
 
-	form.AddFormItem(field)
+	form.AddFormItem(highlightFormItem(field))
 	return field
 }
 
@@ -1059,7 +1127,7 @@ func (sf *ServerForm) addValidatedInputField(form *tview.Form, label, fieldName,
 		sf.validateField(fieldName, field.GetText())
 	})
 
-	form.AddFormItem(field)
+	form.AddFormItem(highlightFormItem(field))
 	return field
 }
 
@@ -1790,7 +1858,7 @@ func (sf *ServerForm) getFormData() ServerFormData {
 	getFieldText := func(fieldName string) string {
 		for _, form := range sf.forms {
 			for i := 0; i < form.GetFormItemCount(); i++ {
-				if field, ok := form.GetFormItem(i).(*tview.InputField); ok {
+				if field, ok := unwrapFormItem(form.GetFormItem(i)).(*tview.InputField); ok {
 					label := strings.TrimSpace(field.GetLabel())
 					// Strip color tags from label for comparison
 					// Labels can be: "Port:", "[red]Port:[-]", "[green]Port:[-]"
@@ -1808,7 +1876,7 @@ func (sf *ServerForm) getFormData() ServerFormData {
 	getDropdownValue := func(fieldName string) string {
 		for _, form := range sf.forms {
 			for i := 0; i < form.GetFormItemCount(); i++ {
-				if dropdown, ok := form.GetFormItem(i).(*tview.DropDown); ok {
+				if dropdown, ok := unwrapFormItem(form.GetFormItem(i)).(*tview.DropDown); ok {
 					label := strings.TrimSpace(dropdown.GetLabel())
 					// Strip color tags from label for comparison
 					cleanLabel := stripColorTags(label)
@@ -2021,8 +2089,12 @@ func (sf *ServerForm) handleCancel() {
 
 			// Set up keyboard shortcuts for the modal
 			modal.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-				switch event.Rune() {
-				case 's', 'S':
+				if event.Key() == tcell.KeyEscape {
+					sf.app.SetRoot(sf.Flex, true)
+					return nil
+				}
+				switch commandKey(event) {
+				case 's':
 					if sf.handleSave() {
 						// Save successful
 					} else {
@@ -2030,12 +2102,12 @@ func (sf *ServerForm) handleCancel() {
 						sf.app.SetRoot(sf.Flex, true)
 					}
 					return nil
-				case 'd', 'D':
+				case 'd':
 					if sf.onCancel != nil {
 						sf.onCancel()
 					}
 					return nil
-				case 'c', 'C':
+				case 'c':
 					sf.app.SetRoot(sf.Flex, true)
 					return nil
 				}

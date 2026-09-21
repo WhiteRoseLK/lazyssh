@@ -43,28 +43,108 @@ const (
 	ReadonlyMessage = "Readonly mode: SSH configuration modifications are disabled."
 )
 
+// commandKey normalizes runes only in command contexts. Text inputs, search,
+// and dropdown filtering intentionally consume the original event unchanged.
+func commandKey(event *tcell.EventKey) rune {
+	return normalizeGlobalHotkey(event.Rune())
+}
+
+// normalizeGlobalHotkey preserves command semantics for ASCII keys while
+// keeping all other runes untouched.
+func normalizeGlobalHotkey(key rune) rune {
+	switch key {
+	case 'q', 'Q':
+		return 'q'
+	case '/':
+		return '/'
+	case 'a', 'A':
+		return 'a'
+	case 'e', 'E':
+		return 'e'
+	case 'd', 'D':
+		return 'd'
+	case 'p', 'P':
+		return 'p'
+	case 's':
+		return 's'
+	case 'S':
+		return 'S'
+	case 'c':
+		return 'c'
+	case 'C':
+		return 'C'
+	case 'v', 'V':
+		return 'v'
+	case 'y', 'Y':
+		return 'y'
+	case 'h', 'H':
+		return 'h'
+	case 'g':
+		return 'g'
+	case 'G':
+		return 'G'
+	case 'r', 'R':
+		return 'r'
+	case 't', 'T':
+		return 't'
+	case 'f', 'F':
+		return 'f'
+	case 'x', 'X':
+		return 'x'
+	case 'j', 'J':
+		return 'j'
+	case 'k':
+		return 'k'
+	case 'K':
+		return 'K'
+	default:
+		return key
+	}
+}
+
+func (t *tui) handleNavigationKey(key tcell.Key) bool {
+	//nolint:exhaustive // We only handle navigation keys and pass through others
+	switch key {
+	case tcell.KeyTab:
+		t.handleNextPanel()
+		return true
+	case tcell.KeyBacktab:
+		t.handlePrevPanel()
+		return true
+	case tcell.KeyEnter:
+		t.handleServerConnect()
+		return true
+	default:
+		return false
+	}
+}
+
 func (t *tui) handleGlobalKeys(event *tcell.EventKey) *tcell.EventKey {
 	// Don't handle global keys when search has focus
 	if t.app.GetFocus() == t.searchBar {
 		return event
 	}
 
+	if t.handleNavigationKey(event.Key()) {
+		return nil
+	}
+
 	if t.readonly {
-		switch event.Rune() {
+		switch commandKey(event) {
 		case 'a', 'e', 'd', 'c', 'C', 'y', 'p', 'v', 'K', 't', 'i', 'I':
 			t.showReadonlyModal()
 			return nil
 		}
 	}
 
-	switch event.Rune() {
+	switch commandKey(event) {
 	case '0':
 		t.handleSearchFocus()
 		return nil
 	case '1':
 		t.handleServerListFocus()
 		return nil
-	case '2':
+	case '2', '3':
 		t.handleDetailsFocus()
 		return nil
 	case 'q':
@@ -132,11 +212,6 @@ func (t *tui) handleGlobalKeys(event *tcell.EventKey) *tcell.EventKey {
 		return nil
 	case 'i', 'I':
 		t.handleImportKnownHosts()
-		return nil
-	}
-
-	if event.Key() == tcell.KeyEnter {
-		t.handleServerConnect()
 		return nil
 	}
 
@@ -323,18 +398,45 @@ func (t *tui) isServerListFocused() bool {
 func (t *tui) handleSearchFocus() {
 	if t.app != nil && t.searchBar != nil {
 		t.app.SetFocus(t.searchBar)
+		t.updateFocusBorders()
 	}
 }
 
 func (t *tui) handleServerListFocus() {
 	if t.app != nil && t.serverList != nil {
 		t.app.SetFocus(t.serverList)
+		t.updateFocusBorders()
 	}
 }
 
 func (t *tui) handleDetailsFocus() {
 	if t.app != nil && t.details != nil {
 		t.app.SetFocus(t.details)
+		t.updateFocusBorders()
+	}
+}
+
+func (t *tui) handleNextPanel() {
+	focus := t.app.GetFocus()
+	switch {
+	case t.searchBar != nil && (focus == t.searchBar || t.searchBar.HasFocus()):
+		t.handleServerListFocus()
+	case t.serverList != nil && (focus == t.serverList || focus == t.serverList.List || t.serverList.HasFocus()):
+		t.handleDetailsFocus()
+	default:
+		t.handleSearchFocus()
+	}
+}
+
+func (t *tui) handlePrevPanel() {
+	focus := t.app.GetFocus()
+	switch {
+	case t.details != nil && (focus == t.details || focus == t.details.TextView || t.details.HasFocus()):
+		t.handleServerListFocus()
+	case t.serverList != nil && (focus == t.serverList || focus == t.serverList.List || t.serverList.HasFocus()):
+		t.handleSearchFocus()
+	default:
+		t.handleDetailsFocus()
 	}
 }
 
@@ -848,6 +950,12 @@ func (t *tui) showDeleteConfirmModal(server domain.Server) {
 	msg := fmt.Sprintf("Delete server %s (%s@%s:%d)?\n\nThis action cannot be undone.",
 		server.Alias, server.User, server.Host, server.Port)
 
+	modal, pages := t.newDeleteConfirmationOverlay(server, msg)
+	t.app.SetRoot(pages, true)
+	t.app.SetFocus(modal)
+}
+
+func (t *tui) newDeleteConfirmationOverlay(server domain.Server, msg string) (*tview.Modal, *tview.Pages) {
 	doDelete := func() {
 		err := t.serverService.DeleteServer(server)
 		if err != nil {
@@ -862,19 +970,26 @@ func (t *tui) showDeleteConfirmModal(server domain.Server) {
 					}
 					t.showStatusTemp(fmt.Sprintf("Deleted %s from %s", srv.Alias, chosen))
 					t.refreshServerList()
+					t.handleModalClose()
 				})
 				return
 			}
 			t.showStatusTempColor("Delete failed: "+err.Error(), "#FF6B6B")
+			t.handleModalClose()
 			return
 		}
+		t.showStatusTemp(fmt.Sprintf("Deleted %s", server.Alias))
 		t.refreshServerList()
 		t.handleModalClose()
 	}
 
 	modal := tview.NewModal().
 		SetText(msg).
-		AddButtons([]string{"[yellow]C[-]ancel", "[yellow]D[-]elete"}).
+		AddButtons([]string{"[yellow]C[-]ancel", "[red]D[-]elete"}).
+		SetBackgroundColor(tcell.Color235).
+		SetTextColor(tcell.Color252).
+		SetButtonStyle(tcell.StyleDefault.Foreground(tcell.Color252).Background(tcell.Color232)).
+		SetButtonActivatedStyle(tcell.StyleDefault.Foreground(tcell.Color232).Background(tcell.Color252)).
 		SetDoneFunc(func(buttonIndex int, buttonLabel string) {
 			if buttonIndex == 1 {
 				doDelete()
@@ -882,20 +997,39 @@ func (t *tui) showDeleteConfirmModal(server domain.Server) {
 			}
 			t.handleModalClose()
 		})
+	modal.SetBorderColor(tcell.ColorRed)
+	modal.SetTitle(" Confirm Deletion ")
+	modal.SetTitleAlign(tview.AlignCenter)
+	modal.SetTitleColor(tcell.ColorRed)
+	modal.SetFocus(0)
 
 	modal.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-		switch event.Rune() {
-		case 'c', 'C':
+		if event.Key() == tcell.KeyEscape {
 			t.handleModalClose()
 			return nil
-		case 'd', 'D':
+		}
+		switch commandKey(event) {
+		case 'c':
+			t.handleModalClose()
+			return nil
+		case 'd':
 			doDelete()
 			return nil
 		}
 		return event
 	})
 
-	t.app.SetRoot(modal, true)
+	pages := tview.NewPages().
+		AddPage("main", t.root, true, true).
+		AddPage("delete-confirmation", modal, true, true)
+	pages.SetMouseCapture(func(action tview.MouseAction, event *tcell.EventMouse) (tview.MouseAction, *tcell.EventMouse) {
+		if modal.InRect(event.Position()) {
+			return action, event
+		}
+		return tview.MouseConsumed, nil
+	})
+
+	return modal, pages
 }
 
 // showFileChoiceModal asks the user which config file to apply an action to
@@ -918,7 +1052,30 @@ func (t *tui) showFileChoiceModal(alias string, candidates []string, action stri
 			t.handleModalClose()
 			onChoose(candidates[idx])
 		})
-	t.app.SetRoot(modal, true)
+	modal.SetBorderColor(BorderColorUnfocused)
+	modal.SetTitle(fmt.Sprintf(" Multiple Files: %s ", action))
+	modal.SetTitleAlign(tview.AlignCenter)
+	modal.SetTitleColor(TitleColorUnfocused)
+	modal.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		if event.Key() == tcell.KeyEscape {
+			t.handleModalClose()
+			return nil
+		}
+		return event
+	})
+
+	pages := tview.NewPages().
+		AddPage("main", t.root, true, true).
+		AddPage("file-choice", modal, true, true)
+	pages.SetMouseCapture(func(action tview.MouseAction, event *tcell.EventMouse) (tview.MouseAction, *tcell.EventMouse) {
+		if modal.InRect(event.Position()) {
+			return action, event
+		}
+		return tview.MouseConsumed, nil
+	})
+
+	t.app.SetRoot(pages, true)
+	t.app.SetFocus(modal)
 }
 
 func (t *tui) showErrorModal(title, errMsg string) {
@@ -1152,6 +1309,7 @@ func (t *tui) showPortForwardForm(server domain.Server) *tview.Form {
 func (t *tui) blurSearchBar() {
 	if t.app != nil && t.serverList != nil {
 		t.app.SetFocus(t.serverList)
+		t.updateFocusBorders()
 	}
 }
 
@@ -1173,6 +1331,10 @@ func (t *tui) refreshServerList() {
 
 func (t *tui) returnToMain() {
 	t.app.SetRoot(t.root, true)
+	if t.serverList != nil {
+		t.app.SetFocus(t.serverList)
+	}
+	t.updateFocusBorders()
 }
 
 // showStatusTemp displays a temporary message in the status bar (default green) and then restores the default text.

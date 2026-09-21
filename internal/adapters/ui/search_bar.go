@@ -24,6 +24,8 @@ type SearchBar struct {
 	onSearch   func(string)
 	onEscape   func()
 	onNavigate func(direction int) // -1 for up, 1 for down
+	onTab      func()
+	onBacktab  func()
 }
 
 func NewSearchBar() *SearchBar {
@@ -42,8 +44,8 @@ func (s *SearchBar) build() {
 		SetBorder(true).
 		SetTitle(" 0 Search ").
 		SetTitleAlign(tview.AlignCenter).
-		SetBorderColor(tcell.Color238).
-		SetTitleColor(tcell.Color250)
+		SetBorderColor(BorderColorUnfocused).
+		SetTitleColor(TitleColorUnfocused)
 
 	s.InputField.SetChangedFunc(func(text string) {
 		if s.onSearch != nil {
@@ -60,7 +62,7 @@ func (s *SearchBar) build() {
 	})
 
 	s.InputField.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-		//nolint:exhaustive // We only handle arrow keys and pass through others
+		//nolint:exhaustive // We only handle arrow and tab keys and pass through others
 		switch event.Key() {
 		case tcell.KeyDown:
 			if s.onNavigate != nil {
@@ -70,6 +72,16 @@ func (s *SearchBar) build() {
 		case tcell.KeyUp:
 			if s.onNavigate != nil {
 				s.onNavigate(-1)
+			}
+			return nil
+		case tcell.KeyTab:
+			if s.onTab != nil {
+				s.onTab()
+			}
+			return nil
+		case tcell.KeyBacktab:
+			if s.onBacktab != nil {
+				s.onBacktab()
 			}
 			return nil
 		default:
@@ -90,5 +102,15 @@ func (s *SearchBar) OnEscape(fn func()) *SearchBar {
 
 func (s *SearchBar) OnNavigate(fn func(direction int)) *SearchBar {
 	s.onNavigate = fn
+	return s
+}
+
+func (s *SearchBar) OnTab(fn func()) *SearchBar {
+	s.onTab = fn
+	return s
+}
+
+func (s *SearchBar) OnBacktab(fn func()) *SearchBar {
+	s.onBacktab = fn
 	return s
 }

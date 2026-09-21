@@ -28,6 +28,8 @@ type ServerList struct {
 	onSelection       func(domain.Server)
 	onSelectionChange func(domain.Server)
 	onReturnToSearch  func()
+	onTab             func()
+	onBacktab         func()
 }
 
 func NewServerList() *ServerList {
@@ -43,8 +45,8 @@ func (sl *ServerList) build() {
 	sl.List.SetBorder(true).
 		SetTitle(" 1 Servers ").
 		SetTitleAlign(tview.AlignCenter).
-		SetBorderColor(tcell.Color238).
-		SetTitleColor(tcell.Color250)
+		SetBorderColor(BorderColorUnfocused).
+		SetTitleColor(TitleColorUnfocused)
 	sl.List.
 		SetSelectedBackgroundColor(tcell.Color24).
 		SetSelectedTextColor(tcell.Color255).
@@ -59,6 +61,16 @@ func (sl *ServerList) build() {
 	sl.List.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		//nolint:exhaustive // We only handle specific keys and pass through others
 		switch event.Key() {
+		case tcell.KeyTab:
+			if sl.onTab != nil {
+				sl.onTab()
+				return nil
+			}
+		case tcell.KeyBacktab:
+			if sl.onBacktab != nil {
+				sl.onBacktab()
+				return nil
+			}
 		case tcell.KeyLeft, tcell.KeyRight, tcell.KeyBackspace, tcell.KeyBackspace2, tcell.KeyESC:
 			if sl.onReturnToSearch != nil {
 				sl.onReturnToSearch()
@@ -151,5 +163,15 @@ func (sl *ServerList) OnSelectionChange(fn func(server domain.Server)) *ServerLi
 
 func (sl *ServerList) OnReturnToSearch(fn func()) *ServerList {
 	sl.onReturnToSearch = fn
+	return sl
+}
+
+func (sl *ServerList) OnTab(fn func()) *ServerList {
+	sl.onTab = fn
+	return sl
+}
+
+func (sl *ServerList) OnBacktab(fn func()) *ServerList {
+	sl.onBacktab = fn
 	return sl
 }

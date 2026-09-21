@@ -56,8 +56,8 @@ If you are coming from **lazyssh**, here is a concrete summary of everything **n
 | **Duplicate / Clone Server** | Instantly clones any existing server configuration into the Add form with automatic alias deduplication (`srv_1`, `srv_2`), eliminating manual re-typing. | <kbd>y</kbd> / <kbd>C</kbd> |
 | **Zero-Friction Migration** | Automatically detects and migrates your favorites, tags, and connection history from `~/.lazyssh` to `~/.neossh`. | *Automatic* |
 | **Custom Config Path** | Loads any alternative SSH config file without modifying `~/.ssh/config`. | `--sshconfig <path>` |
-| **Persistent Sorting** | Remembers your preferred sort mode (by alias, last SSH connection, ascending/descending) across sessions. | <kbd>s</kbd> |
-| **Quick Panel Jump** | Instant focus switching between Search, Server List, and Details panels using numeric keys. | <kbd>1</kbd> / <kbd>2</kbd> / <kbd>3</kbd> |
+| **Focus Borders & UI Navigation** | Distinct focus borders highlight the currently active panel (Search, Server List, Details), with smooth <kbd>Tab</kbd> / <kbd>Shift+Tab</kbd> cycling across panels and form fields, active field highlights, and robust destructive confirmation dialogs. | <kbd>Tab</kbd> / <kbd>Shift+Tab</kbd> |
+| **Quick Panel Jump** | Instant focus switching between Search, Server List, and Details panels using numeric keys. | <kbd>0</kbd> / <kbd>1</kbd> / <kbd>2</kbd> |
 | **Modern Toolchain & Deps** | Fully upgraded to latest upstream packages (`tview v0.42`, `tcell/v2 v2.13`, `cobra v1.10`, `zap v1.28`, `go-runewidth v0.0.30`), with Go race detection and `golangci-lint` v2. | *Core* |
 
 ### 🛠️ Bug Fixes & Stability Improvements
@@ -287,7 +287,8 @@ neossh --sshconfig ~/.ssh/config_work -r
 | `s` | Toggle sort mode (alias, last SSH, reverse) |
 | `g` | Ping selected server |
 | `G` | Ping all servers (parallel check with latency badges) |
-| `1` / `2` / `3` | Focus Search / Server List / Details |
+| `Tab` / `Shift+Tab` | Cycle focus between Search, Server List, and Details panels |
+| `0` / `1` / `2` / `3` | Focus Search (`0`) / Server List (`1`) / Details (`2`, `3`) |
 | `j` / `k` or `↓` / `↑` | Navigate server list |
 | `q` / `Ctrl+C` | Quit |
 
@@ -377,4 +378,5 @@ This project is licensed under the [Apache-2.0 License](LICENSE).
   - `@levinion` — Copy SSH command shortcut
   - `@gaoyifan` — Persistent sort mode
   - `@k161196` — Panel focus shortcuts
+  - `@shekel588` — Keyboard navigation improvements, focus borders, active field styling, and confirmation dialogs
   - `@arniom`, `@leoncamel`, `@breakersun`, `@OlalalalaO`, `@manato-tajiri`, `@komapro` — Bug fixes & documentation improvements

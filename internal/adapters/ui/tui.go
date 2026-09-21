@@ -135,15 +135,28 @@ func (t *tui) Run() error {
 	return nil
 }
 
+const (
+	BorderColorUnfocused = tcell.Color238
+	BorderColorFocused   = tcell.ColorDodgerBlue
+	TitleColorUnfocused  = tcell.Color250
+	TitleColorFocused    = tcell.ColorWhite
+)
+
+func configureCursor(screen tcell.Screen) {
+	if screen != nil {
+		screen.SetCursorStyle(tcell.CursorStyleBlinkingBlock)
+	}
+}
+
 func (t *tui) initializeTheme() {
 	tview.Styles.PrimitiveBackgroundColor = tcell.Color232
 	tview.Styles.ContrastBackgroundColor = tcell.Color235
-	tview.Styles.BorderColor = tcell.Color238
-	tview.Styles.TitleColor = tcell.Color250
+	tview.Styles.BorderColor = BorderColorUnfocused
+	tview.Styles.TitleColor = TitleColorUnfocused
 	tview.Styles.PrimaryTextColor = tcell.Color252
 	tview.Styles.TertiaryTextColor = tcell.Color245
 	tview.Styles.SecondaryTextColor = tcell.Color245
-	tview.Styles.GraphicsColor = tcell.Color238
+	tview.Styles.GraphicsColor = BorderColorUnfocused
 }
 
 func (t *tui) buildComponents() {
@@ -151,13 +164,20 @@ func (t *tui) buildComponents() {
 	t.searchBar = NewSearchBar().
 		OnSearch(t.handleSearchInput).
 		OnEscape(t.blurSearchBar).
-		OnNavigate(t.handleSearchNavigate)
+		OnNavigate(t.handleSearchNavigate).
+		OnTab(t.handleServerListFocus).
+		OnBacktab(t.handleDetailsFocus)
 	IsForwarding = t.serverService.IsForwarding
 
 	t.serverList = NewServerList().
 		OnSelectionChange(t.handleServerSelectionChange).
-		OnReturnToSearch(t.handleReturnToSearch)
-	t.details = NewServerDetails(t.readonly)
+		OnReturnToSearch(t.handleReturnToSearch).
+		OnTab(t.handleDetailsFocus).
+		OnBacktab(t.handleSearchFocus)
+	t.details = NewServerDetails(t.readonly).
+		OnTab(t.handleSearchFocus).
+		OnBacktab(t.handleServerListFocus).
+		OnEscape(t.handleServerListFocus)
 	t.statusBar = NewStatusBar(t.readonly)
 
 	// default sort mode
@@ -197,11 +217,43 @@ func (t *tui) buildLayout() {
 func (t *tui) bindEvents() {
 	t.root.SetInputCapture(t.handleGlobalKeys)
 	t.app.SetBeforeDrawFunc(func(screen tcell.Screen) bool {
+		configureCursor(screen)
+		t.updateFocusBorders()
 		if t.serverList != nil {
 			t.serverList.RefreshDisplay()
 		}
 		return false
 	})
+}
+
+func (t *tui) updateFocusBorders() {
+	searchFocused := t.searchBar != nil && t.searchBar.HasFocus()
+	listFocused := t.serverList != nil && t.serverList.HasFocus()
+	detailsFocused := t.details != nil && t.details.HasFocus()
+
+	if t.searchBar != nil {
+		if searchFocused {
+			t.searchBar.SetBorderColor(BorderColorFocused).SetTitleColor(TitleColorFocused)
+		} else {
+			t.searchBar.SetBorderColor(BorderColorUnfocused).SetTitleColor(TitleColorUnfocused)
+		}
+	}
+
+	if t.serverList != nil {
+		if listFocused {
+			t.serverList.SetBorderColor(BorderColorFocused).SetTitleColor(TitleColorFocused)
+		} else {
+			t.serverList.SetBorderColor(BorderColorUnfocused).SetTitleColor(TitleColorUnfocused)
+		}
+	}
+
+	if t.details != nil {
+		if detailsFocused {
+			t.details.SetBorderColor(BorderColorFocused).SetTitleColor(TitleColorFocused)
+		} else {
+			t.details.SetBorderColor(BorderColorUnfocused).SetTitleColor(TitleColorUnfocused)
+		}
+	}
 }
 
 func (t *tui) loadInitialData() {
