@@ -44,9 +44,7 @@ If you are coming from **lazyssh**, here is a concrete summary of everything **n
 | **Import Known Hosts** | Quickly bootstrap your SSH config by discovering and importing unconfigured hosts from `~/.ssh/known_hosts` with automatic deduplication, standard port parsing (`[host]:port`), and safe skipping of hashed entries. | `--import-known-hosts` / <kbd>i</kbd> |
 | **Hidden Hosts Support** | Hide jump hosts, proxy targets, or internal nodes from the primary server list (<kbd>m</kbd> or form), reveal on demand with <kbd>H</kbd>, or launch with hidden servers visible. | <kbd>m</kbd> / <kbd>H</kbd> / `-H` |
 | **CLI Pre-filtering & Direct Connect** | Launch pre-filtered (`neossh prod` or `-f prod`) to prevent exposing your entire server fleet during screen shares, or connect directly (`neossh -c <alias>`). | `neossh <filter>` / `-c` |
-
 | **Read-Only / Viewer Mode** | Protect production files with an immutable viewer mode. Blocks add, edit, delete, clone, paste, and key installs with an interactive indicator and notification. | `--readonly` / `-r` |
-
 | **Exit On Disconnect** | Automatically exits `neossh` when your SSH session terminates, providing a seamless one-shot terminal launcher experience. | `-x` / `--exit-on-disconnect` |
 | **Multi-Alias Directive Support** | Preserves and indexes all space-separated aliases on a single `Host` line (`Host web1 web2 staging`). Supports fuzzy search and connection by any defined alias without dropping them on writeback. | *Automatic* |
 | **SSH Config Tag Comments** | Store and sync tags directly in `~/.ssh/config` comments (`# tags: prod, db` on the `Host` line or inside the block), keeping tags in sync across machines without relying solely on local `metadata.json`. | *Automatic* / <kbd>t</kbd> |
@@ -88,17 +86,17 @@ If you are coming from **lazyssh**, here is a concrete summary of everything **n
 ### Startup
 <img src="./docs/loader.png" alt="Startup screen" />
 
-### Server List
-<img src="./docs/list server.png" alt="Server list" />
+### Server List & Active Sessions
+<img src="./docs/list server.png" alt="Server list and active sessions" />
 
 ### Fuzzy Search
 <img src="./docs/search.png" alt="Fuzzy search" />
 
-### SSH Connection
-<img src="./docs/ssh.png" alt="SSH connection" />
-
-### Add Server
+### Add / Edit Server Form
 <img src="./docs/add server.png" alt="Add server form" />
+
+### SCP & SSH Command Generator
+<img src="./docs/ssh.png" alt="SCP and SSH command generator" />
 
 </details>
 
