@@ -11,8 +11,8 @@
   "search.label": " 🔍 搜索: ",
   "search.title": " 0 搜索 (/ 过滤, Esc 退出) ",
 
-  "statusbar.readonly": "[yellow::b]只读模式[::-] (禁止修改) • [white]Tab[-] 切换面板 • [white]Enter[-] 连接 • [white]c[-] 复制 • [white]g/G[-] Ping • [white]P[-] Git SSH • [white]T[-] 主题 • [white]q[-] 退出",
-  "statusbar.normal": "[white]Tab[-] 切换面板 • [white]Enter[-] 连接 • [white]a[-] 添加 • [white]e[-] 编辑 • [white]d[-] 删除 • [white]c[-] 复制 • [white]g/G[-] Ping • [white]P[-] Git SSH • [white]C[-] 备注 • [white]l/u[-] Agent • [white]T[-] 主题 • [white]q[-] 退出",
+  "statusbar.readonly": "[yellow::b]只读模式[::-] (禁止修改) • [white]Tab[-] 切换面板 • [white]Enter[-] 连接 • [white]c[-] 复制 • [white]o[-] SCP • [white]g/G[-] Ping • [white]P[-] Git SSH • [white]T[-] 主题 • [white]q[-] 退出",
+  "statusbar.normal": "[white]Tab[-] 切换面板 • [white]Enter[-] 连接 • [white]a[-] 添加 • [white]e[-] 编辑 • [white]d[-] 删除 • [white]c[-] 复制 • [white]o[-] SCP • [white]g/G[-] Ping • [white]P[-] Git SSH • [white]C[-] 备注 • [white]l/u[-] Agent • [white]T[-] 主题 • [white]q[-] 退出",
 
   "details.title": " 详细信息 ",
   "details.label.basic": "基础设置:",
@@ -55,5 +55,17 @@
   "git.repo": "Git 仓库:",
   "git.push_remote": "推送远程:",
   "git.configured": "Git SSH 密钥配置成功！",
-  "git.cleared": "Git SSH 配置已成功清除！"
+  "git.cleared": "Git SSH 配置已成功清除！",
+
+  "scp.title": " SCP 命令生成器 ",
+  "scp.direction": "传输方向:",
+  "scp.upload": "上传 (本地 -> 远程)",
+  "scp.download": "下载 (远程 -> 本地)",
+  "scp.local_path": "本地路径:",
+  "scp.remote_path": "远程路径:",
+  "scp.recursive": "递归 (-r)",
+  "scp.use_alias": "使用 SSH 别名",
+  "scp.btn_copy": "复制命令",
+  "scp.btn_cancel": "取消",
+  "scp.preview": "生成的命令:"
 }

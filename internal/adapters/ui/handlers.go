@@ -82,6 +82,8 @@ func normalizeGlobalHotkey(key rune) rune {
 		return 'c'
 	case 'C':
 		return 'C'
+	case 'o', 'O':
+		return 'o'
 	case 'v', 'V':
 		return 'v'
 	case 'y', 'Y':
@@ -188,7 +190,33 @@ func (t *tui) handleGlobalKeys(event *tcell.EventKey) *tcell.EventKey {
 	return event
 }
 
+func (t *tui) handleClipboardKeys(cmd rune) bool {
+	switch cmd {
+	case 'c':
+		t.handleCopyCommand()
+		return true
+	case 'h':
+		t.handleCopyHost()
+		return true
+	case 'o':
+		t.handleSCPCommandGenerator()
+		return true
+	case 'v':
+		t.handlePasteCommand()
+		return true
+	case 'y':
+		t.handleServerClone()
+		return true
+	default:
+		return false
+	}
+}
+
 func (t *tui) handleActionKeys(cmd rune) bool {
+	if t.handleClipboardKeys(cmd) {
+		return true
+	}
+
 	switch cmd {
 	case 'q':
 		t.handleQuit()
@@ -226,20 +254,8 @@ func (t *tui) handleActionKeys(cmd rune) bool {
 	case 'S':
 		t.handleSortReverse()
 		return true
-	case 'c':
-		t.handleCopyCommand()
-		return true
 	case 'C':
 		t.handleEditServerKeyComment()
-		return true
-	case 'v':
-		t.handlePasteCommand()
-		return true
-	case 'y':
-		t.handleServerClone()
-		return true
-	case 'h':
-		t.handleCopyHost()
 		return true
 	case 'g':
 		t.handlePingSelected()
@@ -396,6 +412,27 @@ func (t *tui) handleCopyHost() {
 			t.showStatusTemp("Failed to copy to clipboard")
 		}
 	}
+}
+
+func (t *tui) handleSCPCommandGenerator() {
+	server, ok := t.serverList.GetSelectedServer()
+	if !ok {
+		t.showStatusTemp("No server selected")
+		return
+	}
+
+	modal := NewSCPModal(t.app, server).
+		OnCopied(func(cmd string) {
+			t.app.SetRoot(t.root, true)
+			t.app.SetFocus(t.serverList)
+			t.showStatusTemp("Copied SCP: " + cmd)
+		}).
+		OnCancel(func() {
+			t.app.SetRoot(t.root, true)
+			t.app.SetFocus(t.serverList)
+		})
+
+	_ = modal.Show()
 }
 
 func (t *tui) handlePasteCommand() {
