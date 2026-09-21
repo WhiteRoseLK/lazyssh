@@ -72,6 +72,7 @@ If you are coming from **lazyssh**, here is a concrete summary of everything **n
 - ⌨️ **TUI Key Traps & Navigation**: Fixed backspace key issues, input modal traps, and cursor glitches across terminal emulators.
 - 🗂️ **XDG Base Directory Compliance**: Standardized config and state paths respecting `$XDG_CONFIG_HOME` and `$XDG_STATE_HOME`.
 - 🏷️ **Quoted Host Alias Stripping**: Automatically sanitizes and strips enclosing quotes from `Host` lines in SSH configs (e.g. `Host "server"`), avoiding invalid hostname rejection during connection.
+- 👤 **Numeric Username Validation**: Adjusted username validation rules to support usernames starting with a number or underscore (e.g. `007admin`), fully supporting Linux service and UID-based accounts.
 - 🚀 **Automated Multi-Arch Releases**: Continuous delivery via GoReleaser and Semantic Release Please providing prebuilt binaries for macOS (Intel & Apple Silicon), Linux (x86_64, ARM64), and Windows, alongside an official Homebrew tap.
 
 ---
@@ -436,4 +437,5 @@ This project is licensed under the [Apache-2.0 License](LICENSE).
   - `@davidszp` — Dark, Light, and System color theme support with runtime toggle
   - `@maxadc` — Internationalization framework and localization support (English, French, Chinese)
   - `@franksl` — Quoted `Host` aliases sanitization
+  - `@mahyarmirrashed` — Numeric username validation support
   - `@arniom`, `@leoncamel`, `@breakersun`, `@OlalalalaO`, `@manato-tajiri`, `@komapro` — Bug fixes & documentation improvements
