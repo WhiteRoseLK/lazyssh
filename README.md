@@ -78,6 +78,7 @@ If you are coming from **lazyssh**, here is a concrete summary of everything **n
 - 🗂️ **XDG Base Directory Compliance**: Standardized config and state paths respecting `$XDG_CONFIG_HOME` and `$XDG_STATE_HOME`.
 - 🏷️ **Quoted Host Alias Stripping**: Automatically sanitizes and strips enclosing quotes from `Host` lines in SSH configs (e.g. `Host "server"`), avoiding invalid hostname rejection during connection.
 - 👤 **Numeric Username Validation**: Adjusted username validation rules to support usernames starting with a number or underscore (e.g. `007admin`), fully supporting Linux service and UID-based accounts.
+- 📂 **Include Globs Matching Directories**: Fixed a startup failure that left the server list empty when a top-level `Include` glob (e.g. `Include config.d/*`) matched a subdirectory. Directories are now skipped like OpenSSH does, and `Include` directives are preserved verbatim on writeback.
 - 🚀 **Automated Multi-Arch Releases**: Continuous delivery via GoReleaser and Semantic Release Please providing prebuilt binaries for macOS (Intel & Apple Silicon), Linux (x86_64, ARM64), and Windows, alongside an official Homebrew tap.
 
 ---
@@ -434,6 +435,7 @@ neossh --sshconfig ~/.ssh/config_work -r
 `neossh` honours top-level `Include` directives in your `~/.ssh/config`:
 
 - **Reads**: All included files are parsed in OpenSSH precedence order.
+- **Globs**: Wildcard patterns are expanded like OpenSSH; matches that are directories are skipped instead of aborting startup.
 - **Writes route back to source**: Editing or deleting a host modifies the file that actually defines it. Other files are never touched.
 - **Ambiguity modal**: If the same alias is defined in multiple files, a prompt asks which file to update. Your choice is remembered in `metadata.json`.
 

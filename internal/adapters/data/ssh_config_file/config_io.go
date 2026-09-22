@@ -111,6 +111,8 @@ func (r *Repository) writeConfigToFile(filePath string, cfg *ssh_config.Config) 
 	configContent := cfg.String()
 	// Collapse 3 or more consecutive newlines to 2 (one blank line between blocks)
 	configContent = reMultipleNewlines.ReplaceAllString(configContent, "\n\n")
+	// Turn the inert Include markers back into real directives.
+	configContent = restoreIncludeDirectives(configContent)
 
 	if _, err := file.WriteString(configContent); err != nil {
 		return fmt.Errorf("failed to write config content: %w", err)
