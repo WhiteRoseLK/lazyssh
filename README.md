@@ -67,6 +67,7 @@ If you are coming from **lazyssh**, here is a concrete summary of everything **n
 | **Active SSH Sessions Panel** | Dedicated live panel tracking running SSH and background sessions with process inspection (PID, forwarded ports, identity keys), one-touch process termination (<kbd>K</kbd>), and instant configuration generation (<kbd>a</kbd>) directly from running connections. | <kbd>2</kbd> / <kbd>K</kbd> |
 | **Focus Borders & UI Navigation** | Distinct focus borders highlight the currently active panel (Search, Servers, Active Sessions, Details), with smooth <kbd>Tab</kbd> / <kbd>Shift+Tab</kbd> cycling across panels and form fields, active field highlights, and robust destructive confirmation dialogs. | <kbd>Tab</kbd> / <kbd>Shift+Tab</kbd> |
 | **In-Memory Server State & Fast Search** | Server configuration hierarchy is preloaded and managed reactively in-memory with write-through persistence. Search-as-you-type and async background pings run instantaneously with 0 redundant disk I/O or parser allocations. | *Core Performance* |
+| **Advanced Search Filters** | Token-based search syntax in the search bar: filter by `tag:`, `user:`, `host:`, `port:`, `status:`, and `group:` with negative exclusions (e.g. `-tag:staging`). | `/` or <kbd>0</kbd> |
 | **Quick Panel Jump** | Instant focus switching between Search, Servers, Active Sessions, and Details panels using numeric keys. | <kbd>0</kbd> / <kbd>1</kbd> / <kbd>2</kbd> / <kbd>3</kbd> |
 | **Modern Toolchain & Deps** | Fully upgraded to latest upstream packages (`tview v0.42`, `tcell/v2 v2.13`, `cobra v1.10`, `zap v1.28`, `go-runewidth v0.0.30`), with Go race detection and `golangci-lint` v2. | *Core* |
 
@@ -124,12 +125,22 @@ If you are coming from **lazyssh**, here is a concrete summary of everything **n
 - 📂 Expand or collapse groups with `Space` or `Enter` for a tidy, clutter-free server list.
 - 🪟 Tmux multi-pane integration: Launch and connect to all servers in a group simultaneously using tmux panes (<kbd>m</kbd> context menu).
 
-### Quick Server Navigation
-- 🔍 Fuzzy search by alias, IP, or tags (`/`).
+### Quick Server Navigation & Advanced Search
+- 🔍 Fuzzy search by alias, hostname, IP, user, or tags (`/` or `0`).
+- 🎯 **Advanced Filter Syntax**:
+  - `tag:<name>` / `tags:<name>` (e.g. `tag:prod`, `tag:k8s`) — filter by server tag.
+  - `-tag:<name>` (e.g. `-tag:staging`) — exclude servers with tag.
+  - `user:<username>` (e.g. `user:root`, `user:ubuntu`) — filter by username.
+  - `-user:<username>` — exclude servers with user.
+  - `host:<hostname>` (e.g. `host:192.168.`, `host:*.aws.*`) — filter by host/IP.
+  - `port:<number>` (e.g. `port:2222`) — filter by SSH port.
+  - `status:up` / `status:down` / `status:unknown` (or `online`/`offline`) — filter by ping status.
+  - `group:<name>` (e.g. `group:production`) — filter by server folder/group.
+  - Combine filters and search terms: `tag:prod user:root status:up web`
 - 🖥 One‑keypress SSH into the selected server (`Enter`).
 - 🏷 Tag servers (e.g., `prod`, `dev`, `test`) stored directly as SSH config comments for quick filtering and cross-machine synchronization.
 - ↕️ Sort by alias or last SSH (toggle + reverse).
-- 🔢 Jump focus between panels using numeric shortcuts (`1`, `2`, `3`).
+- 🔢 Jump focus between panels using numeric shortcuts (`0` Search, `1` Servers, `2` Active, `3` Details).
 
 ### Advanced SSH Configuration
 - 🔗 Port forwarding (`LocalForward`, `RemoteForward`, `DynamicForward`).
