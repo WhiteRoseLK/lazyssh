@@ -76,7 +76,6 @@ func (r *Repository) toDomainServer(lc *loadedConfig) []domain.Server {
 					IsWildcard:        isWildcard,
 					Tags:              extractHostTags(host),
 					PreConnectCommand: extractHostPreConnectCommand(host),
-					Password:          extractHostPassword(host),
 				})
 				idx = len(servers) - 1
 				seenKeys[idx] = make(map[string]bool)
@@ -100,9 +99,6 @@ func (r *Repository) toDomainServer(lc *loadedConfig) []domain.Server {
 				}
 				if servers[idx].PreConnectCommand == "" {
 					servers[idx].PreConnectCommand = extractHostPreConnectCommand(host)
-				}
-				if servers[idx].Password == "" {
-					servers[idx].Password = extractHostPassword(host)
 				}
 			}
 
@@ -411,9 +407,6 @@ func (r *Repository) mergeMetadata(servers []domain.Server, metadata map[string]
 			}
 			if servers[i].PreConnectCommand == "" && meta.PreConnectCommand != "" {
 				servers[i].PreConnectCommand = meta.PreConnectCommand
-			}
-			if servers[i].Password == "" && meta.Password != "" {
-				servers[i].Password = meta.Password
 			}
 			servers[i].SSHCount = meta.SSHCount
 			if meta.File != "" {

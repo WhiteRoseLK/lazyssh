@@ -957,3 +957,87 @@ func TestServerServiceSSH_PasswordAuthentication(t *testing.T) {
 		t.Errorf("expected newSSHPassCommand to be called for SSHWithArgs with password")
 	}
 }
+
+type mockCredentialStore struct {
+	passwords map[string]string
+}
+
+func newMockCredentialStore() *mockCredentialStore {
+	return &mockCredentialStore{passwords: make(map[string]string)}
+}
+
+func (m *mockCredentialStore) GetPassword(alias string) (string, error) {
+	return m.passwords[alias], nil
+}
+
+func (m *mockCredentialStore) SetPassword(alias, password string) error {
+	m.passwords[alias] = password
+	return nil
+}
+
+func (m *mockCredentialStore) DeletePassword(alias string) error {
+	delete(m.passwords, alias)
+	return nil
+}
+
+func TestServerService_CredentialStoreIntegration(t *testing.T) {
+	credStore := newMockCredentialStore()
+	repo := &mockServerRepository{
+		servers: []domain.Server{
+			{Alias: "srv-vault", Host: "10.0.0.1", Port: 22},
+		},
+	}
+
+	svc := NewServerService(
+		zap.NewNop().Sugar(),
+		repo,
+		WithCredentialStore(credStore),
+	)
+
+	// 1. Initially no password
+	servers, err := svc.ListServers("")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(servers) != 1 || servers[0].Password != "" {
+		t.Errorf("expected empty password, got %q", servers[0].Password)
+	}
+
+	// 2. AddServer with password saves to CredentialStore
+	newSrv := domain.Server{Alias: "new-srv", Host: "10.0.0.2", Port: 22, Password: "pwd123"}
+	if err := svc.AddServer(newSrv); err != nil {
+		t.Fatalf("unexpected error adding server: %v", err)
+	}
+	if credStore.passwords["new-srv"] != "pwd123" {
+		t.Errorf("expected credStore to have 'pwd123', got %q", credStore.passwords["new-srv"])
+	}
+
+	// 3. UpdateServer with new password
+	updatedSrv := newSrv
+	updatedSrv.Password = "newpwd456"
+	if err := svc.UpdateServer(newSrv, updatedSrv); err != nil {
+		t.Fatalf("unexpected error updating server: %v", err)
+	}
+	if credStore.passwords["new-srv"] != "newpwd456" {
+		t.Errorf("expected credStore to have 'newpwd456', got %q", credStore.passwords["new-srv"])
+	}
+
+	// 4. UpdateServer clearing password
+	clearedSrv := updatedSrv
+	clearedSrv.Password = ""
+	if err := svc.UpdateServer(updatedSrv, clearedSrv); err != nil {
+		t.Fatalf("unexpected error updating server: %v", err)
+	}
+	if _, exists := credStore.passwords["new-srv"]; exists {
+		t.Errorf("expected password to be removed from credStore")
+	}
+
+	// 5. DeleteServer deletes from CredentialStore
+	credStore.passwords["srv-vault"] = "storedpassword"
+	if err := svc.DeleteServer(servers[0]); err != nil {
+		t.Fatalf("unexpected error deleting server: %v", err)
+	}
+	if _, exists := credStore.passwords["srv-vault"]; exists {
+		t.Errorf("expected password to be deleted on DeleteServer")
+	}
+}

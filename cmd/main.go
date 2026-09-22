@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"github.com/WhiteRoseLK/neossh/internal/adapters/data/ssh_config_file"
+	"github.com/WhiteRoseLK/neossh/internal/adapters/security"
 	"github.com/WhiteRoseLK/neossh/internal/adapters/ui"
 	"github.com/WhiteRoseLK/neossh/internal/core/domain"
 	"github.com/WhiteRoseLK/neossh/internal/core/ports"
@@ -169,7 +170,13 @@ func newRootCmd() *cobra.Command {
 			}
 
 			serverRepo := ssh_config_file.NewRepository(log, resolvedConfig, metaDataFile)
-			serverService := services.NewServerService(log, serverRepo, services.WithReadOnly(opts.isReadonly))
+			credStore := security.NewCredentialStore(log, filepath.Dir(metaDataFile))
+			serverService := services.NewServerService(
+				log,
+				serverRepo,
+				services.WithReadOnly(opts.isReadonly),
+				services.WithCredentialStore(credStore),
+			)
 			gitService := services.NewGitService(log)
 			gitService.SetServerRepository(serverRepo)
 

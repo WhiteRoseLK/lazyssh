@@ -44,6 +44,7 @@ var ErrReadOnly = errors.New("readonly mode: SSH configuration modifications are
 
 type serverService struct {
 	serverRepository ports.ServerRepository
+	credentialStore  ports.CredentialStore
 	logger           *zap.SugaredLogger
 	readonly         bool
 
@@ -64,6 +65,13 @@ type ServerServiceOption func(*serverService)
 func WithReadOnly(ro bool) ServerServiceOption {
 	return func(s *serverService) {
 		s.readonly = ro
+	}
+}
+
+// WithCredentialStore sets the credential store for secure password management.
+func WithCredentialStore(cs ports.CredentialStore) ServerServiceOption {
+	return func(s *serverService) {
+		s.credentialStore = cs
 	}
 }
 
@@ -144,6 +152,7 @@ func (s *serverService) ListServers(query string) ([]domain.Server, error) {
 			}
 			return servers[i].Alias < servers[j].Alias
 		})
+		s.enrichServersWithCredentials(servers)
 		return servers, nil
 	}
 
@@ -192,7 +201,19 @@ func (s *serverService) ListServers(query string) ([]domain.Server, error) {
 	for _, r := range results {
 		out = append(out, r.srv)
 	}
+	s.enrichServersWithCredentials(out)
 	return out, nil
+}
+
+func (s *serverService) enrichServersWithCredentials(servers []domain.Server) {
+	if s.credentialStore == nil {
+		return
+	}
+	for i := range servers {
+		if pwd, err := s.credentialStore.GetPassword(servers[i].Alias); err == nil && pwd != "" {
+			servers[i].Password = pwd
+		}
+	}
 }
 
 func computeServerScore(srv domain.Server, q string) int {
@@ -372,8 +393,19 @@ func (s *serverService) UpdateServer(server domain.Server, newServer domain.Serv
 	err := s.serverRepository.UpdateServer(server, newServer)
 	if err != nil {
 		s.logger.Errorw("failed to update server", "error", err, "server", server)
+		return err
 	}
-	return err
+	if s.credentialStore != nil {
+		if newServer.Password != "" {
+			_ = s.credentialStore.SetPassword(newServer.Alias, newServer.Password)
+		} else if server.Password != "" {
+			_ = s.credentialStore.DeletePassword(server.Alias)
+		}
+		if newServer.Alias != server.Alias && server.Password != "" {
+			_ = s.credentialStore.DeletePassword(server.Alias)
+		}
+	}
+	return nil
 }
 
 // AddServer adds a new server to the repository.
@@ -388,8 +420,12 @@ func (s *serverService) AddServer(server domain.Server) error {
 	err := s.serverRepository.AddServer(server)
 	if err != nil {
 		s.logger.Errorw("failed to add server", "error", err, "server", server)
+		return err
 	}
-	return err
+	if s.credentialStore != nil && server.Password != "" {
+		_ = s.credentialStore.SetPassword(server.Alias, server.Password)
+	}
+	return nil
 }
 
 // DeleteServer removes a server from the repository.
@@ -400,8 +436,12 @@ func (s *serverService) DeleteServer(server domain.Server) error {
 	err := s.serverRepository.DeleteServer(server)
 	if err != nil {
 		s.logger.Errorw("failed to delete server", "error", err, "server", server)
+		return err
 	}
-	return err
+	if s.credentialStore != nil {
+		_ = s.credentialStore.DeletePassword(server.Alias)
+	}
+	return nil
 }
 
 // SetPinned sets or clears a pin timestamp for the server alias.
@@ -576,6 +616,11 @@ func (s *serverService) getPasswordForServer(alias string) string {
 	}
 	if pwd := os.Getenv("SSHPASS"); pwd != "" {
 		return pwd
+	}
+	if s.credentialStore != nil {
+		if pwd, err := s.credentialStore.GetPassword(alias); err == nil && pwd != "" {
+			return pwd
+		}
 	}
 	servers, err := s.serverRepository.ListServers("")
 	if err != nil {

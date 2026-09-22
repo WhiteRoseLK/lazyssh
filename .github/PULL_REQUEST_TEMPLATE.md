@@ -22,4 +22,7 @@ Closes #
 - [ ] I have run `go test ./...` and all tests pass.
 - [ ] I have added tests that prove my fix is effective or that my feature works.
 - [ ] 📖 Documentation: I have updated `README.md` (new flags, keybindings, features, or CLI options) if applicable.
+- [ ] 🔒 Security: No credentials, passwords, or secrets stored in plain text (native OS keyring or AES-256-GCM vault used).
+- [ ] 🔒 Security: No secrets leaked in process arguments (`ps`), shell history, or application logs.
+- [ ] 🔒 Security: Strict file permissions (`0600` / `0700`) enforced for sensitive files or key stores.
 - [ ] My commit messages follow [Conventional Commits](https://www.conventionalcommits.org/) (e.g. `feat(ui): ...`, `fix(config): ...`).

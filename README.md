@@ -57,7 +57,7 @@ If you are coming from **lazyssh**, here is a concrete summary of everything **n
 | **Pre-Connect Command Hooks** | Run automated local scripts/hooks (VPN bring-up, Wake-on-LAN, bastion tunnels, token refresh) before connecting. Supports token expansions (`%h`, `%p`, `%r`, `%n`), environment variables, and config comment persistence (`# pre-connect: ...`). | `--pre-connect <cmd>` / UI form |
 | **Default SSH Identity Key** | Configure a global default private key (via CLI `--default-key <path>`, Git & SSH Keys Setup dialog, or `NEOSSH_DEFAULT_KEY`), automatically prefilling the identity file on new servers while allowing manual overrides. | `--default-key <path>` / UI form |
 | **SCP Command Generator** | Generates and copies ready-to-use `scp` upload and download command templates with port, identity key, and proxy jump arguments directly to your clipboard. | <kbd>o</kbd> / `--scp <alias>` |
-| **Password Authentication (sshpass)** | Automated password delivery on connection for legacy or restricted hosts using `sshpass`, configurable via SSH config comments (`# password: ...`), the UI form, `--password` / `-P` CLI flag, or `NEOSSH_PASSWORD`. | `--password` / `-P` / UI form |
+| **Secure Password Auth (sshpass)** | Automated password delivery for legacy hosts using `sshpass` backed by native OS keyring (macOS Keychain, Linux Secret Service, Windows Credential Manager) or AES-256-GCM vault—never written in plain text to `~/.ssh/config` or `metadata.json`. | `--password` / `-P` / UI form |
 | **SSHFS Remote Mounts** | Mount remote server filesystems locally with full SSH configuration (ports, identity files, jump proxies, auto-reconnect, and read-only flags) and copy ready-to-run mount/unmount commands. | <kbd>M</kbd> / `--sshfs <alias>` |
 | **Paste SSH Command** | Parses any SSH command from system clipboard (flags, identity keys, ports, jump hosts) into an add-server modal with intelligent alias deduction and deduplication. | <kbd>v</kbd> |
 | **Duplicate / Clone Server** | Instantly clones any existing server configuration into the Add form with automatic alias deduplication (`srv_1`, `srv_2`), eliminating manual re-typing. | <kbd>y</kbd> / <kbd>C</kbd> |
@@ -409,12 +409,13 @@ neossh --sshconfig ~/.ssh/config_work -r
 
 ## 🔐 Security Notice
 
-`neossh` does not introduce any new security risks. It is a TUI wrapper around your existing `~/.ssh/config` file:
+`neossh` treats credential security and user privacy as paramount requirements:
 
-- All SSH connections are executed through your system's native `ssh` binary (OpenSSH).
-- Private keys, passwords, and credentials are never stored, transmitted, or inspected by `neossh`.
-- Your existing `IdentityFile` paths and `ssh-agent` integrations work exactly as before.
-- File permissions on your SSH config (`0600`) are strictly preserved.
+- **No Plaintext Passwords on Disk**: Passwords are **never** stored in plain text anywhere on disk—neither in `~/.ssh/config` nor in `metadata.json`. Your SSH configuration remains clean, portable, and completely safe to version-control in dotfiles.
+- **Native OS Keyring & Hardware Security**: Server passwords configured for automated `sshpass` login are managed by the operating system's native secure credential store (macOS Keychain, Linux Secret Service / DBus, Windows Credential Manager) with an authenticated AES-256-GCM local vault fallback (`0600` permissions).
+- **Process Table Protection**: When connecting via `sshpass`, `neossh` delivers passwords through the `SSHPASS` environment variable (`sshpass -e`) rather than command-line arguments, preventing password exposure to other users in `ps aux`.
+- **OpenSSH Native Execution**: All SSH connections run through your system's native `ssh` binary (OpenSSH). Your existing `IdentityFile` paths, passphrases, and `ssh-agent` integrations work exactly as before.
+- **Strict File Permissions**: Config snapshots, backups, and vault files strictly enforce `0600` permissions.
 
 ---
 
@@ -496,16 +497,11 @@ If the pre-connect hook command exits with a non-zero exit code, the SSH connect
 
 ## 🔑 Password Authentication via `sshpass`
 
-For legacy servers or restricted environments that do not support SSH public key authentication, `neossh` provides automated password authentication via `sshpass`:
+For legacy servers or restricted environments that do not support SSH public key authentication, `neossh` provides automated password authentication via `sshpass` with end-to-end credential security:
 
-- **SSH Config Comment Storage**: Passwords can be stored directly within `~/.ssh/config` comments (`# password: ...` or `# pass: ...`), keeping credentials synchronized without modifying server directives:
-  ```ssh-config
-  Host legacy-switch # password: mysecretpassword
-      HostName 192.168.1.50
-      User admin
-  ```
-- **TUI Form & Masked Display**: Configure or update passwords directly in the Add/Edit Server form under `▶ Password & Interactive`. Passwords are typed and displayed with secure mask characters in the UI.
-- **Secure Process Invocation**: Uses `sshpass -e` with environment variable delivery (`SSHPASS`) rather than CLI flags, preventing passwords from leaking into system process tables (`ps aux`).
+- **Zero Plaintext Footprint in `~/.ssh/config`**: Unlike insecure approaches, `neossh` **never** stores passwords in `~/.ssh/config` or `metadata.json`. Your SSH configuration remains clean, portable, and completely safe to version-control in public or shared dotfiles.
+- **Hardware-Backed Credential Store**: Passwords configured via the Add/Edit Server form under `▶ Password & Interactive` are securely stored in your operating system's native keyring (macOS Keychain, Linux Secret Service / DBus, Windows Credential Manager) with an authenticated AES-256-GCM local vault fallback.
+- **Secure Process Invocation**: Uses `sshpass -e` with environment variable delivery (`SSHPASS`) rather than CLI flags, completely eliminating visibility in system process tables (`ps aux`).
 - **One-Shot CLI Flag & Environment Variable**: Pass one-shot passwords via `--password <pwd>` (or `-P <pwd>`) or through the `NEOSSH_PASSWORD` / `SSHPASS` environment variables.
 
 ---
