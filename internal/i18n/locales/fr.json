@@ -10,6 +10,7 @@
 
   "search.label": " 🔍 Recherche : ",
   "search.title": " 0 Recherche (/ pour filtrer, Échap pour quitter) ",
+  "search.placeholder": "ex. prod, tag:aws, user:root, status:up",
 
   "statusbar.readonly": "[yellow::b]MODE LECTURE SEULE[::-] (Modifications verrouillées) • [white]Tab[-] Changer panneau • [white]Entrée[-] Connecter • [white]c[-] Copier • [white]o[-] SCP • [white]g/G[-] Ping • [white]P[-] Git SSH • [white]T[-] Thème • [white]q[-] Quitter",
   "statusbar.normal": "[white]Tab[-] Changer panneau • [white]Entrée[-] Connecter • [white]a[-] Ajouter • [white]e[-] Modifier • [white]d[-] Supprimer • [white]c[-] Copier • [white]o[-] SCP • [white]g/G[-] Ping • [white]P[-] Git SSH • [white]C[-] Commentaire • [white]l/u[-] Agent • [white]T[-] Thème • [white]q[-] Quitter",

@@ -39,6 +39,7 @@ func NewSearchBar() *SearchBar {
 
 func (s *SearchBar) build() {
 	s.InputField.SetLabel(i18n.T("search.label")).
+		SetPlaceholder(i18n.T("search.placeholder")).
 		SetFieldBackgroundColor(CurrentTheme.SearchFieldBg).
 		SetFieldTextColor(CurrentTheme.SearchFieldText).
 		SetFieldWidth(30).

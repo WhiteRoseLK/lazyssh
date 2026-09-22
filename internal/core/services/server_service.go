@@ -251,13 +251,14 @@ func (s *serverService) ListServers(query string) ([]domain.Server, error) {
 		return out, nil
 	}
 
+	filter := parseSearchQuery(q)
 	type scored struct {
 		srv   domain.Server
 		score int
 	}
 	results := make([]scored, 0, len(s.servers))
 	for _, srv := range s.servers {
-		score := computeServerScore(srv, q)
+		score := filter.Score(srv)
 		if score > 0 {
 			results = append(results, scored{srv: srv, score: score})
 		}
@@ -294,35 +295,6 @@ func (s *serverService) enrichServersWithCredentials(servers []domain.Server) {
 			servers[i].Password = pwd
 		}
 	}
-}
-
-func computeServerScore(srv domain.Server, q string) int {
-	best := 0
-	fields := []string{
-		srv.Alias,
-		srv.Host,
-		srv.User,
-	}
-	if len(srv.Aliases) > 0 {
-		fields = append(fields, strings.Join(srv.Aliases, " "))
-		for _, a := range srv.Aliases {
-			if a != "" {
-				fields = append(fields, a)
-			}
-		}
-	}
-	if len(srv.Tags) > 0 {
-		fields = append(fields, strings.Join(srv.Tags, " "))
-	}
-	for _, f := range fields {
-		if f == "" {
-			continue
-		}
-		if sc := fuzzyScore(q, f); sc > best {
-			best = sc
-		}
-	}
-	return best
 }
 
 // fuzzyScore computes a VS Code–like fuzzy subsequence score for q against s.
@@ -1465,26 +1437,11 @@ func mergeForwardSpecs(existing []string, incoming []string) []string {
 }
 
 func matchesServerQuery(server domain.Server, query string) bool {
-	fields := []string{
-		strings.ToLower(server.Host),
-		strings.ToLower(server.User),
-		strings.ToLower(server.Alias),
+	q := strings.TrimSpace(query)
+	if q == "" {
+		return true
 	}
-	for _, tag := range server.Tags {
-		fields = append(fields, strings.ToLower(tag))
-	}
-	if len(server.Aliases) > 0 {
-		for _, alias := range server.Aliases {
-			fields = append(fields, strings.ToLower(alias))
-		}
-	}
-
-	for _, field := range fields {
-		if strings.Contains(field, query) {
-			return true
-		}
-	}
-	return false
+	return parseSearchQuery(q).Matches(server)
 }
 
 func (s *serverService) listActiveSSHSessions() ([]activeSSHSession, error) {
