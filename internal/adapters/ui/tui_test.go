@@ -58,6 +58,12 @@ func (m *mockServerService) IsForwarding(alias string) bool {
 	return false
 }
 
+func (m *mockServerService) ReloadServers() error {
+	return nil
+}
+
+func (m *mockServerService) UpdateServerPing(string, string, time.Duration) {}
+
 func (m *mockServerService) DiscoverKnownHosts(string) ([]domain.Server, domain.ImportResult, error) {
 	return nil, domain.ImportResult{}, nil
 }

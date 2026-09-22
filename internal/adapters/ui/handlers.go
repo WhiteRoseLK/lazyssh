@@ -1052,6 +1052,7 @@ func (t *tui) handlePingSelected() {
 		// Set checking status
 		server.PingStatus = StatusChecking
 		t.pingStatuses[alias] = server
+		t.serverService.UpdateServerPing(alias, StatusChecking, 0)
 		t.updateServerListWithPingStatus()
 
 		t.showStatusTemp(fmt.Sprintf("Pinging %s…", alias))
@@ -1069,6 +1070,7 @@ func (t *tui) handlePingSelected() {
 						t.showStatusTempColor(fmt.Sprintf("Ping %s: UP (%s)", alias, dur), "#A0FFA0")
 					}
 					t.pingStatuses[alias] = ps
+					t.serverService.UpdateServerPing(alias, ps.PingStatus, ps.PingLatency)
 					t.updateServerListWithPingStatus()
 				}
 			})
@@ -1077,34 +1079,13 @@ func (t *tui) handlePingSelected() {
 }
 
 func (t *tui) updateServerListWithPingStatus() {
-	query := ""
-	if t.searchBar != nil {
-		query = t.searchBar.InputField.GetText()
+	if t.serverList != nil {
+		t.serverList.UpdatePingStatuses(t.pingStatuses)
 	}
-	servers, _ := t.serverService.ListServers(query)
-	sortServersForUI(servers, t.sortMode)
-
-	for i := range servers {
-		if ps, ok := t.pingStatuses[servers[i].Alias]; ok {
-			servers[i].PingStatus = ps.PingStatus
-			servers[i].PingLatency = ps.PingLatency
-		}
-	}
-
-	t.serverList.UpdateServers(servers)
 }
 
 func (t *tui) handlePingAll() {
-	query := ""
-	if t.searchBar != nil {
-		query = t.searchBar.InputField.GetText()
-	}
-	servers, err := t.serverService.ListServers(query)
-	if err != nil {
-		t.showStatusTempColor(fmt.Sprintf("Failed to get servers: %v", err), "#FF6B6B")
-		return
-	}
-
+	servers := t.serverList.GetServers()
 	if len(servers) == 0 {
 		t.showStatusTemp("No servers to ping")
 		return
@@ -1121,6 +1102,7 @@ func (t *tui) handlePingAll() {
 		s := server
 		s.PingStatus = StatusChecking
 		t.pingStatuses[s.Alias] = s
+		t.serverService.UpdateServerPing(s.Alias, StatusChecking, 0)
 	}
 	t.updateServerListWithPingStatus()
 
@@ -1141,6 +1123,7 @@ func (t *tui) handlePingAll() {
 						ps.PingLatency = dur
 					}
 					t.pingStatuses[srv.Alias] = ps
+					t.serverService.UpdateServerPing(srv.Alias, ps.PingStatus, ps.PingLatency)
 					t.updateServerListWithPingStatus()
 				}
 			})
@@ -1181,6 +1164,7 @@ func (t *tui) handleRefreshBackground() {
 	t.showStatusTemp("Refreshing…")
 
 	go func(prevIdx int, q string) {
+		_ = t.serverService.ReloadServers()
 		servers, err := t.serverService.ListServers(q)
 		if err != nil {
 			t.app.QueueUpdateDraw(func() {
