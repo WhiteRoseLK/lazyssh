@@ -2,23 +2,39 @@ name: Issue Triage
 
 on:
   issues:
-    types: [opened]
+    types: [opened, labeled]
 
 permissions:
   issues: write
 
 jobs:
   triage:
-    name: Auto-label needs-triage
+    name: Manage needs-triage label
     runs-on: ubuntu-latest
     steps:
-      - name: Add needs-triage label
+      - name: Sync needs-triage label based on priority
         uses: actions/github-script@v7
         with:
           script: |
-            await github.rest.issues.addLabels({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-              labels: ['needs-triage']
-            });
+            const issue = context.payload.issue;
+            const labels = (issue.labels || []).map(l => (typeof l === 'string' ? l : l.name));
+            const hasPriority = labels.some(l => l.startsWith('priority:'));
+            const hasNeedsTriage = labels.includes('needs-triage');
+
+            if (hasPriority && hasNeedsTriage) {
+              // Issue has been triaged with a priority label: remove needs-triage
+              await github.rest.issues.removeLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                name: 'needs-triage'
+              });
+            } else if (!hasPriority && !hasNeedsTriage && context.payload.action === 'opened') {
+              // New issue opened without any priority label: mark as needs-triage
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                labels: ['needs-triage']
+              });
+            }
