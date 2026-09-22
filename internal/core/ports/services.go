@@ -43,6 +43,8 @@ type ServerService interface {
 	ResolveConfigServer(server domain.Server) (domain.Server, bool, error)
 	GetDefaultIdentityKey() (string, error)
 	SaveDefaultIdentityKey(key string) error
+	ReloadServers() error
+	UpdateServerPing(alias string, status string, latency time.Duration)
 }
 
 // GitService provides Git and SSH key management operations.

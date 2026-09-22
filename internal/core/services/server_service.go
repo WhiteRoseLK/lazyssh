@@ -48,6 +48,10 @@ type serverService struct {
 	logger           *zap.SugaredLogger
 	readonly         bool
 
+	serversMu     sync.RWMutex
+	serversLoaded bool
+	servers       []domain.Server
+
 	fwMu     sync.Mutex
 	forwards map[string][]*os.Process
 
@@ -125,50 +129,134 @@ func NewServerService(logger *zap.SugaredLogger, sr ports.ServerRepository, opts
 	return s
 }
 
+// ReloadServers reloads all servers from the underlying repository into memory.
+func (s *serverService) ReloadServers() error {
+	s.serversMu.Lock()
+	defer s.serversMu.Unlock()
+	return s.loadFromRepoLocked()
+}
+
+// UpdateServerPing updates the ping status and latency of a server in-memory.
+func (s *serverService) UpdateServerPing(alias string, status string, latency time.Duration) {
+	s.serversMu.Lock()
+	defer s.serversMu.Unlock()
+
+	for i := range s.servers {
+		if s.servers[i].Alias == alias || hasAlias(s.servers[i].Aliases, alias) {
+			s.servers[i].PingStatus = status
+			s.servers[i].PingLatency = latency
+			return
+		}
+	}
+}
+
+func hasAlias(aliases []string, target string) bool {
+	for _, a := range aliases {
+		if strings.EqualFold(a, target) {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *serverService) loadFromRepoLocked() error {
+	if s.serverRepository == nil {
+		s.servers = nil
+		s.serversLoaded = true
+		return nil
+	}
+	rawServers, err := s.serverRepository.ListServers("")
+	if err != nil {
+		s.logger.Errorw("failed to load servers from repository", "error", err)
+		return err
+	}
+	s.enrichServersWithCredentials(rawServers)
+
+	// Preserve in-memory ping statuses if previously loaded
+	if len(s.servers) > 0 {
+		pingMap := make(map[string]struct {
+			status  string
+			latency time.Duration
+		}, len(s.servers))
+		for _, srv := range s.servers {
+			if srv.PingStatus != "" {
+				pingMap[srv.Alias] = struct {
+					status  string
+					latency time.Duration
+				}{status: srv.PingStatus, latency: srv.PingLatency}
+			}
+		}
+		for i := range rawServers {
+			if p, ok := pingMap[rawServers[i].Alias]; ok {
+				rawServers[i].PingStatus = p.status
+				rawServers[i].PingLatency = p.latency
+			}
+		}
+	}
+
+	s.servers = rawServers
+	s.serversLoaded = true
+	return nil
+}
+
+func (s *serverService) ensureLoaded() error {
+	s.serversMu.RLock()
+	if s.serversLoaded {
+		s.serversMu.RUnlock()
+		return nil
+	}
+	s.serversMu.RUnlock()
+
+	s.serversMu.Lock()
+	defer s.serversMu.Unlock()
+	if s.serversLoaded {
+		return nil
+	}
+	return s.loadFromRepoLocked()
+}
+
 // ListServers returns servers. With empty query, keep pinned-first default ordering.
 // With non-empty query, perform fuzzy subsequence matching and rank by relevance.
 func (s *serverService) ListServers(query string) ([]domain.Server, error) {
+	if err := s.ensureLoaded(); err != nil {
+		return nil, err
+	}
+
+	s.serversMu.RLock()
+	defer s.serversMu.RUnlock()
+
 	q := strings.TrimSpace(query)
 	if q == "" {
-		servers, err := s.serverRepository.ListServers("")
-		if err != nil {
-			s.logger.Errorw("failed to list servers", "error", err)
-			return nil, err
+		if s.servers == nil {
+			return nil, nil
 		}
-		// Sort: pinned first (PinnedAt non-zero), then by PinnedAt desc, then by Alias asc.
-		sort.SliceStable(servers, func(i, j int) bool {
-			pi := !servers[i].PinnedAt.IsZero()
-			pj := !servers[j].PinnedAt.IsZero()
+		out := make([]domain.Server, len(s.servers))
+		copy(out, s.servers)
+		sort.SliceStable(out, func(i, j int) bool {
+			pi := !out[i].PinnedAt.IsZero()
+			pj := !out[j].PinnedAt.IsZero()
 			if pi != pj {
 				return pi
 			}
 			if pi && pj {
-				return servers[i].PinnedAt.After(servers[j].PinnedAt)
+				return out[i].PinnedAt.After(out[j].PinnedAt)
 			}
-			ai := strings.ToLower(servers[i].Alias)
-			aj := strings.ToLower(servers[j].Alias)
+			ai := strings.ToLower(out[i].Alias)
+			aj := strings.ToLower(out[j].Alias)
 			if ai != aj {
 				return ai < aj
 			}
-			return servers[i].Alias < servers[j].Alias
+			return out[i].Alias < out[j].Alias
 		})
-		s.enrichServersWithCredentials(servers)
-		return servers, nil
-	}
-
-	// Non-empty query: fetch all and rank via fuzzy scoring.
-	all, err := s.serverRepository.ListServers("")
-	if err != nil {
-		s.logger.Errorw("failed to list servers", "error", err)
-		return nil, err
+		return out, nil
 	}
 
 	type scored struct {
 		srv   domain.Server
 		score int
 	}
-	results := make([]scored, 0, len(all))
-	for _, srv := range all {
+	results := make([]scored, 0, len(s.servers))
+	for _, srv := range s.servers {
 		score := computeServerScore(srv, q)
 		if score > 0 {
 			results = append(results, scored{srv: srv, score: score})
@@ -184,24 +272,16 @@ func (s *serverService) ListServers(query string) ([]domain.Server, error) {
 		if pi != pj {
 			return pi
 		}
-		if pi && pj {
-			if !results[i].srv.PinnedAt.Equal(results[j].srv.PinnedAt) {
-				return results[i].srv.PinnedAt.After(results[j].srv.PinnedAt)
-			}
+		if pi && pj && !results[i].srv.PinnedAt.Equal(results[j].srv.PinnedAt) {
+			return results[i].srv.PinnedAt.After(results[j].srv.PinnedAt)
 		}
-		ai := strings.ToLower(results[i].srv.Alias)
-		aj := strings.ToLower(results[j].srv.Alias)
-		if ai != aj {
-			return ai < aj
-		}
-		return results[i].srv.Alias < results[j].srv.Alias
+		return strings.ToLower(results[i].srv.Alias) < strings.ToLower(results[j].srv.Alias)
 	})
 
-	out := make([]domain.Server, 0, len(results))
-	for _, r := range results {
-		out = append(out, r.srv)
+	out := make([]domain.Server, len(results))
+	for i, r := range results {
+		out[i] = r.srv
 	}
-	s.enrichServersWithCredentials(out)
 	return out, nil
 }
 
@@ -405,6 +485,9 @@ func (s *serverService) UpdateServer(server domain.Server, newServer domain.Serv
 			_ = s.credentialStore.DeletePassword(server.Alias)
 		}
 	}
+	s.serversMu.Lock()
+	_ = s.loadFromRepoLocked()
+	s.serversMu.Unlock()
 	return nil
 }
 
@@ -425,6 +508,9 @@ func (s *serverService) AddServer(server domain.Server) error {
 	if s.credentialStore != nil && server.Password != "" {
 		_ = s.credentialStore.SetPassword(server.Alias, server.Password)
 	}
+	s.serversMu.Lock()
+	_ = s.loadFromRepoLocked()
+	s.serversMu.Unlock()
 	return nil
 }
 
@@ -441,6 +527,9 @@ func (s *serverService) DeleteServer(server domain.Server) error {
 	if s.credentialStore != nil {
 		_ = s.credentialStore.DeletePassword(server.Alias)
 	}
+	s.serversMu.Lock()
+	_ = s.loadFromRepoLocked()
+	s.serversMu.Unlock()
 	return nil
 }
 
@@ -449,8 +538,12 @@ func (s *serverService) SetPinned(alias string, pinned bool) error {
 	err := s.serverRepository.SetPinned(alias, pinned)
 	if err != nil {
 		s.logger.Errorw("failed to set pin state", "error", err, "alias", alias, "pinned", pinned)
+		return err
 	}
-	return err
+	s.serversMu.Lock()
+	_ = s.loadFromRepoLocked()
+	s.serversMu.Unlock()
+	return nil
 }
 
 // SetHidden sets or clears hidden status for the server alias.
@@ -461,8 +554,12 @@ func (s *serverService) SetHidden(alias string, hidden bool) error {
 	err := s.serverRepository.SetHidden(alias, hidden)
 	if err != nil {
 		s.logger.Errorw("failed to set hidden state", "error", err, "alias", alias, "hidden", hidden)
+		return err
 	}
-	return err
+	s.serversMu.Lock()
+	_ = s.loadFromRepoLocked()
+	s.serversMu.Unlock()
+	return nil
 }
 
 var terminalTitleWriter io.Writer = os.Stdout
@@ -483,15 +580,13 @@ func RestoreTerminalTitle() {
 
 func (s *serverService) formatTerminalTitle(alias string) string {
 	title := alias
-	if s.serverRepository != nil {
-		if servers, err := s.serverRepository.ListServers(alias); err == nil {
-			for _, srv := range servers {
-				if strings.EqualFold(srv.Alias, alias) {
-					if srv.Host != "" && !strings.EqualFold(srv.Host, alias) {
-						title = fmt.Sprintf("%s (%s)", alias, srv.Host)
-					}
-					break
+	if servers, err := s.ListServers(alias); err == nil {
+		for _, srv := range servers {
+			if strings.EqualFold(srv.Alias, alias) {
+				if srv.Host != "" && !strings.EqualFold(srv.Host, alias) {
+					title = fmt.Sprintf("%s (%s)", alias, srv.Host)
 				}
+				break
 			}
 		}
 	}
@@ -515,7 +610,7 @@ func interpolateHookCommand(template string, s domain.Server) string {
 }
 
 func (s *serverService) runPreConnectHook(alias string) error {
-	servers, err := s.serverRepository.ListServers("")
+	servers, err := s.ListServers("")
 	if err != nil {
 		s.logger.Warnw("failed to list servers for pre-connect hook lookup", "error", err)
 	}
@@ -622,7 +717,7 @@ func (s *serverService) getPasswordForServer(alias string) string {
 			return pwd
 		}
 	}
-	servers, err := s.serverRepository.ListServers("")
+	servers, err := s.ListServers("")
 	if err != nil {
 		return ""
 	}
@@ -715,6 +810,16 @@ func (s *serverService) SSH(alias string) error {
 
 	if err := s.serverRepository.RecordSSH(alias); err != nil {
 		s.logger.Errorw("failed to record ssh metadata", "alias", alias, "error", err)
+	} else {
+		s.serversMu.Lock()
+		for i := range s.servers {
+			if strings.EqualFold(s.servers[i].Alias, alias) {
+				s.servers[i].LastSeen = time.Now()
+				s.servers[i].SSHCount++
+				break
+			}
+		}
+		s.serversMu.Unlock()
 	}
 
 	s.logger.Infow("ssh end", "alias", alias)
@@ -774,6 +879,16 @@ func (s *serverService) SSHWithArgs(alias string, extraArgs []string) error {
 	}
 	if err := s.serverRepository.RecordSSH(alias); err != nil {
 		s.logger.Errorw("failed to record ssh metadata", "alias", alias, "error", err)
+	} else {
+		s.serversMu.Lock()
+		for i := range s.servers {
+			if strings.EqualFold(s.servers[i].Alias, alias) {
+				s.servers[i].LastSeen = time.Now()
+				s.servers[i].SSHCount++
+				break
+			}
+		}
+		s.serversMu.Unlock()
 	}
 	s.logger.Infow("ssh end (with args)", "alias", alias)
 	return nil
@@ -1081,7 +1196,13 @@ func (s *serverService) ImportKnownHosts(knownHostsPath string) (domain.ImportRe
 	if s.readonly {
 		return domain.ImportResult{}, ErrReadOnly
 	}
-	return s.serverRepository.ImportKnownHosts(knownHostsPath)
+	res, err := s.serverRepository.ImportKnownHosts(knownHostsPath)
+	if err == nil && res.Imported > 0 {
+		s.serversMu.Lock()
+		_ = s.loadFromRepoLocked()
+		s.serversMu.Unlock()
+	}
+	return res, err
 }
 
 // GetTheme returns the current theme name from settings.
@@ -1143,7 +1264,7 @@ func (s *serverService) ListActiveSessions(query string) ([]domain.Server, error
 		return nil, err
 	}
 
-	configured, err := s.serverRepository.ListServers("")
+	configured, err := s.ListServers("")
 	if err != nil {
 		return nil, err
 	}
@@ -1262,7 +1383,7 @@ func (s *serverService) KillActiveSessions(server domain.Server) (int, error) {
 
 // ResolveConfigServer attempts to map a server entry to a configured server.
 func (s *serverService) ResolveConfigServer(server domain.Server) (domain.Server, bool, error) {
-	servers, err := s.serverRepository.ListServers("")
+	servers, err := s.ListServers("")
 	if err != nil {
 		return domain.Server{}, false, err
 	}

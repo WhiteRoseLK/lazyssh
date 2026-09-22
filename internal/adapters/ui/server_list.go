@@ -329,6 +329,28 @@ func (sl *ServerList) GetSelectedServer() (domain.Server, bool) {
 	return domain.Server{}, false
 }
 
+// GetServers returns a shallow copy of the current server list held in memory.
+func (sl *ServerList) GetServers() []domain.Server {
+	if sl.servers == nil {
+		return nil
+	}
+	cp := make([]domain.Server, len(sl.servers))
+	copy(cp, sl.servers)
+	return cp
+}
+
+// UpdatePingStatuses updates the ping status and latency for the current servers in memory
+// and refreshes the display without reloading from disk.
+func (sl *ServerList) UpdatePingStatuses(statuses map[string]domain.Server) {
+	for i := range sl.servers {
+		if ps, ok := statuses[sl.servers[i].Alias]; ok {
+			sl.servers[i].PingStatus = ps.PingStatus
+			sl.servers[i].PingLatency = ps.PingLatency
+		}
+	}
+	sl.UpdateServers(sl.servers)
+}
+
 func (sl *ServerList) OnSelection(fn func(server domain.Server)) *ServerList {
 	sl.onSelection = fn
 	return sl

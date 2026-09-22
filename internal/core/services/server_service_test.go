@@ -22,6 +22,7 @@ import (
 	"os/exec"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/WhiteRoseLK/neossh/internal/core/domain"
 	"github.com/WhiteRoseLK/neossh/internal/core/ports"
@@ -1039,5 +1040,168 @@ func TestServerService_CredentialStoreIntegration(t *testing.T) {
 	}
 	if _, exists := credStore.passwords["srv-vault"]; exists {
 		t.Errorf("expected password to be deleted on DeleteServer")
+	}
+}
+
+type countingServerRepo struct {
+	ports.ServerRepository
+	listCalls int
+	servers   []domain.Server
+}
+
+func (c *countingServerRepo) ListServers(string) ([]domain.Server, error) {
+	c.listCalls++
+	cp := make([]domain.Server, len(c.servers))
+	copy(cp, c.servers)
+	return cp, nil
+}
+
+func (c *countingServerRepo) AddServer(s domain.Server) error {
+	c.servers = append(c.servers, s)
+	return nil
+}
+
+func (c *countingServerRepo) UpdateServer(orig, updated domain.Server) error {
+	for i := range c.servers {
+		if c.servers[i].Alias == orig.Alias {
+			c.servers[i] = updated
+			return nil
+		}
+	}
+	return nil
+}
+
+func (c *countingServerRepo) DeleteServer(s domain.Server) error {
+	for i := range c.servers {
+		if c.servers[i].Alias == s.Alias {
+			c.servers = append(c.servers[:i], c.servers[i+1:]...)
+			return nil
+		}
+	}
+	return nil
+}
+
+func (c *countingServerRepo) SetPinned(alias string, pinned bool) error {
+	for i := range c.servers {
+		if c.servers[i].Alias == alias {
+			if pinned {
+				c.servers[i].PinnedAt = time.Now()
+			} else {
+				c.servers[i].PinnedAt = time.Time{}
+			}
+			return nil
+		}
+	}
+	return nil
+}
+
+func (c *countingServerRepo) SetHidden(alias string, hidden bool) error {
+	for i := range c.servers {
+		if c.servers[i].Alias == alias {
+			c.servers[i].Hidden = hidden
+			return nil
+		}
+	}
+	return nil
+}
+
+func TestServerService_InMemoryStateAndPings(t *testing.T) {
+	repo := &countingServerRepo{
+		servers: []domain.Server{
+			{Alias: "prod-web-01", Host: "10.0.1.1", Port: 22},
+			{Alias: "prod-db-01", Host: "10.0.2.1", Port: 22},
+			{Alias: "staging-api", Host: "10.0.3.1", Port: 22},
+		},
+	}
+	logger := zap.NewNop().Sugar()
+	svc := NewServerService(logger, repo)
+
+	// 1. Initial ListServers loads from repository once
+	servers, err := svc.ListServers("")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(servers) != 3 {
+		t.Fatalf("expected 3 servers, got %d", len(servers))
+	}
+	if repo.listCalls != 1 {
+		t.Fatalf("expected 1 call to repo.ListServers on initial load, got %d", repo.listCalls)
+	}
+
+	// 2. Subsequent ListServers (empty and query) hit in-memory cache without calling repository
+	filtered, err := svc.ListServers("prod")
+	if err != nil {
+		t.Fatalf("unexpected error on filtered search: %v", err)
+	}
+	if len(filtered) != 2 {
+		t.Fatalf("expected 2 matches for 'prod', got %d", len(filtered))
+	}
+	if repo.listCalls != 1 {
+		t.Fatalf("expected repo.ListServers NOT to be called on search (cached in-memory), got %d calls", repo.listCalls)
+	}
+
+	allAgain, err := svc.ListServers("")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(allAgain) != 3 {
+		t.Fatalf("expected 3 servers, got %d", len(allAgain))
+	}
+	if repo.listCalls != 1 {
+		t.Fatalf("expected repo.ListServers still to have only 1 call, got %d", repo.listCalls)
+	}
+
+	// 3. UpdateServerPing updates status and latency in-memory without calling repository
+	svc.UpdateServerPing("prod-web-01", "up", 15*time.Millisecond)
+	if repo.listCalls != 1 {
+		t.Fatalf("expected repo.ListServers not called on ping update, got %d", repo.listCalls)
+	}
+
+	checked, err := svc.ListServers("prod-web-01")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(checked) == 0 || checked[0].PingStatus != "up" || checked[0].PingLatency != 15*time.Millisecond {
+		t.Fatalf("expected prod-web-01 to have PingStatus 'up' and latency 15ms, got %+v", checked)
+	}
+
+	// 4. ReloadServers forces reload from repository and preserves active ping statuses
+	repo.servers = append(repo.servers, domain.Server{Alias: "newly-added-external", Host: "10.0.4.1", Port: 22})
+	if err := svc.ReloadServers(); err != nil {
+		t.Fatalf("ReloadServers failed: %v", err)
+	}
+	if repo.listCalls != 2 {
+		t.Fatalf("expected repo.ListServers to be called on explicit reload (2 total calls), got %d", repo.listCalls)
+	}
+
+	reloaded, err := svc.ListServers("")
+	if err != nil {
+		t.Fatalf("unexpected error after reload: %v", err)
+	}
+	if len(reloaded) != 4 {
+		t.Fatalf("expected 4 servers after reload, got %d", len(reloaded))
+	}
+	// Check that prod-web-01's ping was preserved
+	found := false
+	for _, s := range reloaded {
+		if s.Alias == "prod-web-01" {
+			found = true
+			if s.PingStatus != "up" || s.PingLatency != 15*time.Millisecond {
+				t.Errorf("expected preserved ping status 'up' and 15ms, got status %q latency %v", s.PingStatus, s.PingLatency)
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("prod-web-01 not found in reloaded servers")
+	}
+
+	// 5. AddServer writes through and updates in-memory list
+	newSrv := domain.Server{Alias: "brand-new", Host: "10.0.5.1", Port: 22}
+	if err := svc.AddServer(newSrv); err != nil {
+		t.Fatalf("AddServer failed: %v", err)
+	}
+	afterAdd, _ := svc.ListServers("")
+	if len(afterAdd) != 5 {
+		t.Fatalf("expected 5 servers after AddServer, got %d", len(afterAdd))
 	}
 }

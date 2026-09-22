@@ -127,6 +127,12 @@ func (m *mockReadOnlyService) SaveDefaultIdentityKey(string) error {
 	return nil
 }
 
+func (m *mockReadOnlyService) ReloadServers() error {
+	return nil
+}
+
+func (m *mockReadOnlyService) UpdateServerPing(string, string, time.Duration) {}
+
 func TestTUI_ReadOnlyState(t *testing.T) {
 	logger := zap.NewNop().Sugar()
 	mockSvc := &mockReadOnlyService{}
