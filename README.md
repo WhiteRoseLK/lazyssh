@@ -436,7 +436,6 @@ neossh --sshconfig ~/.ssh/config_work -r
 
 - **Reads**: All included files are parsed in OpenSSH precedence order.
 - **Globs**: Wildcard patterns are expanded like OpenSSH; matches that are directories are skipped instead of aborting startup.
-- **Cached reads**: The parsed config is cached briefly (2s) so rapid re-listings (e.g. `ping all`) stay responsive; <kbd>r</kbd> (refresh) and any add/edit/delete force an immediate re-read.
 - **Writes route back to source**: Editing or deleting a host modifies the file that actually defines it. Other files are never touched.
 - **Ambiguity modal**: If the same alias is defined in multiple files, a prompt asks which file to update. Your choice is remembered in `metadata.json`.
 

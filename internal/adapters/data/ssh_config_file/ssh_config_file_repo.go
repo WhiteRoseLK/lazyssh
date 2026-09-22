@@ -17,8 +17,6 @@ package ssh_config_file
 import (
 	"fmt"
 	"strings"
-	"sync"
-	"time"
 
 	"github.com/WhiteRoseLK/neossh/internal/core/domain"
 	"github.com/WhiteRoseLK/neossh/internal/core/ports"
@@ -32,12 +30,6 @@ type Repository struct {
 	fileSystem      FileSystem
 	metadataManager *metadataManager
 	logger          *zap.SugaredLogger
-
-	// cacheMu guards cachedLC/cacheAt. The parsed config is immutable once
-	// published, so read paths may share it without holding the lock.
-	cacheMu  sync.Mutex
-	cachedLC *loadedConfig
-	cacheAt  time.Time
 }
 
 // NewRepository creates a new SSH config repository.
@@ -63,7 +55,7 @@ func NewRepositoryWithFS(logger *zap.SugaredLogger, configPath string, metaDataP
 // ListServers returns all servers matching the query pattern.
 // Empty query returns all servers.
 func (r *Repository) ListServers(query string) ([]domain.Server, error) {
-	lc, err := r.loadConfigCached()
+	lc, err := r.loadConfig()
 	if err != nil {
 		return nil, err
 	}
