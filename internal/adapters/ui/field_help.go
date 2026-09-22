@@ -256,6 +256,14 @@ var fieldHelpData = map[string]FieldHelp{
 		Default:     "yes",
 		Category:    "Authentication",
 	},
+	"Password": {
+		Field:       "Password",
+		Description: "Server password for automated login via sshpass.",
+		Syntax:      "<password>",
+		Examples:    []string{"secretpassword"},
+		Default:     "",
+		Category:    "Authentication",
+	},
 	"PreferredAuthentications": {
 		Field:       "PreferredAuthentications",
 		Description: "Order of authentication methods to try.",

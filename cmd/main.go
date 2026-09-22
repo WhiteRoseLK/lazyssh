@@ -51,6 +51,7 @@ var (
 	sshfsFlag         string
 	preConnectFlag    string
 	defaultKeyFlag    string
+	passwordFlag      string
 
 	rootCmd = newRootCmd()
 )
@@ -63,6 +64,7 @@ type rootOptions struct {
 	theme      string
 	lang       string
 	defKey     string
+	password   string
 }
 
 func parseRootOptions(cmd *cobra.Command, args []string) rootOptions {
@@ -110,6 +112,11 @@ func parseRootOptions(cmd *cobra.Command, args []string) rootOptions {
 		defKey = dk
 	}
 
+	password := passwordFlag
+	if p, err := cmd.Flags().GetString("password"); err == nil && p != "" {
+		password = p
+	}
+
 	return rootOptions{
 		isReadonly: isReadonly,
 		filter:     filter,
@@ -118,6 +125,7 @@ func parseRootOptions(cmd *cobra.Command, args []string) rootOptions {
 		theme:      theme,
 		lang:       lang,
 		defKey:     defKey,
+		password:   password,
 	}
 }
 
@@ -128,6 +136,9 @@ func newRootCmd() *cobra.Command {
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts := parseRootOptions(cmd, args)
+			if opts.password != "" {
+				_ = os.Setenv("NEOSSH_PASSWORD", opts.password)
+			}
 
 			log, err := logger.New("NEOSSH")
 			if err != nil {
@@ -263,6 +274,9 @@ func newRootCmd() *cobra.Command {
 	)
 	cmd.PersistentFlags().StringVar(
 		&defaultKeyFlag, "default-key", "", "get or set default SSH identity key for new servers",
+	)
+	cmd.PersistentFlags().StringVarP(
+		&passwordFlag, "password", "P", "", "password for automated sshpass authentication",
 	)
 
 	cmd.SilenceUsage = true

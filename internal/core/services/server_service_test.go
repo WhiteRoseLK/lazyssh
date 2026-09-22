@@ -814,3 +814,146 @@ func TestServerService_DefaultIdentityKey(t *testing.T) {
 		t.Errorf("expected '/env/key2', got %q", key)
 	}
 }
+
+func TestServerServiceSSH_PasswordAuthentication(t *testing.T) {
+	repo := &mockServerRepository{
+		servers: []domain.Server{
+			{
+				Alias:    "legacy-pwd",
+				Host:     "192.168.1.50",
+				Port:     22,
+				Password: "supersecretpassword",
+			},
+			{
+				Alias: "normal-server",
+				Host:  "192.168.1.51",
+				Port:  22,
+			},
+		},
+	}
+
+	// 1. Password configured, but sshpass is not found in PATH
+	svcMissingSSHPass := &serverService{
+		logger:           zap.NewNop().Sugar(),
+		serverRepository: repo,
+		lookPath: func(file string) (string, error) {
+			if file == "sshpass" {
+				return "", errors.New("executable file not found in $PATH")
+			}
+			return exec.LookPath(file)
+		},
+		newSSHCommand: helperCommandFactory("success"),
+	}
+
+	err := svcMissingSSHPass.SSH("legacy-pwd")
+	if err == nil {
+		t.Fatal("expected error when sshpass is missing, got nil")
+	}
+	if !strings.Contains(err.Error(), "sshpass") || !strings.Contains(err.Error(), "not installed in PATH") {
+		t.Fatalf("unexpected error message: %v", err)
+	}
+
+	// 2. Password configured, and sshpass is available
+	var invokedSSHPassCmd *exec.Cmd
+	var capturedPwd string
+	var capturedSSHPassPath string
+
+	svcWithSSHPass := &serverService{
+		logger:           zap.NewNop().Sugar(),
+		serverRepository: repo,
+		lookPath: func(file string) (string, error) {
+			if file == "sshpass" {
+				return "/usr/bin/sshpass", nil
+			}
+			return exec.LookPath(file)
+		},
+		newSSHCommand: helperCommandFactory("success"),
+		newSSHPassCommand: func(sshpassPath, pwd string, sshCmd *exec.Cmd) *exec.Cmd {
+			capturedSSHPassPath = sshpassPath
+			capturedPwd = pwd
+			cs := []string{"-test.run=TestHelperProcess", "--", "success", "legacy-pwd"}
+			cmd := exec.Command(os.Args[0], cs...)
+			cmd.Env = append(os.Environ(), "GO_WANT_HELPER_PROCESS=1", "SSHPASS="+pwd)
+			invokedSSHPassCmd = cmd
+			return cmd
+		},
+	}
+
+	err = svcWithSSHPass.SSH("legacy-pwd")
+	if err != nil {
+		t.Fatalf("expected nil error on success, got %v", err)
+	}
+	if capturedSSHPassPath != "/usr/bin/sshpass" {
+		t.Errorf("expected sshpassPath '/usr/bin/sshpass', got %q", capturedSSHPassPath)
+	}
+	if capturedPwd != "supersecretpassword" {
+		t.Errorf("expected capturedPwd 'supersecretpassword', got %q", capturedPwd)
+	}
+	if invokedSSHPassCmd == nil {
+		t.Fatal("expected invokedSSHPassCmd to be set")
+	}
+	hasSSHPASS := false
+	for _, env := range invokedSSHPassCmd.Env {
+		if env == "SSHPASS=supersecretpassword" {
+			hasSSHPASS = true
+			break
+		}
+	}
+	if !hasSSHPASS {
+		t.Errorf("expected SSHPASS in cmd.Env")
+	}
+
+	// 3. Normal server without password does not call newSSHPassCommand
+	calledSSHPass := false
+	svcNormal := &serverService{
+		logger:           zap.NewNop().Sugar(),
+		serverRepository: repo,
+		newSSHCommand:    helperCommandFactory("success"),
+		newSSHPassCommand: func(sshpassPath, pwd string, sshCmd *exec.Cmd) *exec.Cmd {
+			calledSSHPass = true
+			return sshCmd
+		},
+	}
+
+	err = svcNormal.SSH("normal-server")
+	if err != nil {
+		t.Fatalf("expected nil error for normal server, got %v", err)
+	}
+	if calledSSHPass {
+		t.Errorf("expected newSSHPassCommand not to be called for server without password")
+	}
+
+	// 4. SSHWithArgs with password and sshpass
+	capturedWithArgs := false
+	svcWithArgs := &serverService{
+		logger:           zap.NewNop().Sugar(),
+		serverRepository: repo,
+		lookPath: func(file string) (string, error) {
+			if file == "sshpass" {
+				return "/usr/bin/sshpass", nil
+			}
+			return exec.LookPath(file)
+		},
+		newSSHCommandWithArgs: func(alias string, extra []string) *exec.Cmd {
+			cs := []string{"-test.run=TestHelperProcess", "--", "success", alias}
+			cmd := exec.Command(os.Args[0], cs...)
+			cmd.Env = append(os.Environ(), "GO_WANT_HELPER_PROCESS=1")
+			return cmd
+		},
+		newSSHPassCommand: func(sshpassPath, pwd string, sshCmd *exec.Cmd) *exec.Cmd {
+			capturedWithArgs = true
+			cs := []string{"-test.run=TestHelperProcess", "--", "success", "legacy-pwd"}
+			cmd := exec.Command(os.Args[0], cs...)
+			cmd.Env = append(os.Environ(), "GO_WANT_HELPER_PROCESS=1", "SSHPASS="+pwd)
+			return cmd
+		},
+	}
+
+	err = svcWithArgs.SSHWithArgs("legacy-pwd", []string{"-v"})
+	if err != nil {
+		t.Fatalf("expected nil error on SSHWithArgs, got %v", err)
+	}
+	if !capturedWithArgs {
+		t.Errorf("expected newSSHPassCommand to be called for SSHWithArgs with password")
+	}
+}
