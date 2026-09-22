@@ -264,6 +264,7 @@ func (sd *ServerDetails) UpdateServer(server domain.Server) {
 				{"PubkeyAuthentication", server.PubkeyAuthentication},
 				{"PubkeyAcceptedAlgorithms", server.PubkeyAcceptedAlgorithms},
 				{"HostbasedAcceptedAlgorithms", server.HostbasedAcceptedAlgorithms},
+				{"Password (sshpass)", maskedPassword(server.Password)},
 				{"PasswordAuthentication", server.PasswordAuthentication},
 				{"PreferredAuthentications", server.PreferredAuthentications},
 				{"IdentitiesOnly", server.IdentitiesOnly},
@@ -367,4 +368,11 @@ func (sd *ServerDetails) OnBacktab(fn func()) *ServerDetails {
 func (sd *ServerDetails) OnEscape(fn func()) *ServerDetails {
 	sd.onEscape = fn
 	return sd
+}
+
+func maskedPassword(p string) string {
+	if p == "" {
+		return ""
+	}
+	return "••••••••"
 }

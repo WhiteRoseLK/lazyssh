@@ -75,6 +75,7 @@ type Server struct {
 	AddKeysToAgent string
 	IdentityAgent  string
 	// Password & Interactive
+	Password                     string
 	PasswordAuthentication       string
 	KbdInteractiveAuthentication string // yes, no
 	NumberOfPasswordPrompts      string

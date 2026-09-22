@@ -715,3 +715,28 @@ func TestHandleDefaultKeyFlag(t *testing.T) {
 		t.Errorf("expected defaultKey=%q, got %q", "~/.ssh/new_key", svc.defaultKey)
 	}
 }
+
+func TestRootCmd_PasswordFlag(t *testing.T) {
+	cmd := newRootCmd()
+	flag := cmd.PersistentFlags().Lookup("password")
+	if flag == nil {
+		t.Fatal("expected persistent flag --password to exist")
+	}
+	if flag.Shorthand != "P" {
+		t.Errorf("expected shorthand 'P', got %q", flag.Shorthand)
+	}
+
+	opts := parseRootOptions(cmd, []string{})
+	if opts.password != "" {
+		t.Errorf("expected empty password by default, got %q", opts.password)
+	}
+
+	cmd = newRootCmd()
+	if err := cmd.ParseFlags([]string{"-P", "secret123"}); err != nil {
+		t.Fatalf("failed to parse flags: %v", err)
+	}
+	opts = parseRootOptions(cmd, []string{})
+	if opts.password != "secret123" {
+		t.Errorf("expected password 'secret123', got %q", opts.password)
+	}
+}

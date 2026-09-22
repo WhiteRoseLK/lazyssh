@@ -40,6 +40,7 @@ type ServerMetadata struct {
 	Hidden            bool     `json:"hidden,omitempty"`
 	SSHCount          int      `json:"ssh_count,omitempty"`
 	PreConnectCommand string   `json:"pre_connect_command,omitempty"`
+	Password          string   `json:"password,omitempty"`
 	// File is the absolute path of the SSH config file neossh should
 	// write to when editing or deleting this host. Populated lazily on
 	// the first successful write and used to suppress the ambiguity
@@ -201,6 +202,7 @@ func (m *metadataManager) updateServer(server domain.Server, oldAlias string) er
 	}
 
 	merged.PreConnectCommand = server.PreConnectCommand
+	merged.Password = server.Password
 
 	metadata[server.Alias] = merged
 	return m.saveAll(metadata)

@@ -288,3 +288,34 @@ func extractHostPreConnectCommand(host *ssh_config.Host) string {
 	}
 	return ""
 }
+
+var passwordCommentRegex = regexp.MustCompile(
+	`(?i)(?:^|[\s#;|,(\[])(?:password|pass)\s*[:=]\s*([^#;\r\n]+)`,
+)
+
+func extractPasswordFromComment(comment string) string {
+	match := passwordCommentRegex.FindStringSubmatch(comment)
+	if len(match) >= 2 {
+		return strings.Trim(match[1], " \t\r\n)]}\"'")
+	}
+	return ""
+}
+
+func extractHostPassword(host *ssh_config.Host) string {
+	if pwd := extractPasswordFromComment(host.EOLComment); pwd != "" {
+		return pwd
+	}
+	for _, node := range host.Nodes {
+		switch n := node.(type) {
+		case *ssh_config.Empty:
+			if pwd := extractPasswordFromComment(n.Comment); pwd != "" {
+				return pwd
+			}
+		case *ssh_config.KV:
+			if pwd := extractPasswordFromComment(n.Comment); pwd != "" {
+				return pwd
+			}
+		}
+	}
+	return ""
+}

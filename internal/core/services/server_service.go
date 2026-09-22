@@ -53,6 +53,8 @@ type serverService struct {
 	newSSHCommand         func(alias string) *exec.Cmd
 	newSSHCommandWithArgs func(alias string, extraArgs []string) *exec.Cmd
 	newHookCommand        func(cmdStr string) *exec.Cmd
+	newSSHPassCommand     func(sshpassPath, pwd string, sshCmd *exec.Cmd) *exec.Cmd
+	lookPath              func(file string) (string, error)
 }
 
 // ServerServiceOption allows configuring a serverService instance.
@@ -65,11 +67,31 @@ func WithReadOnly(ro bool) ServerServiceOption {
 	}
 }
 
+// WithLookPath sets the LookPath function for finding executables (useful in tests).
+func WithLookPath(lp func(string) (string, error)) ServerServiceOption {
+	return func(s *serverService) {
+		s.lookPath = lp
+	}
+}
+
 // NewServerService creates a new instance of serverService.
 func NewServerService(logger *zap.SugaredLogger, sr ports.ServerRepository, opts ...ServerServiceOption) ports.ServerService {
 	s := &serverService{
 		logger:           logger,
 		serverRepository: sr,
+		lookPath:         exec.LookPath,
+		newSSHPassCommand: func(sshpassPath, pwd string, sshCmd *exec.Cmd) *exec.Cmd {
+			args := append([]string{"-e", sshCmd.Path}, sshCmd.Args[1:]...)
+			//nolint:gosec // G204: intentional execution of sshpass with ssh arguments
+			cmd := exec.Command(sshpassPath, args...)
+			env := sshCmd.Env
+			if len(env) == 0 {
+				env = os.Environ()
+			}
+			env = append(env, "SSHPASS="+pwd)
+			cmd.Env = env
+			return cmd
+		},
 		newSSHCommand: func(alias string) *exec.Cmd {
 			//nolint:gosec // G204: intentional SSH command
 			return exec.Command("ssh", "-F", sr.GetConfigFile(), alias)
@@ -548,6 +570,54 @@ func (s *serverService) runPreConnectHook(alias string) error {
 	return nil
 }
 
+func (s *serverService) getPasswordForServer(alias string) string {
+	if pwd := os.Getenv("NEOSSH_PASSWORD"); pwd != "" {
+		return pwd
+	}
+	if pwd := os.Getenv("SSHPASS"); pwd != "" {
+		return pwd
+	}
+	servers, err := s.serverRepository.ListServers("")
+	if err != nil {
+		return ""
+	}
+	for i := range servers {
+		if strings.EqualFold(servers[i].Alias, alias) {
+			return servers[i].Password
+		}
+	}
+	return ""
+}
+
+func (s *serverService) wrapWithSSHPass(alias string, cmd *exec.Cmd) (*exec.Cmd, error) {
+	pwd := s.getPasswordForServer(alias)
+	if pwd == "" {
+		return cmd, nil
+	}
+
+	lookPath := s.lookPath
+	if lookPath == nil {
+		lookPath = exec.LookPath
+	}
+	sshpassPath, err := lookPath("sshpass")
+	if err != nil {
+		return nil, fmt.Errorf(
+			"password authentication configured for %q, but 'sshpass' is not installed in PATH: please install sshpass",
+			alias,
+		)
+	}
+
+	if s.newSSHPassCommand == nil {
+		return cmd, nil
+	}
+
+	wrapped := s.newSSHPassCommand(sshpassPath, pwd, cmd)
+	if wrapped == nil {
+		return nil, fmt.Errorf("sshpass command creation failed")
+	}
+	return wrapped, nil
+}
+
 // SSH starts an interactive SSH session to the given alias using the system's ssh client.
 func (s *serverService) SSH(alias string) error {
 	s.logger.Infow("ssh start", "alias", alias)
@@ -574,6 +644,11 @@ func (s *serverService) SSH(alias string) error {
 	if cmd == nil {
 		err := fmt.Errorf("ssh command factory returned nil")
 		s.logger.Errorw("ssh command creation failed", "alias", alias, "error", err)
+		return err
+	}
+	cmd, err := s.wrapWithSSHPass(alias, cmd)
+	if err != nil {
+		s.logger.Errorw("sshpass wrap failed", "alias", alias, "error", err)
 		return err
 	}
 	stderrBuf := newLimitedBuffer(2048)
@@ -629,6 +704,11 @@ func (s *serverService) SSHWithArgs(alias string, extraArgs []string) error {
 	if cmd == nil {
 		err := fmt.Errorf("ssh command factory returned nil")
 		s.logger.Errorw("ssh command creation failed", "alias", alias, "error", err)
+		return err
+	}
+	cmd, err := s.wrapWithSSHPass(alias, cmd)
+	if err != nil {
+		s.logger.Errorw("sshpass wrap failed", "alias", alias, "error", err)
 		return err
 	}
 	stderrBuf := newLimitedBuffer(2048)

@@ -57,6 +57,7 @@ If you are coming from **lazyssh**, here is a concrete summary of everything **n
 | **Pre-Connect Command Hooks** | Run automated local scripts/hooks (VPN bring-up, Wake-on-LAN, bastion tunnels, token refresh) before connecting. Supports token expansions (`%h`, `%p`, `%r`, `%n`), environment variables, and config comment persistence (`# pre-connect: ...`). | `--pre-connect <cmd>` / UI form |
 | **Default SSH Identity Key** | Configure a global default private key (via CLI `--default-key <path>`, Git & SSH Keys Setup dialog, or `NEOSSH_DEFAULT_KEY`), automatically prefilling the identity file on new servers while allowing manual overrides. | `--default-key <path>` / UI form |
 | **SCP Command Generator** | Generates and copies ready-to-use `scp` upload and download command templates with port, identity key, and proxy jump arguments directly to your clipboard. | <kbd>o</kbd> / `--scp <alias>` |
+| **Password Authentication (sshpass)** | Automated password delivery on connection for legacy or restricted hosts using `sshpass`, configurable via SSH config comments (`# password: ...`), the UI form, `--password` / `-P` CLI flag, or `NEOSSH_PASSWORD`. | `--password` / `-P` / UI form |
 | **SSHFS Remote Mounts** | Mount remote server filesystems locally with full SSH configuration (ports, identity files, jump proxies, auto-reconnect, and read-only flags) and copy ready-to-run mount/unmount commands. | <kbd>M</kbd> / `--sshfs <alias>` |
 | **Paste SSH Command** | Parses any SSH command from system clipboard (flags, identity keys, ports, jump hosts) into an add-server modal with intelligent alias deduction and deduplication. | <kbd>v</kbd> |
 | **Duplicate / Clone Server** | Instantly clones any existing server configuration into the Add form with automatic alias deduplication (`srv_1`, `srv_2`), eliminating manual re-typing. | <kbd>y</kbd> / <kbd>C</kbd> |
@@ -131,6 +132,7 @@ If you are coming from **lazyssh**, here is a concrete summary of everything **n
 - 🔗 Port forwarding (`LocalForward`, `RemoteForward`, `DynamicForward`).
 - 🚀 Connection multiplexing for instant subsequent connections.
 - 🔐 Advanced authentication options (public key, password, agent forwarding).
+- 🔑 Automated password authentication via `sshpass` for legacy or restricted hosts.
 - 🔒 Security settings (ciphers, MACs, key exchange algorithms).
 - 🌐 Proxy settings (`ProxyJump`, `ProxyCommand`).
 - ⚙️ Full SSH config options organized in a tabbed interface.
@@ -288,6 +290,7 @@ neossh [filter] [flags]
 | `--sshfs <alias>` | | Generate SSHFS remote mount and unmount command templates for a server alias and copy to clipboard | `""` |
 | `--pre-connect <cmd>` | | Run local hook command before SSH connect (supports `%h`, `%p`, `%r`, `%n`) | `""` |
 | `--default-key <path>` | | Get or set default SSH identity key prefilled for new server entries | `""` |
+| `--password <pwd>` | `-P` | Password for automated `sshpass` authentication | `""` |
 | `--sshconfig <path>` | | Specify custom path to SSH config file | `~/.ssh/config` |
 | `--readonly`, `--ssh-config-readonly` | `-r` | Run in read-only / viewer mode (prevents writing or modifying SSH configuration) | `false` |
 | `--exit-on-disconnect`, `--auto-exit` | `-x` | Exit `neossh` immediately after SSH session terminates (one-shot launcher) | `false` |
@@ -347,6 +350,9 @@ neossh -c my-server
 
 # Combine direct connect with exit-on-disconnect:
 neossh -c -x my-server
+
+# Connect directly with one-shot password authentication via sshpass:
+neossh -c my-server -P "secretpassword"
 
 # Open in safe read-only viewer mode (modifications disabled):
 neossh -r
@@ -454,7 +460,7 @@ Host db-primary
 
 ---
 
-### 🪝 Pre-Connect Command Hooks
+## 🪝 Pre-Connect Command Hooks
 
 `neossh` allows executing custom local commands or scripts right before connecting to an SSH host. This is particularly useful for:
 - 🛡️ Triggering corporate VPN connection scripts before dialing private IP ranges.
@@ -485,6 +491,22 @@ Hook commands support tokens and environment variables:
 - Environment variables: `NEOSSH_ALIAS`, `NEOSSH_HOST`, `NEOSSH_PORT`, `NEOSSH_USER`
 
 If the pre-connect hook command exits with a non-zero exit code, the SSH connection is safely aborted and the error output is reported.
+
+---
+
+## 🔑 Password Authentication via `sshpass`
+
+For legacy servers or restricted environments that do not support SSH public key authentication, `neossh` provides automated password authentication via `sshpass`:
+
+- **SSH Config Comment Storage**: Passwords can be stored directly within `~/.ssh/config` comments (`# password: ...` or `# pass: ...`), keeping credentials synchronized without modifying server directives:
+  ```ssh-config
+  Host legacy-switch # password: mysecretpassword
+      HostName 192.168.1.50
+      User admin
+  ```
+- **TUI Form & Masked Display**: Configure or update passwords directly in the Add/Edit Server form under `▶ Password & Interactive`. Passwords are typed and displayed with secure mask characters in the UI.
+- **Secure Process Invocation**: Uses `sshpass -e` with environment variable delivery (`SSHPASS`) rather than CLI flags, preventing passwords from leaking into system process tables (`ps aux`).
+- **One-Shot CLI Flag & Environment Variable**: Pass one-shot passwords via `--password <pwd>` (or `-P <pwd>`) or through the `NEOSSH_PASSWORD` / `SSHPASS` environment variables.
 
 ---
 
@@ -527,4 +549,5 @@ This project is licensed under the [Apache-2.0 License](LICENSE).
   - `@piRGoif` — SCP command generator modal and CLI helper
   - `@pranav79` — Configurable default identity SSH key for new servers
   - `@mas-kon` — SSHFS remote filesystem mount integration
+  - `@0xkatana` — Password authentication integration via `sshpass`
   - `@arniom`, `@leoncamel`, `@breakersun`, `@OlalalalaO`, `@manato-tajiri`, `@komapro` — Bug fixes & documentation improvements

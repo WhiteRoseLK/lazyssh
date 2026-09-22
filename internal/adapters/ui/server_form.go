@@ -1095,6 +1095,26 @@ func (sf *ServerForm) addInputFieldWithHelp(form *tview.Form, label, fieldName, 
 	return field
 }
 
+// addPasswordField adds a masked input field with help support
+func (sf *ServerForm) addPasswordField(form *tview.Form, label, fieldName, defaultValue string, width int, placeholder string) *tview.InputField {
+	field := tview.NewInputField().
+		SetLabel(label).
+		SetText(defaultValue).
+		SetFieldWidth(width).
+		SetMaskCharacter('*')
+
+	if placeholder != "" {
+		field.SetPlaceholder(placeholder)
+	}
+
+	field.SetFocusFunc(func() {
+		sf.updateHelp(fieldName)
+	})
+
+	form.AddFormItem(highlightFormItem(field))
+	return field
+}
+
 // addValidatedInputField adds an input field with real-time validation
 func (sf *ServerForm) addValidatedInputField(form *tview.Form, label, fieldName, defaultValue string, width int, placeholder string) *tview.InputField {
 	// Store the original label without color tags
@@ -1236,6 +1256,7 @@ func (sf *ServerForm) getDefaultValues() ServerFormData {
 			AddKeysToAgent: server.AddKeysToAgent,
 			IdentityAgent:  server.IdentityAgent,
 			// Password & Interactive
+			Password:                     server.Password,
 			PasswordAuthentication:       server.PasswordAuthentication,
 			KbdInteractiveAuthentication: server.KbdInteractiveAuthentication,
 			NumberOfPasswordPrompts:      server.NumberOfPasswordPrompts,
@@ -1315,6 +1336,7 @@ func (sf *ServerForm) getDefaultValues() ServerFormData {
 		GatewayPorts:        "",
 
 		// Authentication
+		Password:                     "",
 		PubkeyAuthentication:         "",
 		IdentitiesOnly:               "",
 		AddKeysToAgent:               "",
@@ -1681,6 +1703,9 @@ func (sf *ServerForm) createAuthenticationForm() {
 	// Password/Interactive authentication
 	form.AddTextView("\n[yellow]▶ Password & Interactive[-]", "", 0, 1, true, false)
 
+	// Password field for automated sshpass authentication
+	sf.addPasswordField(form, "Password:", "Password", defaultValues.Password, 30, GetFieldPlaceholder("Password"))
+
 	// PasswordAuthentication dropdown
 	passwordOptions := createOptionsWithDefault("PasswordAuthentication", []string{"", "yes", "no"})
 	passwordIndex := sf.findOptionIndex(passwordOptions, defaultValues.PasswordAuthentication)
@@ -1861,6 +1886,7 @@ type ServerFormData struct {
 	AddKeysToAgent string
 	IdentityAgent  string
 	// Password & Interactive
+	Password                     string
 	PasswordAuthentication       string
 	KbdInteractiveAuthentication string
 	NumberOfPasswordPrompts      string
@@ -1988,6 +2014,7 @@ func (sf *ServerForm) getFormData() ServerFormData {
 		AddKeysToAgent: getDropdownValue("AddKeysToAgent:"),
 		IdentityAgent:  getFieldText("IdentityAgent:"),
 		// Password & Interactive
+		Password:                     getFieldText("Password:"),
 		PasswordAuthentication:       getDropdownValue("PasswordAuthentication:"),
 		KbdInteractiveAuthentication: getDropdownValue("KbdInteractiveAuthentication:"),
 		NumberOfPasswordPrompts:      getFieldText("NumberOfPasswordPrompts:"),
@@ -2406,6 +2433,7 @@ func (sf *ServerForm) dataToServer(data ServerFormData) domain.Server {
 		AddKeysToAgent: data.AddKeysToAgent,
 		IdentityAgent:  data.IdentityAgent,
 		// Password & Interactive
+		Password:                     data.Password,
 		PasswordAuthentication:       data.PasswordAuthentication,
 		KbdInteractiveAuthentication: data.KbdInteractiveAuthentication,
 		NumberOfPasswordPrompts:      data.NumberOfPasswordPrompts,
