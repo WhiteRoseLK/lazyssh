@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"github.com/WhiteRoseLK/neossh/internal/adapters/data/ssh_config_file"
+	"github.com/WhiteRoseLK/neossh/internal/adapters/security"
 	"github.com/WhiteRoseLK/neossh/internal/adapters/ui"
 	"github.com/WhiteRoseLK/neossh/internal/core/domain"
 	"github.com/WhiteRoseLK/neossh/internal/core/ports"
@@ -48,10 +49,86 @@ var (
 	gitSSHFlag        string
 	langFlag          string
 	scpFlag           string
+	sshfsFlag         string
 	preConnectFlag    string
+	defaultKeyFlag    string
+	passwordFlag      string
 
 	rootCmd = newRootCmd()
 )
+
+type rootOptions struct {
+	isReadonly bool
+	filter     string
+	isConnect  bool
+	isImportKH bool
+	theme      string
+	lang       string
+	defKey     string
+	password   string
+}
+
+func parseRootOptions(cmd *cobra.Command, args []string) rootOptions {
+	isReadonly := sshConfigReadonly
+	if ro, err := cmd.Flags().GetBool("readonly"); err == nil && ro {
+		isReadonly = true
+	}
+	if ro, err := cmd.Flags().GetBool("ssh-config-readonly"); err == nil && ro {
+		isReadonly = true
+	}
+
+	filter := filterQuery
+	if len(args) > 0 {
+		filter = args[0]
+	}
+	if f, err := cmd.Flags().GetString("filter"); err == nil && f != "" {
+		filter = f
+	}
+
+	isConnect := connectDirectly
+	if c, err := cmd.Flags().GetBool("connect"); err == nil && c {
+		isConnect = true
+	}
+
+	isImportKH := importKnownHosts
+	if ikh, err := cmd.Flags().GetBool("import-known-hosts"); err == nil && ikh {
+		isImportKH = true
+	}
+	if kh, err := cmd.Flags().GetString("known-hosts"); err == nil && kh != "" {
+		knownHostsFile = kh
+	}
+
+	theme := themeFlag
+	if t, err := cmd.Flags().GetString("theme"); err == nil && t != "" {
+		theme = t
+	}
+
+	lang := langFlag
+	if l, err := cmd.Flags().GetString("lang"); err == nil && l != "" {
+		lang = l
+	}
+
+	defKey := defaultKeyFlag
+	if dk, err := cmd.Flags().GetString("default-key"); err == nil && cmd.Flags().Changed("default-key") {
+		defKey = dk
+	}
+
+	password := passwordFlag
+	if p, err := cmd.Flags().GetString("password"); err == nil && p != "" {
+		password = p
+	}
+
+	return rootOptions{
+		isReadonly: isReadonly,
+		filter:     filter,
+		isConnect:  isConnect,
+		isImportKH: isImportKH,
+		theme:      theme,
+		lang:       lang,
+		defKey:     defKey,
+		password:   password,
+	}
+}
 
 func newRootCmd() *cobra.Command {
 	cmd := &cobra.Command{
@@ -59,33 +136,9 @@ func newRootCmd() *cobra.Command {
 		Short: "NeoSSH server picker TUI",
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			isReadonly := sshConfigReadonly
-			if ro, err := cmd.Flags().GetBool("readonly"); err == nil && ro {
-				isReadonly = true
-			}
-			if ro, err := cmd.Flags().GetBool("ssh-config-readonly"); err == nil && ro {
-				isReadonly = true
-			}
-
-			filter := filterQuery
-			if len(args) > 0 {
-				filter = args[0]
-			}
-			if f, err := cmd.Flags().GetString("filter"); err == nil && f != "" {
-				filter = f
-			}
-
-			isConnect := connectDirectly
-			if c, err := cmd.Flags().GetBool("connect"); err == nil && c {
-				isConnect = true
-			}
-
-			isImportKH := importKnownHosts
-			if ikh, err := cmd.Flags().GetBool("import-known-hosts"); err == nil && ikh {
-				isImportKH = true
-			}
-			if kh, err := cmd.Flags().GetString("known-hosts"); err == nil && kh != "" {
-				knownHostsFile = kh
+			opts := parseRootOptions(cmd, args)
+			if opts.password != "" {
+				_ = os.Setenv("NEOSSH_PASSWORD", opts.password)
 			}
 
 			log, err := logger.New("NEOSSH")
@@ -117,11 +170,21 @@ func newRootCmd() *cobra.Command {
 			}
 
 			serverRepo := ssh_config_file.NewRepository(log, resolvedConfig, metaDataFile)
-			serverService := services.NewServerService(log, serverRepo, services.WithReadOnly(isReadonly))
+			credStore := security.NewCredentialStore(log, filepath.Dir(metaDataFile))
+			serverService := services.NewServerService(
+				log,
+				serverRepo,
+				services.WithReadOnly(opts.isReadonly),
+				services.WithCredentialStore(credStore),
+			)
 			gitService := services.NewGitService(log)
 			gitService.SetServerRepository(serverRepo)
 
-			if handled, err := handleGitSSHFlag(cmd, gitService, isReadonly); handled {
+			if handled, err := handleGitSSHFlag(cmd, gitService, opts.isReadonly); handled {
+				return err
+			}
+
+			if handled, err := handleDefaultKeyFlag(cmd, serverService, opts.isReadonly, opts.defKey); handled {
 				return err
 			}
 
@@ -129,16 +192,20 @@ func newRootCmd() *cobra.Command {
 				return handleSCPFlag(serverService, scpFlag)
 			}
 
+			if sshfsFlag != "" {
+				return handleSSHFSFlag(serverService, sshfsFlag)
+			}
+
 			if preConnectFlag != "" {
 				_ = os.Setenv("NEOSSH_PRE_CONNECT_HOOK", preConnectFlag)
 			}
 
-			if isImportKH {
-				return handleImportKnownHostsFlag(serverService, isReadonly, home, knownHostsFile)
+			if opts.isImportKH {
+				return handleImportKnownHostsFlag(serverService, opts.isReadonly, home, knownHostsFile)
 			}
 
-			if isConnect {
-				connected, err := handleDirectConnect(filter, serverService)
+			if opts.isConnect {
+				connected, err := handleDirectConnect(opts.filter, serverService)
 				if err != nil {
 					return err
 				}
@@ -148,25 +215,16 @@ func newRootCmd() *cobra.Command {
 				// If multiple matches without exact match, launch interactive TUI pre-filtered so user can choose
 			}
 
-			theme := themeFlag
-			if t, err := cmd.Flags().GetString("theme"); err == nil && t != "" {
-				theme = t
-			}
-
-			lang := langFlag
-			if l, err := cmd.Flags().GetString("lang"); err == nil && l != "" {
-				lang = l
-			}
-
 			tui := ui.NewTUI(log, serverService, version, gitCommit, ui.Config{
-				ExitOnDisconnect: exitOnDisconnect,
-				ReadOnly:         isReadonly,
-				InitialFilter:    filter,
-				ShowHidden:       showHidden,
-				Theme:            theme,
-				Language:         lang,
-				ServerRepo:       serverRepo,
-				GitService:       gitService,
+				ExitOnDisconnect:   exitOnDisconnect,
+				ReadOnly:           opts.isReadonly,
+				InitialFilter:      opts.filter,
+				ShowHidden:         showHidden,
+				Theme:              opts.theme,
+				Language:           opts.lang,
+				DefaultIdentityKey: opts.defKey,
+				ServerRepo:         serverRepo,
+				GitService:         gitService,
 			})
 
 			return tui.Run()
@@ -216,7 +274,16 @@ func newRootCmd() *cobra.Command {
 		&scpFlag, "scp", "", "generate SCP command templates for server alias (e.g. --scp myserver)",
 	)
 	cmd.PersistentFlags().StringVar(
+		&sshfsFlag, "sshfs", "", "generate SSHFS remote mount command for server alias (e.g. --sshfs myserver)",
+	)
+	cmd.PersistentFlags().StringVar(
 		&preConnectFlag, "pre-connect", "", "run local hook command before SSH connect (supports %h, %p, %r, %n)",
+	)
+	cmd.PersistentFlags().StringVar(
+		&defaultKeyFlag, "default-key", "", "get or set default SSH identity key for new servers",
+	)
+	cmd.PersistentFlags().StringVarP(
+		&passwordFlag, "password", "P", "", "password for automated sshpass authentication",
 	)
 
 	cmd.SilenceUsage = true
@@ -420,6 +487,75 @@ func handleSCPFlag(serverService ports.ServerService, alias string) error {
 		fmt.Println("\n✓ Copied default upload command to system clipboard.")
 	}
 	return nil
+}
+
+func handleSSHFSFlag(serverService ports.ServerService, alias string) error {
+	servers, err := serverService.ListServers("")
+	if err != nil {
+		return fmt.Errorf("failed to list servers: %w", err)
+	}
+
+	var found *domain.Server
+	for i := range servers {
+		if strings.EqualFold(servers[i].Alias, alias) {
+			found = &servers[i]
+			break
+		}
+	}
+
+	if found == nil {
+		return fmt.Errorf("server alias %q not found", alias)
+	}
+
+	mountPoint := fmt.Sprintf("~/mounts/%s", found.Alias)
+	mountCmd := ui.BuildSSHFSCommand(*found, "/", mountPoint, false, true, false)
+	aliasMountCmd := ui.BuildSSHFSCommand(*found, "/", mountPoint, false, true, true)
+	roMountCmd := ui.BuildSSHFSCommand(*found, "/", mountPoint, true, true, false)
+	unmountCmd := ui.BuildSSHFSUnmountCommand(mountPoint)
+
+	fmt.Printf("SSHFS Remote Mount Commands for [%s]:\n\n", found.Alias)
+	fmt.Printf("• Mount Remote Root (Full Config):\n  %s\n\n", mountCmd)
+	fmt.Printf("• Mount via SSH Config Alias:\n  %s\n\n", aliasMountCmd)
+	fmt.Printf("• Mount Read-Only:\n  %s\n\n", roMountCmd)
+	fmt.Printf("• Unmount Remote Filesystem:\n  %s\n", unmountCmd)
+
+	if err := clipboard.WriteAll(mountCmd); err == nil {
+		fmt.Println("\n✓ Copied default mount command to system clipboard.")
+	}
+	return nil
+}
+
+func handleDefaultKeyFlag(
+	cmd *cobra.Command, serverService ports.ServerService, isReadonly bool, key string,
+) (bool, error) {
+	if !cmd.Flags().Changed("default-key") {
+		return false, nil
+	}
+
+	trimmed := strings.TrimSpace(key)
+	if trimmed == "" {
+		current, err := serverService.GetDefaultIdentityKey()
+		if err != nil {
+			return true, fmt.Errorf("failed to get default identity key: %w", err)
+		}
+		if current == "" {
+			fmt.Println("No default SSH identity key configured.")
+		} else {
+			fmt.Printf("Current default SSH identity key: %s\n", current)
+		}
+		return true, nil
+	}
+
+	if isReadonly {
+		return true, fmt.Errorf("cannot configure default identity key in read-only mode")
+	}
+
+	if err := serverService.SaveDefaultIdentityKey(trimmed); err != nil {
+		return true, fmt.Errorf("failed to save default identity key: %w", err)
+	}
+
+	fmt.Printf("Successfully set default SSH identity key: %s\n", trimmed)
+	return true, nil
 }
 
 func main() {

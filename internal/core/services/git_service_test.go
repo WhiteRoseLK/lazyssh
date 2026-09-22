@@ -49,6 +49,8 @@ func (m *mockServerRepo) GetTheme() (string, error)              { return "", ni
 func (m *mockServerRepo) SaveTheme(theme string) error           { return nil }
 func (m *mockServerRepo) GetPreConnectCommand() (string, error)  { return "", nil }
 func (m *mockServerRepo) SavePreConnectCommand(cmd string) error { return nil }
+func (m *mockServerRepo) GetDefaultIdentityKey() (string, error) { return "", nil }
+func (m *mockServerRepo) SaveDefaultIdentityKey(_ string) error  { return nil }
 
 func TestGitService_IsGitRepository(t *testing.T) {
 	logger := zap.NewNop().Sugar()

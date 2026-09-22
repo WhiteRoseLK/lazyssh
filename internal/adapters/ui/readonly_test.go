@@ -119,6 +119,14 @@ func (m *mockReadOnlyService) ResolveConfigServer(server domain.Server) (domain.
 	return server, true, nil
 }
 
+func (m *mockReadOnlyService) GetDefaultIdentityKey() (string, error) {
+	return "", nil
+}
+
+func (m *mockReadOnlyService) SaveDefaultIdentityKey(string) error {
+	return nil
+}
+
 func TestTUI_ReadOnlyState(t *testing.T) {
 	logger := zap.NewNop().Sugar()
 	mockSvc := &mockReadOnlyService{}

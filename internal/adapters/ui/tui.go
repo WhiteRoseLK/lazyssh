@@ -34,14 +34,15 @@ type App interface {
 
 // Config holds configuration options for the TUI application.
 type Config struct {
-	ExitOnDisconnect bool
-	ReadOnly         bool
-	InitialFilter    string
-	ShowHidden       bool
-	Theme            string
-	Language         string
-	ServerRepo       ports.ServerRepository
-	GitService       ports.GitService
+	ExitOnDisconnect   bool
+	ReadOnly           bool
+	InitialFilter      string
+	ShowHidden         bool
+	Theme              string
+	Language           string
+	DefaultIdentityKey string
+	ServerRepo         ports.ServerRepository
+	GitService         ports.GitService
 }
 
 type tui struct {
@@ -68,14 +69,15 @@ type tui struct {
 	left    *tview.Flex
 	content *tview.Flex
 
-	sortMode         SortMode
-	themeWatcher     *ThemeWatcher
-	pingStatuses     map[string]domain.Server
-	exitOnDisconnect bool
-	initialFilter    string
-	showHidden       bool
-	themeFlag        string
-	language         string
+	sortMode           SortMode
+	themeWatcher       *ThemeWatcher
+	pingStatuses       map[string]domain.Server
+	exitOnDisconnect   bool
+	initialFilter      string
+	showHidden         bool
+	themeFlag          string
+	language           string
+	defaultIdentityKey string
 }
 
 func NewTUI(logger *zap.SugaredLogger, ss ports.ServerService, version, commit string, cfg ...Config) App {
@@ -85,6 +87,7 @@ func NewTUI(logger *zap.SugaredLogger, ss ports.ServerService, version, commit s
 	var showHidden bool
 	var themeFlag string
 	var language string
+	var defaultIdentityKey string
 	var serverRepo ports.ServerRepository
 	var gitService ports.GitService
 	if len(cfg) > 0 {
@@ -94,26 +97,45 @@ func NewTUI(logger *zap.SugaredLogger, ss ports.ServerService, version, commit s
 		showHidden = cfg[0].ShowHidden
 		themeFlag = cfg[0].Theme
 		language = cfg[0].Language
+		defaultIdentityKey = cfg[0].DefaultIdentityKey
 		serverRepo = cfg[0].ServerRepo
 		gitService = cfg[0].GitService
 	}
 	return &tui{
-		logger:           logger,
-		app:              tview.NewApplication(),
-		serverService:    ss,
-		serverRepo:       serverRepo,
-		gitService:       gitService,
-		version:          version,
-		commit:           commit,
-		readonly:         readonly,
-		settings:         newSettingsManager(logger),
-		pingStatuses:     make(map[string]domain.Server),
-		exitOnDisconnect: exitOnDisconnect,
-		initialFilter:    initialFilter,
-		showHidden:       showHidden,
-		themeFlag:        themeFlag,
-		language:         language,
+		logger:             logger,
+		app:                tview.NewApplication(),
+		serverService:      ss,
+		serverRepo:         serverRepo,
+		gitService:         gitService,
+		version:            version,
+		commit:             commit,
+		readonly:           readonly,
+		settings:           newSettingsManager(logger),
+		pingStatuses:       make(map[string]domain.Server),
+		exitOnDisconnect:   exitOnDisconnect,
+		initialFilter:      initialFilter,
+		showHidden:         showHidden,
+		themeFlag:          themeFlag,
+		language:           language,
+		defaultIdentityKey: defaultIdentityKey,
 	}
+}
+
+func (t *tui) getDefaultIdentityKey() string {
+	if t.defaultIdentityKey != "" {
+		return t.defaultIdentityKey
+	}
+	if t.serverService != nil {
+		if key, err := t.serverService.GetDefaultIdentityKey(); err == nil && key != "" {
+			return key
+		}
+	}
+	if t.settings != nil {
+		if key, err := t.settings.LoadDefaultIdentityKey(); err == nil && key != "" {
+			return key
+		}
+	}
+	return ""
 }
 
 func (t *tui) ShowHidden() bool {

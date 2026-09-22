@@ -397,6 +397,83 @@ func BuildSCPDownloadCommand(s domain.Server, remotePath, localPath string, recu
 	return BuildSCPCommand(s, false, localPath, remotePath, recursive, useAlias)
 }
 
+// BuildSSHFSCommand constructs an sshfs mount command for the given server.
+func BuildSSHFSCommand(
+	s domain.Server, remotePath, localMountPoint string, readOnly, reconnect, useAlias bool,
+) string {
+	if remotePath == "" {
+		remotePath = "/"
+	}
+	if localMountPoint == "" {
+		name := s.Alias
+		if name == "" {
+			name = s.Host
+		}
+		if name == "" {
+			name = "remote"
+		}
+		localMountPoint = fmt.Sprintf("~/mounts/%s", name)
+	}
+
+	parts := []string{"sshfs"}
+
+	var target string
+	if useAlias && s.Alias != "" {
+		target = s.Alias
+	} else {
+		// Port option: sshfs uses -p
+		if s.Port != 0 && s.Port != 22 {
+			parts = append(parts, "-p", fmt.Sprintf("%d", s.Port))
+		}
+
+		// Identity file options
+		for _, keyFile := range s.IdentityFiles {
+			if keyFile != "" {
+				parts = append(parts, "-o", fmt.Sprintf("IdentityFile=%s", quoteIfNeeded(keyFile)))
+			}
+		}
+
+		// ProxyJump option
+		if s.ProxyJump != "" {
+			parts = append(parts, "-o", fmt.Sprintf("ProxyJump=%s", quoteIfNeeded(s.ProxyJump)))
+		}
+
+		// Target specification
+		switch {
+		case s.User != "" && s.Host != "":
+			target = fmt.Sprintf("%s@%s", s.User, s.Host)
+		case s.Host != "":
+			target = s.Host
+		default:
+			target = s.Alias
+		}
+	}
+
+	if reconnect {
+		parts = append(parts, "-o", "reconnect")
+	}
+	if readOnly {
+		parts = append(parts, "-o", "ro")
+	}
+
+	remoteTarget := fmt.Sprintf("%s:%s", target, remotePath)
+	if strings.ContainsAny(remotePath, " \t") {
+		remoteTarget = fmt.Sprintf("%s:%q", target, remotePath)
+	}
+
+	parts = append(parts, remoteTarget, quoteIfNeeded(localMountPoint))
+	return strings.Join(parts, " ")
+}
+
+// BuildSSHFSUnmountCommand returns the recommended unmount command for the given mount point.
+func BuildSSHFSUnmountCommand(localMountPoint string) string {
+	if localMountPoint == "" {
+		localMountPoint = "~/mounts/remote"
+	}
+	return fmt.Sprintf("fusermount3 -u %s || umount %s",
+		quoteIfNeeded(localMountPoint), quoteIfNeeded(localMountPoint))
+}
+
 // addOption adds an SSH option in the format "-o Key=Value" if value is not empty
 func addOption(parts *[]string, key, value string) {
 	if value != "" {

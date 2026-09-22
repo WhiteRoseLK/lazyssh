@@ -41,6 +41,8 @@ type ServerService interface {
 	ListActiveSessions(query string) ([]domain.Server, error)
 	KillActiveSessions(server domain.Server) (int, error)
 	ResolveConfigServer(server domain.Server) (domain.Server, bool, error)
+	GetDefaultIdentityKey() (string, error)
+	SaveDefaultIdentityKey(key string) error
 }
 
 // GitService provides Git and SSH key management operations.

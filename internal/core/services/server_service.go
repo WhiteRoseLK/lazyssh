@@ -44,6 +44,7 @@ var ErrReadOnly = errors.New("readonly mode: SSH configuration modifications are
 
 type serverService struct {
 	serverRepository ports.ServerRepository
+	credentialStore  ports.CredentialStore
 	logger           *zap.SugaredLogger
 	readonly         bool
 
@@ -53,6 +54,8 @@ type serverService struct {
 	newSSHCommand         func(alias string) *exec.Cmd
 	newSSHCommandWithArgs func(alias string, extraArgs []string) *exec.Cmd
 	newHookCommand        func(cmdStr string) *exec.Cmd
+	newSSHPassCommand     func(sshpassPath, pwd string, sshCmd *exec.Cmd) *exec.Cmd
+	lookPath              func(file string) (string, error)
 }
 
 // ServerServiceOption allows configuring a serverService instance.
@@ -65,11 +68,38 @@ func WithReadOnly(ro bool) ServerServiceOption {
 	}
 }
 
+// WithCredentialStore sets the credential store for secure password management.
+func WithCredentialStore(cs ports.CredentialStore) ServerServiceOption {
+	return func(s *serverService) {
+		s.credentialStore = cs
+	}
+}
+
+// WithLookPath sets the LookPath function for finding executables (useful in tests).
+func WithLookPath(lp func(string) (string, error)) ServerServiceOption {
+	return func(s *serverService) {
+		s.lookPath = lp
+	}
+}
+
 // NewServerService creates a new instance of serverService.
 func NewServerService(logger *zap.SugaredLogger, sr ports.ServerRepository, opts ...ServerServiceOption) ports.ServerService {
 	s := &serverService{
 		logger:           logger,
 		serverRepository: sr,
+		lookPath:         exec.LookPath,
+		newSSHPassCommand: func(sshpassPath, pwd string, sshCmd *exec.Cmd) *exec.Cmd {
+			args := append([]string{"-e", sshCmd.Path}, sshCmd.Args[1:]...)
+			//nolint:gosec // G204: intentional execution of sshpass with ssh arguments
+			cmd := exec.Command(sshpassPath, args...)
+			env := sshCmd.Env
+			if len(env) == 0 {
+				env = os.Environ()
+			}
+			env = append(env, "SSHPASS="+pwd)
+			cmd.Env = env
+			return cmd
+		},
 		newSSHCommand: func(alias string) *exec.Cmd {
 			//nolint:gosec // G204: intentional SSH command
 			return exec.Command("ssh", "-F", sr.GetConfigFile(), alias)
@@ -122,6 +152,7 @@ func (s *serverService) ListServers(query string) ([]domain.Server, error) {
 			}
 			return servers[i].Alias < servers[j].Alias
 		})
+		s.enrichServersWithCredentials(servers)
 		return servers, nil
 	}
 
@@ -170,7 +201,19 @@ func (s *serverService) ListServers(query string) ([]domain.Server, error) {
 	for _, r := range results {
 		out = append(out, r.srv)
 	}
+	s.enrichServersWithCredentials(out)
 	return out, nil
+}
+
+func (s *serverService) enrichServersWithCredentials(servers []domain.Server) {
+	if s.credentialStore == nil {
+		return
+	}
+	for i := range servers {
+		if pwd, err := s.credentialStore.GetPassword(servers[i].Alias); err == nil && pwd != "" {
+			servers[i].Password = pwd
+		}
+	}
 }
 
 func computeServerScore(srv domain.Server, q string) int {
@@ -350,8 +393,19 @@ func (s *serverService) UpdateServer(server domain.Server, newServer domain.Serv
 	err := s.serverRepository.UpdateServer(server, newServer)
 	if err != nil {
 		s.logger.Errorw("failed to update server", "error", err, "server", server)
+		return err
 	}
-	return err
+	if s.credentialStore != nil {
+		if newServer.Password != "" {
+			_ = s.credentialStore.SetPassword(newServer.Alias, newServer.Password)
+		} else if server.Password != "" {
+			_ = s.credentialStore.DeletePassword(server.Alias)
+		}
+		if newServer.Alias != server.Alias && server.Password != "" {
+			_ = s.credentialStore.DeletePassword(server.Alias)
+		}
+	}
+	return nil
 }
 
 // AddServer adds a new server to the repository.
@@ -366,8 +420,12 @@ func (s *serverService) AddServer(server domain.Server) error {
 	err := s.serverRepository.AddServer(server)
 	if err != nil {
 		s.logger.Errorw("failed to add server", "error", err, "server", server)
+		return err
 	}
-	return err
+	if s.credentialStore != nil && server.Password != "" {
+		_ = s.credentialStore.SetPassword(server.Alias, server.Password)
+	}
+	return nil
 }
 
 // DeleteServer removes a server from the repository.
@@ -378,8 +436,12 @@ func (s *serverService) DeleteServer(server domain.Server) error {
 	err := s.serverRepository.DeleteServer(server)
 	if err != nil {
 		s.logger.Errorw("failed to delete server", "error", err, "server", server)
+		return err
 	}
-	return err
+	if s.credentialStore != nil {
+		_ = s.credentialStore.DeletePassword(server.Alias)
+	}
+	return nil
 }
 
 // SetPinned sets or clears a pin timestamp for the server alias.
@@ -548,6 +610,59 @@ func (s *serverService) runPreConnectHook(alias string) error {
 	return nil
 }
 
+func (s *serverService) getPasswordForServer(alias string) string {
+	if pwd := os.Getenv("NEOSSH_PASSWORD"); pwd != "" {
+		return pwd
+	}
+	if pwd := os.Getenv("SSHPASS"); pwd != "" {
+		return pwd
+	}
+	if s.credentialStore != nil {
+		if pwd, err := s.credentialStore.GetPassword(alias); err == nil && pwd != "" {
+			return pwd
+		}
+	}
+	servers, err := s.serverRepository.ListServers("")
+	if err != nil {
+		return ""
+	}
+	for i := range servers {
+		if strings.EqualFold(servers[i].Alias, alias) {
+			return servers[i].Password
+		}
+	}
+	return ""
+}
+
+func (s *serverService) wrapWithSSHPass(alias string, cmd *exec.Cmd) (*exec.Cmd, error) {
+	pwd := s.getPasswordForServer(alias)
+	if pwd == "" {
+		return cmd, nil
+	}
+
+	lookPath := s.lookPath
+	if lookPath == nil {
+		lookPath = exec.LookPath
+	}
+	sshpassPath, err := lookPath("sshpass")
+	if err != nil {
+		return nil, fmt.Errorf(
+			"password authentication configured for %q, but 'sshpass' is not installed in PATH: please install sshpass",
+			alias,
+		)
+	}
+
+	if s.newSSHPassCommand == nil {
+		return cmd, nil
+	}
+
+	wrapped := s.newSSHPassCommand(sshpassPath, pwd, cmd)
+	if wrapped == nil {
+		return nil, fmt.Errorf("sshpass command creation failed")
+	}
+	return wrapped, nil
+}
+
 // SSH starts an interactive SSH session to the given alias using the system's ssh client.
 func (s *serverService) SSH(alias string) error {
 	s.logger.Infow("ssh start", "alias", alias)
@@ -574,6 +689,11 @@ func (s *serverService) SSH(alias string) error {
 	if cmd == nil {
 		err := fmt.Errorf("ssh command factory returned nil")
 		s.logger.Errorw("ssh command creation failed", "alias", alias, "error", err)
+		return err
+	}
+	cmd, err := s.wrapWithSSHPass(alias, cmd)
+	if err != nil {
+		s.logger.Errorw("sshpass wrap failed", "alias", alias, "error", err)
 		return err
 	}
 	stderrBuf := newLimitedBuffer(2048)
@@ -629,6 +749,11 @@ func (s *serverService) SSHWithArgs(alias string, extraArgs []string) error {
 	if cmd == nil {
 		err := fmt.Errorf("ssh command factory returned nil")
 		s.logger.Errorw("ssh command creation failed", "alias", alias, "error", err)
+		return err
+	}
+	cmd, err := s.wrapWithSSHPass(alias, cmd)
+	if err != nil {
+		s.logger.Errorw("sshpass wrap failed", "alias", alias, "error", err)
 		return err
 	}
 	stderrBuf := newLimitedBuffer(2048)
@@ -967,6 +1092,22 @@ func (s *serverService) GetTheme() (string, error) {
 // SaveTheme saves the theme name to settings.
 func (s *serverService) SaveTheme(theme string) error {
 	return s.serverRepository.SaveTheme(theme)
+}
+
+// GetDefaultIdentityKey returns the default identity SSH key from environment or repository settings.
+func (s *serverService) GetDefaultIdentityKey() (string, error) {
+	if envKey := os.Getenv("NEOSSH_DEFAULT_KEY"); envKey != "" {
+		return envKey, nil
+	}
+	if envKey := os.Getenv("NEOSSH_DEFAULT_IDENTITY_KEY"); envKey != "" {
+		return envKey, nil
+	}
+	return s.serverRepository.GetDefaultIdentityKey()
+}
+
+// SaveDefaultIdentityKey saves the default identity SSH key to repository settings.
+func (s *serverService) SaveDefaultIdentityKey(key string) error {
+	return s.serverRepository.SaveDefaultIdentityKey(key)
 }
 
 const unknownLabel = "unknown"

@@ -34,6 +34,7 @@ type mockServerRepository struct {
 	recordCalls int
 	lastAlias   string
 	recordErr   error
+	defaultKey  string
 }
 
 func (m *mockServerRepository) ListServers(string) ([]domain.Server, error) {
@@ -69,6 +70,13 @@ func (m *mockServerRepository) SaveTheme(string) error { return nil }
 func (m *mockServerRepository) GetPreConnectCommand() (string, error) { return "", nil }
 
 func (m *mockServerRepository) SavePreConnectCommand(string) error { return nil }
+
+func (m *mockServerRepository) GetDefaultIdentityKey() (string, error) { return m.defaultKey, nil }
+
+func (m *mockServerRepository) SaveDefaultIdentityKey(k string) error {
+	m.defaultKey = k
+	return nil
+}
 
 func (m *mockServerRepository) RecordSSH(alias string) error {
 	m.recordCalls++
@@ -758,5 +766,278 @@ func TestServerService_GlobalPreConnectHook(t *testing.T) {
 	}
 	if executedCmd != "global-check.sh 10.0.0.5" {
 		t.Errorf("expected interpolated cmd 'global-check.sh 10.0.0.5', got %q", executedCmd)
+	}
+}
+
+func TestServerService_DefaultIdentityKey(t *testing.T) {
+	repo := &mockServerRepository{
+		defaultKey: "/home/user/.ssh/id_ed25519",
+	}
+	svc := NewServerService(zap.NewNop().Sugar(), repo)
+
+	// Test retrieval from repo
+	key, err := svc.GetDefaultIdentityKey()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if key != "/home/user/.ssh/id_ed25519" {
+		t.Errorf("expected '/home/user/.ssh/id_ed25519', got %q", key)
+	}
+
+	// Test saving to repo
+	newKey := "/home/user/.ssh/custom_rsa"
+	if err := svc.SaveDefaultIdentityKey(newKey); err != nil {
+		t.Fatalf("unexpected error saving key: %v", err)
+	}
+	if repo.defaultKey != newKey {
+		t.Errorf("expected repo key %q, got %q", newKey, repo.defaultKey)
+	}
+
+	// Test environment variable override NEOSSH_DEFAULT_KEY
+	t.Setenv("NEOSSH_DEFAULT_KEY", "/env/key1")
+	key, err = svc.GetDefaultIdentityKey()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if key != "/env/key1" {
+		t.Errorf("expected '/env/key1', got %q", key)
+	}
+
+	// Test environment variable override NEOSSH_DEFAULT_IDENTITY_KEY
+	t.Setenv("NEOSSH_DEFAULT_KEY", "")
+	t.Setenv("NEOSSH_DEFAULT_IDENTITY_KEY", "/env/key2")
+	key, err = svc.GetDefaultIdentityKey()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if key != "/env/key2" {
+		t.Errorf("expected '/env/key2', got %q", key)
+	}
+}
+
+func TestServerServiceSSH_PasswordAuthentication(t *testing.T) {
+	repo := &mockServerRepository{
+		servers: []domain.Server{
+			{
+				Alias:    "legacy-pwd",
+				Host:     "192.168.1.50",
+				Port:     22,
+				Password: "supersecretpassword",
+			},
+			{
+				Alias: "normal-server",
+				Host:  "192.168.1.51",
+				Port:  22,
+			},
+		},
+	}
+
+	// 1. Password configured, but sshpass is not found in PATH
+	svcMissingSSHPass := &serverService{
+		logger:           zap.NewNop().Sugar(),
+		serverRepository: repo,
+		lookPath: func(file string) (string, error) {
+			if file == "sshpass" {
+				return "", errors.New("executable file not found in $PATH")
+			}
+			return exec.LookPath(file)
+		},
+		newSSHCommand: helperCommandFactory("success"),
+	}
+
+	err := svcMissingSSHPass.SSH("legacy-pwd")
+	if err == nil {
+		t.Fatal("expected error when sshpass is missing, got nil")
+	}
+	if !strings.Contains(err.Error(), "sshpass") || !strings.Contains(err.Error(), "not installed in PATH") {
+		t.Fatalf("unexpected error message: %v", err)
+	}
+
+	// 2. Password configured, and sshpass is available
+	var invokedSSHPassCmd *exec.Cmd
+	var capturedPwd string
+	var capturedSSHPassPath string
+
+	svcWithSSHPass := &serverService{
+		logger:           zap.NewNop().Sugar(),
+		serverRepository: repo,
+		lookPath: func(file string) (string, error) {
+			if file == "sshpass" {
+				return "/usr/bin/sshpass", nil
+			}
+			return exec.LookPath(file)
+		},
+		newSSHCommand: helperCommandFactory("success"),
+		newSSHPassCommand: func(sshpassPath, pwd string, sshCmd *exec.Cmd) *exec.Cmd {
+			capturedSSHPassPath = sshpassPath
+			capturedPwd = pwd
+			cs := []string{"-test.run=TestHelperProcess", "--", "success", "legacy-pwd"}
+			cmd := exec.Command(os.Args[0], cs...)
+			cmd.Env = append(os.Environ(), "GO_WANT_HELPER_PROCESS=1", "SSHPASS="+pwd)
+			invokedSSHPassCmd = cmd
+			return cmd
+		},
+	}
+
+	err = svcWithSSHPass.SSH("legacy-pwd")
+	if err != nil {
+		t.Fatalf("expected nil error on success, got %v", err)
+	}
+	if capturedSSHPassPath != "/usr/bin/sshpass" {
+		t.Errorf("expected sshpassPath '/usr/bin/sshpass', got %q", capturedSSHPassPath)
+	}
+	if capturedPwd != "supersecretpassword" {
+		t.Errorf("expected capturedPwd 'supersecretpassword', got %q", capturedPwd)
+	}
+	if invokedSSHPassCmd == nil {
+		t.Fatal("expected invokedSSHPassCmd to be set")
+	}
+	hasSSHPASS := false
+	for _, env := range invokedSSHPassCmd.Env {
+		if env == "SSHPASS=supersecretpassword" {
+			hasSSHPASS = true
+			break
+		}
+	}
+	if !hasSSHPASS {
+		t.Errorf("expected SSHPASS in cmd.Env")
+	}
+
+	// 3. Normal server without password does not call newSSHPassCommand
+	calledSSHPass := false
+	svcNormal := &serverService{
+		logger:           zap.NewNop().Sugar(),
+		serverRepository: repo,
+		newSSHCommand:    helperCommandFactory("success"),
+		newSSHPassCommand: func(sshpassPath, pwd string, sshCmd *exec.Cmd) *exec.Cmd {
+			calledSSHPass = true
+			return sshCmd
+		},
+	}
+
+	err = svcNormal.SSH("normal-server")
+	if err != nil {
+		t.Fatalf("expected nil error for normal server, got %v", err)
+	}
+	if calledSSHPass {
+		t.Errorf("expected newSSHPassCommand not to be called for server without password")
+	}
+
+	// 4. SSHWithArgs with password and sshpass
+	capturedWithArgs := false
+	svcWithArgs := &serverService{
+		logger:           zap.NewNop().Sugar(),
+		serverRepository: repo,
+		lookPath: func(file string) (string, error) {
+			if file == "sshpass" {
+				return "/usr/bin/sshpass", nil
+			}
+			return exec.LookPath(file)
+		},
+		newSSHCommandWithArgs: func(alias string, extra []string) *exec.Cmd {
+			cs := []string{"-test.run=TestHelperProcess", "--", "success", alias}
+			cmd := exec.Command(os.Args[0], cs...)
+			cmd.Env = append(os.Environ(), "GO_WANT_HELPER_PROCESS=1")
+			return cmd
+		},
+		newSSHPassCommand: func(sshpassPath, pwd string, sshCmd *exec.Cmd) *exec.Cmd {
+			capturedWithArgs = true
+			cs := []string{"-test.run=TestHelperProcess", "--", "success", "legacy-pwd"}
+			cmd := exec.Command(os.Args[0], cs...)
+			cmd.Env = append(os.Environ(), "GO_WANT_HELPER_PROCESS=1", "SSHPASS="+pwd)
+			return cmd
+		},
+	}
+
+	err = svcWithArgs.SSHWithArgs("legacy-pwd", []string{"-v"})
+	if err != nil {
+		t.Fatalf("expected nil error on SSHWithArgs, got %v", err)
+	}
+	if !capturedWithArgs {
+		t.Errorf("expected newSSHPassCommand to be called for SSHWithArgs with password")
+	}
+}
+
+type mockCredentialStore struct {
+	passwords map[string]string
+}
+
+func newMockCredentialStore() *mockCredentialStore {
+	return &mockCredentialStore{passwords: make(map[string]string)}
+}
+
+func (m *mockCredentialStore) GetPassword(alias string) (string, error) {
+	return m.passwords[alias], nil
+}
+
+func (m *mockCredentialStore) SetPassword(alias, password string) error {
+	m.passwords[alias] = password
+	return nil
+}
+
+func (m *mockCredentialStore) DeletePassword(alias string) error {
+	delete(m.passwords, alias)
+	return nil
+}
+
+func TestServerService_CredentialStoreIntegration(t *testing.T) {
+	credStore := newMockCredentialStore()
+	repo := &mockServerRepository{
+		servers: []domain.Server{
+			{Alias: "srv-vault", Host: "10.0.0.1", Port: 22},
+		},
+	}
+
+	svc := NewServerService(
+		zap.NewNop().Sugar(),
+		repo,
+		WithCredentialStore(credStore),
+	)
+
+	// 1. Initially no password
+	servers, err := svc.ListServers("")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(servers) != 1 || servers[0].Password != "" {
+		t.Errorf("expected empty password, got %q", servers[0].Password)
+	}
+
+	// 2. AddServer with password saves to CredentialStore
+	newSrv := domain.Server{Alias: "new-srv", Host: "10.0.0.2", Port: 22, Password: "pwd123"}
+	if err := svc.AddServer(newSrv); err != nil {
+		t.Fatalf("unexpected error adding server: %v", err)
+	}
+	if credStore.passwords["new-srv"] != "pwd123" {
+		t.Errorf("expected credStore to have 'pwd123', got %q", credStore.passwords["new-srv"])
+	}
+
+	// 3. UpdateServer with new password
+	updatedSrv := newSrv
+	updatedSrv.Password = "newpwd456"
+	if err := svc.UpdateServer(newSrv, updatedSrv); err != nil {
+		t.Fatalf("unexpected error updating server: %v", err)
+	}
+	if credStore.passwords["new-srv"] != "newpwd456" {
+		t.Errorf("expected credStore to have 'newpwd456', got %q", credStore.passwords["new-srv"])
+	}
+
+	// 4. UpdateServer clearing password
+	clearedSrv := updatedSrv
+	clearedSrv.Password = ""
+	if err := svc.UpdateServer(updatedSrv, clearedSrv); err != nil {
+		t.Fatalf("unexpected error updating server: %v", err)
+	}
+	if _, exists := credStore.passwords["new-srv"]; exists {
+		t.Errorf("expected password to be removed from credStore")
+	}
+
+	// 5. DeleteServer deletes from CredentialStore
+	credStore.passwords["srv-vault"] = "storedpassword"
+	if err := svc.DeleteServer(servers[0]); err != nil {
+		t.Fatalf("unexpected error deleting server: %v", err)
+	}
+	if _, exists := credStore.passwords["srv-vault"]; exists {
+		t.Errorf("expected password to be deleted on DeleteServer")
 	}
 }

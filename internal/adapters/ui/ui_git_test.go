@@ -92,10 +92,12 @@ func (m *mockServerRepoForUI) DiscoverKnownHosts(_ string) ([]domain.Server, dom
 func (m *mockServerRepoForUI) ImportKnownHosts(_ string) (domain.ImportResult, error) {
 	return domain.ImportResult{}, nil
 }
-func (m *mockServerRepoForUI) GetTheme() (string, error)             { return "", nil }
-func (m *mockServerRepoForUI) SaveTheme(_ string) error              { return nil }
-func (m *mockServerRepoForUI) GetPreConnectCommand() (string, error) { return "", nil }
-func (m *mockServerRepoForUI) SavePreConnectCommand(_ string) error  { return nil }
+func (m *mockServerRepoForUI) GetTheme() (string, error)              { return "", nil }
+func (m *mockServerRepoForUI) SaveTheme(_ string) error               { return nil }
+func (m *mockServerRepoForUI) GetPreConnectCommand() (string, error)  { return "", nil }
+func (m *mockServerRepoForUI) SavePreConnectCommand(_ string) error   { return nil }
+func (m *mockServerRepoForUI) GetDefaultIdentityKey() (string, error) { return "", nil }
+func (m *mockServerRepoForUI) SaveDefaultIdentityKey(_ string) error  { return nil }
 
 func TestEditKeyComment(t *testing.T) {
 	app := tview.NewApplication()

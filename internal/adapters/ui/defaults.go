@@ -213,6 +213,8 @@ func GetFieldPlaceholder(fieldName string) string {
 		return "e.g., *.example.com:example.net"
 	case "PreConnectCommand":
 		return "e.g., vpn-connect.sh %h"
+	case "Password":
+		return "optional password for sshpass"
 	case "LocalCommand":
 		return "e.g., echo 'Connected to %h'"
 	case "SendEnv":

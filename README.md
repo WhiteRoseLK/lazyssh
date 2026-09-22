@@ -55,11 +55,15 @@ If you are coming from **lazyssh**, here is a concrete summary of everything **n
 | **One-Touch SSH Key Deployment** | Automatically pushes your public SSH key to the remote host using native `ssh-copy-id` directly from the TUI. | <kbd>K</kbd> |
 | **Copy SSH Command** | Copies the full SSH connection command directly to your system clipboard. | <kbd>c</kbd> |
 | **Pre-Connect Command Hooks** | Run automated local scripts/hooks (VPN bring-up, Wake-on-LAN, bastion tunnels, token refresh) before connecting. Supports token expansions (`%h`, `%p`, `%r`, `%n`), environment variables, and config comment persistence (`# pre-connect: ...`). | `--pre-connect <cmd>` / UI form |
+| **Default SSH Identity Key** | Configure a global default private key (via CLI `--default-key <path>`, Git & SSH Keys Setup dialog, or `NEOSSH_DEFAULT_KEY`), automatically prefilling the identity file on new servers while allowing manual overrides. | `--default-key <path>` / UI form |
 | **SCP Command Generator** | Generates and copies ready-to-use `scp` upload and download command templates with port, identity key, and proxy jump arguments directly to your clipboard. | <kbd>o</kbd> / `--scp <alias>` |
+| **Secure Password Auth (sshpass)** | Automated password delivery for legacy hosts using `sshpass` backed by native OS keyring (macOS Keychain, Linux Secret Service, Windows Credential Manager) or AES-256-GCM vault—never written in plain text to `~/.ssh/config` or `metadata.json`. | `--password` / `-P` / UI form |
+| **SSHFS Remote Mounts** | Mount remote server filesystems locally with full SSH configuration (ports, identity files, jump proxies, auto-reconnect, and read-only flags) and copy ready-to-run mount/unmount commands. | <kbd>M</kbd> / `--sshfs <alias>` |
 | **Paste SSH Command** | Parses any SSH command from system clipboard (flags, identity keys, ports, jump hosts) into an add-server modal with intelligent alias deduction and deduplication. | <kbd>v</kbd> |
 | **Duplicate / Clone Server** | Instantly clones any existing server configuration into the Add form with automatic alias deduplication (`srv_1`, `srv_2`), eliminating manual re-typing. | <kbd>y</kbd> / <kbd>C</kbd> |
 | **Zero-Friction Migration** | Automatically detects and migrates your favorites, tags, and connection history from `~/.lazyssh` to `~/.neossh`. | *Automatic* |
 | **Custom Config Path** | Loads any alternative SSH config file without modifying `~/.ssh/config`. | `--sshconfig <path>` |
+| **Windows Scoop Manifest** | Native Scoop package recipe allowing effortless installation and updates on Windows without administrator rights. | `scoop install ...` |
 | **Active SSH Sessions Panel** | Dedicated live panel tracking running SSH and background sessions with process inspection (PID, forwarded ports, identity keys), one-touch process termination (<kbd>K</kbd>), and instant configuration generation (<kbd>a</kbd>) directly from running connections. | <kbd>2</kbd> / <kbd>K</kbd> |
 | **Focus Borders & UI Navigation** | Distinct focus borders highlight the currently active panel (Search, Servers, Active Sessions, Details), with smooth <kbd>Tab</kbd> / <kbd>Shift+Tab</kbd> cycling across panels and form fields, active field highlights, and robust destructive confirmation dialogs. | <kbd>Tab</kbd> / <kbd>Shift+Tab</kbd> |
 | **Quick Panel Jump** | Instant focus switching between Search, Servers, Active Sessions, and Details panels using numeric keys. | <kbd>0</kbd> / <kbd>1</kbd> / <kbd>2</kbd> / <kbd>3</kbd> |
@@ -129,6 +133,7 @@ If you are coming from **lazyssh**, here is a concrete summary of everything **n
 - 🔗 Port forwarding (`LocalForward`, `RemoteForward`, `DynamicForward`).
 - 🚀 Connection multiplexing for instant subsequent connections.
 - 🔐 Advanced authentication options (public key, password, agent forwarding).
+- 🔑 Automated password authentication via `sshpass` for legacy or restricted hosts.
 - 🔒 Security settings (ciphers, MACs, key exchange algorithms).
 - 🌐 Proxy settings (`ProxyJump`, `ProxyCommand`).
 - ⚙️ Full SSH config options organized in a tabbed interface.
@@ -139,6 +144,10 @@ If you are coming from **lazyssh**, here is a concrete summary of everything **n
 - 🐙 **Git SSH key configuration & profile switcher** (<kbd>P</kbd> or <kbd>Ctrl+G</kbd>): configure per-repository or global Git SSH keys via `core.sshCommand` for GitHub, GitLab, and Bitbucket.
 - 💬 **SSH key comment editor** (<kbd>C</kbd>): inspect and directly edit public/private key comments.
 - ⚡ **SSH Agent integration** (<kbd>l</kbd> / <kbd>u</kbd>): load or unload server identity keys directly into/from `ssh-agent`.
+- 🗝️ **Configurable Default Identity Key**: designate a default SSH private key (via CLI `--default-key <path>`, Git & SSH Keys Setup dialog, or `NEOSSH_DEFAULT_KEY`), automatically prefilling new servers.
+
+### Remote Filesystem Mounts (SSHFS)
+- 📂 **SSHFS Remote Mounts** (<kbd>M</kbd>): mount remote server filesystems locally with full SSH configuration (ports, identity files, jump proxies, auto-reconnect, and read-only flags) and copy ready-to-run mount/unmount commands.
 
 ### Internationalization & Localization (i18n)
 - 🌐 Multilingual user interface with native support for English (`en`), French (`fr`), and Simplified Chinese (`zh-CN`).
@@ -171,7 +180,21 @@ brew install neossh
 
 ---
 
-### Option 2: Pre-compiled Binaries (Direct Download)
+### Option 2: Arch Linux (AUR)
+
+`neossh` is available in the Arch User Repository ([AUR/neossh](https://aur.archlinux.org/packages/neossh)):
+
+```bash
+# Using yay:
+yay -S neossh
+
+# Using paru:
+paru -S neossh
+```
+
+---
+
+### Option 3: Pre-compiled Binaries (Direct Download)
 
 Ready-to-run binaries are available for **macOS**, **Linux**, and **Windows** on the [Releases page](https://github.com/WhiteRoseLK/neossh/releases/latest).
 
@@ -190,12 +213,23 @@ sudo mv neossh /usr/local/bin/
 ```
 
 #### Windows:
-1. Download the `.zip` archive from the [Releases page](https://github.com/WhiteRoseLK/neossh/releases/latest).
-2. Extract `neossh.exe` to a folder in your `PATH` (e.g. `C:\Windows\System32` or a dedicated tools directory).
+
+- **Via Scoop (Recommended)**:
+  ```powershell
+  # Install directly via repository manifest:
+  scoop install https://raw.githubusercontent.com/WhiteRoseLK/neossh/main/scoop/neossh.json
+
+  # Or add the official scoop bucket:
+  scoop bucket add neossh https://github.com/WhiteRoseLK/scoop-bucket
+  scoop install neossh
+  ```
+- **Manual Zip Download**:
+  1. Download the `.zip` archive from the [Releases page](https://github.com/WhiteRoseLK/neossh/releases/latest).
+  2. Extract `neossh.exe` to a folder in your `PATH` (e.g. `C:\Windows\System32` or a dedicated tools directory).
 
 ---
 
-### Option 3: Go Install
+### Option 4: Go Install
 
 If you have Go installed:
 
@@ -207,7 +241,7 @@ go install github.com/WhiteRoseLK/neossh/cmd@latest
 
 ---
 
-### Option 4: Build from Source
+### Option 5: Build from Source
 
 **Prerequisites**: [Go](https://go.dev/) 1.22+ and `git` (and optionally `make`).
 
@@ -254,7 +288,10 @@ neossh [filter] [flags]
 | `--lang <code>` | `-l` | Set interface language: `en`, `fr`, `zh-CN` (or via `NEOSSH_LANG`) | `""` *(English default)* |
 | `--show-hidden` | `-H` | Display hidden servers in UI list | `false` |
 | `--scp <alias>` | | Generate SCP upload/download command templates for a server alias and copy to clipboard | `""` |
+| `--sshfs <alias>` | | Generate SSHFS remote mount and unmount command templates for a server alias and copy to clipboard | `""` |
 | `--pre-connect <cmd>` | | Run local hook command before SSH connect (supports `%h`, `%p`, `%r`, `%n`) | `""` |
+| `--default-key <path>` | | Get or set default SSH identity key prefilled for new server entries | `""` |
+| `--password <pwd>` | `-P` | Password for automated `sshpass` authentication | `""` |
 | `--sshconfig <path>` | | Specify custom path to SSH config file | `~/.ssh/config` |
 | `--readonly`, `--ssh-config-readonly` | `-r` | Run in read-only / viewer mode (prevents writing or modifying SSH configuration) | `false` |
 | `--exit-on-disconnect`, `--auto-exit` | `-x` | Exit `neossh` immediately after SSH session terminates (one-shot launcher) | `false` |
@@ -265,8 +302,17 @@ neossh [filter] [flags]
 # Launch normal interactive TUI:
 neossh
 
+# Set default SSH identity key for new servers:
+neossh --default-key ~/.ssh/id_ed25519
+
+# Check current default SSH identity key:
+neossh --default-key ""
+
 # Generate SCP command templates for a server alias:
 neossh --scp web-prod
+
+# Generate SSHFS remote filesystem mount commands:
+neossh --sshfs web-prod
 
 # Launch TUI with French localization:
 neossh --lang fr
@@ -306,6 +352,9 @@ neossh -c my-server
 # Combine direct connect with exit-on-disconnect:
 neossh -c -x my-server
 
+# Connect directly with one-shot password authentication via sshpass:
+neossh -c my-server -P "secretpassword"
+
 # Open in safe read-only viewer mode (modifications disabled):
 neossh -r
 
@@ -337,6 +386,7 @@ neossh --sshconfig ~/.ssh/config_work -r
 | `T` | Toggle color theme (Dark → Light → System) |
 | `c` | Copy SSH connection command to clipboard |
 | `o` | Open SCP command generator modal to configure and copy upload/download commands |
+| `M` | Open SSHFS remote mount command generator modal to configure and copy mount/unmount commands |
 | `C` | Edit SSH key comment *(on server with identity file)* *(disabled in read-only mode)* |
 | `l` | Load selected server's key into `ssh-agent` *(disabled in read-only mode)* |
 | `u` | Unload selected server's key from `ssh-agent` *(disabled in read-only mode)* |
@@ -360,12 +410,13 @@ neossh --sshconfig ~/.ssh/config_work -r
 
 ## 🔐 Security Notice
 
-`neossh` does not introduce any new security risks. It is a TUI wrapper around your existing `~/.ssh/config` file:
+`neossh` treats credential security and user privacy as paramount requirements:
 
-- All SSH connections are executed through your system's native `ssh` binary (OpenSSH).
-- Private keys, passwords, and credentials are never stored, transmitted, or inspected by `neossh`.
-- Your existing `IdentityFile` paths and `ssh-agent` integrations work exactly as before.
-- File permissions on your SSH config (`0600`) are strictly preserved.
+- **No Plaintext Passwords on Disk**: Passwords are **never** stored in plain text anywhere on disk—neither in `~/.ssh/config` nor in `metadata.json`. Your SSH configuration remains clean, portable, and completely safe to version-control in dotfiles.
+- **Native OS Keyring & Hardware Security**: Server passwords configured for automated `sshpass` login are managed by the operating system's native secure credential store (macOS Keychain, Linux Secret Service / DBus, Windows Credential Manager) with an authenticated AES-256-GCM local vault fallback (`0600` permissions).
+- **Process Table Protection**: When connecting via `sshpass`, `neossh` delivers passwords through the `SSHPASS` environment variable (`sshpass -e`) rather than command-line arguments, preventing password exposure to other users in `ps aux`.
+- **OpenSSH Native Execution**: All SSH connections run through your system's native `ssh` binary (OpenSSH). Your existing `IdentityFile` paths, passphrases, and `ssh-agent` integrations work exactly as before.
+- **Strict File Permissions**: Config snapshots, backups, and vault files strictly enforce `0600` permissions.
 
 ---
 
@@ -413,7 +464,7 @@ Host db-primary
 
 ---
 
-### 🪝 Pre-Connect Command Hooks
+## 🪝 Pre-Connect Command Hooks
 
 `neossh` allows executing custom local commands or scripts right before connecting to an SSH host. This is particularly useful for:
 - 🛡️ Triggering corporate VPN connection scripts before dialing private IP ranges.
@@ -447,6 +498,17 @@ If the pre-connect hook command exits with a non-zero exit code, the SSH connect
 
 ---
 
+## 🔑 Password Authentication via `sshpass`
+
+For legacy servers or restricted environments that do not support SSH public key authentication, `neossh` provides automated password authentication via `sshpass` with end-to-end credential security:
+
+- **Zero Plaintext Footprint in `~/.ssh/config`**: Unlike insecure approaches, `neossh` **never** stores passwords in `~/.ssh/config` or `metadata.json`. Your SSH configuration remains clean, portable, and completely safe to version-control in public or shared dotfiles.
+- **Hardware-Backed Credential Store**: Passwords configured via the Add/Edit Server form under `▶ Password & Interactive` are securely stored in your operating system's native keyring (macOS Keychain, Linux Secret Service / DBus, Windows Credential Manager) with an authenticated AES-256-GCM local vault fallback.
+- **Secure Process Invocation**: Uses `sshpass -e` with environment variable delivery (`SSHPASS`) rather than CLI flags, completely eliminating visibility in system process tables (`ps aux`).
+- **One-Shot CLI Flag & Environment Variable**: Pass one-shot passwords via `--password <pwd>` (or `-P <pwd>`) or through the `NEOSSH_PASSWORD` / `SSHPASS` environment variables.
+
+---
+
 ## 🤝 Contributing
 
 Contributions are welcome! Feel free to open an [Issue](https://github.com/WhiteRoseLK/neossh/issues) or submit a Pull Request.
@@ -469,10 +531,10 @@ This project is licensed under the [Apache-2.0 License](LICENSE).
   - `@Q0`, `@Midas-sudo` — Server folders, nested grouping, and tmux session integration
   - `@Midas-sudo` — Wildcard pattern blocks & pre-connect command hooks
   - `@Mehrdad-Farshi` — SSH error diagnostics display
-  - `@leleobhz` — CLI filter and direct connect options
+  - `@leleobhz` — CLI filter, direct connect options, and Arch Linux AUR package maintenance
   - `@eznix86` — Import hosts from `~/.ssh/known_hosts` (CLI flag & bootstrap)
   - `@OleksandrKucherenko` — Git SSH key configuration, profile switcher, and SSH key management
-  - `@gonsalvesc` — XDG base directory specification support
+  - `@gonsalvesc` — XDG base directory specification support & Windows Scoop package manifest
   - `@levinion` — Copy SSH command shortcut
   - `@gaoyifan` — Persistent sort mode
   - `@k161196` — Panel focus shortcuts, active background SSH sessions panel, and process controls
@@ -484,4 +546,7 @@ This project is licensed under the [Apache-2.0 License](LICENSE).
   - `@mahyarmirrashed` — Numeric username validation support
   - `@vetash` — Automatic terminal and tab title integration
   - `@piRGoif` — SCP command generator modal and CLI helper
+  - `@pranav79` — Configurable default identity SSH key for new servers
+  - `@mas-kon` — SSHFS remote filesystem mount integration
+  - `@0xkatana` — Password authentication integration via `sshpass`
   - `@arniom`, `@leoncamel`, `@breakersun`, `@OlalalalaO`, `@manato-tajiri`, `@komapro` — Bug fixes & documentation improvements

@@ -44,30 +44,31 @@ const (
 )
 
 type ServerForm struct {
-	*tview.Flex                 // The root container (includes header, form panel and hint bar)
-	header          *AppHeader  // The app header
-	formPanel       *tview.Flex // The actual form panel
-	pages           *tview.Pages
-	tabBar          *tview.TextView
-	forms           map[string]*tview.Form
-	currentTab      string
-	tabs            []string
-	tabAbbrev       map[string]string // Abbreviated tab names for narrow views
-	mode            ServerFormMode
-	original        *domain.Server
-	initialData     *domain.Server // Initial data for pre-filling form (used in Add mode)
-	existingAliases []string       // List of existing aliases for validation
-	existingGroups  []string       // List of existing groups for autocomplete
-	onSave          func(domain.Server, *domain.Server)
-	onCancel        func()
-	app             *tview.Application // Reference to app for showing modals
-	version         string             // Version for header
-	commit          string             // Commit for header
-	validation      *ValidationState   // Validation state for all fields
-	helpPanel       *tview.TextView    // Help panel for field descriptions
-	helpMode        HelpDisplayMode    // Current help display mode
-	currentField    string             // Currently focused field
-	mainContainer   *tview.Flex        // Container for form and help panel
+	*tview.Flex                    // The root container (includes header, form panel and hint bar)
+	header             *AppHeader  // The app header
+	formPanel          *tview.Flex // The actual form panel
+	pages              *tview.Pages
+	tabBar             *tview.TextView
+	forms              map[string]*tview.Form
+	currentTab         string
+	tabs               []string
+	tabAbbrev          map[string]string // Abbreviated tab names for narrow views
+	mode               ServerFormMode
+	original           *domain.Server
+	initialData        *domain.Server // Initial data for pre-filling form (used in Add mode)
+	existingAliases    []string       // List of existing aliases for validation
+	existingGroups     []string       // List of existing groups for autocomplete
+	onSave             func(domain.Server, *domain.Server)
+	onCancel           func()
+	app                *tview.Application // Reference to app for showing modals
+	version            string             // Version for header
+	commit             string             // Commit for header
+	validation         *ValidationState   // Validation state for all fields
+	helpPanel          *tview.TextView    // Help panel for field descriptions
+	helpMode           HelpDisplayMode    // Current help display mode
+	currentField       string             // Currently focused field
+	mainContainer      *tview.Flex        // Container for form and help panel
+	defaultIdentityKey string             // Configured default SSH identity key for new servers
 }
 
 const (
@@ -1094,6 +1095,26 @@ func (sf *ServerForm) addInputFieldWithHelp(form *tview.Form, label, fieldName, 
 	return field
 }
 
+// addPasswordField adds a masked input field with help support
+func (sf *ServerForm) addPasswordField(form *tview.Form, label, fieldName, defaultValue string, width int, placeholder string) *tview.InputField {
+	field := tview.NewInputField().
+		SetLabel(label).
+		SetText(defaultValue).
+		SetFieldWidth(width).
+		SetMaskCharacter('*')
+
+	if placeholder != "" {
+		field.SetPlaceholder(placeholder)
+	}
+
+	field.SetFocusFunc(func() {
+		sf.updateHelp(fieldName)
+	})
+
+	form.AddFormItem(highlightFormItem(field))
+	return field
+}
+
 // addValidatedInputField adds an input field with real-time validation
 func (sf *ServerForm) addValidatedInputField(form *tview.Form, label, fieldName, defaultValue string, width int, placeholder string) *tview.InputField {
 	// Store the original label without color tags
@@ -1190,7 +1211,13 @@ func (sf *ServerForm) getDefaultValues() ServerFormData {
 			Host:  server.Host,
 			User:  server.User,
 			Port:  fmt.Sprint(server.Port),
-			Key:   strings.Join(server.IdentityFiles, ", "),
+			Key: func() string {
+				k := strings.Join(server.IdentityFiles, ", ")
+				if k == "" && sf.mode == ServerFormAdd {
+					return sf.defaultIdentityKey
+				}
+				return k
+			}(),
 			Tags:  strings.Join(server.Tags, ", "),
 			Group: server.Group,
 			Hidden: func() string {
@@ -1229,6 +1256,7 @@ func (sf *ServerForm) getDefaultValues() ServerFormData {
 			AddKeysToAgent: server.AddKeysToAgent,
 			IdentityAgent:  server.IdentityAgent,
 			// Password & Interactive
+			Password:                     server.Password,
 			PasswordAuthentication:       server.PasswordAuthentication,
 			KbdInteractiveAuthentication: server.KbdInteractiveAuthentication,
 			NumberOfPasswordPrompts:      server.NumberOfPasswordPrompts,
@@ -1269,11 +1297,11 @@ func (sf *ServerForm) getDefaultValues() ServerFormData {
 	// For new servers, use empty values instead of SSH defaults
 	// SSH defaults will be applied by the SSH client if values are not specified
 	return ServerFormData{
-		Alias:  "",   // Explicitly empty for new servers
-		Host:   "",   // Explicitly empty for new servers
-		User:   "",   // Empty for new servers (SSH will use current username)
-		Port:   "22", // Keep port 22 as it's the standard SSH port
-		Key:    "",   // Empty for new servers (SSH will try default keys)
+		Alias:  "",                    // Explicitly empty for new servers
+		Host:   "",                    // Explicitly empty for new servers
+		User:   "",                    // Empty for new servers (SSH will use current username)
+		Port:   "22",                  // Keep port 22 as it's the standard SSH port
+		Key:    sf.defaultIdentityKey, // Configured default identity key if present
 		Tags:   "",
 		Group:  "",
 		Hidden: "no",
@@ -1308,6 +1336,7 @@ func (sf *ServerForm) getDefaultValues() ServerFormData {
 		GatewayPorts:        "",
 
 		// Authentication
+		Password:                     "",
 		PubkeyAuthentication:         "",
 		IdentitiesOnly:               "",
 		AddKeysToAgent:               "",
@@ -1674,6 +1703,9 @@ func (sf *ServerForm) createAuthenticationForm() {
 	// Password/Interactive authentication
 	form.AddTextView("\n[yellow]▶ Password & Interactive[-]", "", 0, 1, true, false)
 
+	// Password field for automated sshpass authentication
+	sf.addPasswordField(form, "Password:", "Password", defaultValues.Password, 30, GetFieldPlaceholder("Password"))
+
 	// PasswordAuthentication dropdown
 	passwordOptions := createOptionsWithDefault("PasswordAuthentication", []string{"", "yes", "no"})
 	passwordIndex := sf.findOptionIndex(passwordOptions, defaultValues.PasswordAuthentication)
@@ -1854,6 +1886,7 @@ type ServerFormData struct {
 	AddKeysToAgent string
 	IdentityAgent  string
 	// Password & Interactive
+	Password                     string
 	PasswordAuthentication       string
 	KbdInteractiveAuthentication string
 	NumberOfPasswordPrompts      string
@@ -1981,6 +2014,7 @@ func (sf *ServerForm) getFormData() ServerFormData {
 		AddKeysToAgent: getDropdownValue("AddKeysToAgent:"),
 		IdentityAgent:  getFieldText("IdentityAgent:"),
 		// Password & Interactive
+		Password:                     getFieldText("Password:"),
 		PasswordAuthentication:       getDropdownValue("PasswordAuthentication:"),
 		KbdInteractiveAuthentication: getDropdownValue("KbdInteractiveAuthentication:"),
 		NumberOfPasswordPrompts:      getFieldText("NumberOfPasswordPrompts:"),
@@ -2399,6 +2433,7 @@ func (sf *ServerForm) dataToServer(data ServerFormData) domain.Server {
 		AddKeysToAgent: data.AddKeysToAgent,
 		IdentityAgent:  data.IdentityAgent,
 		// Password & Interactive
+		Password:                     data.Password,
 		PasswordAuthentication:       data.PasswordAuthentication,
 		KbdInteractiveAuthentication: data.KbdInteractiveAuthentication,
 		NumberOfPasswordPrompts:      data.NumberOfPasswordPrompts,
@@ -2511,5 +2546,10 @@ func (sf *ServerForm) SetVersionInfo(version, commit string) *ServerForm {
 
 func (sf *ServerForm) SetExistingGroups(groups []string) *ServerForm {
 	sf.existingGroups = groups
+	return sf
+}
+
+func (sf *ServerForm) SetDefaultIdentityKey(key string) *ServerForm {
+	sf.defaultIdentityKey = key
 	return sf
 }

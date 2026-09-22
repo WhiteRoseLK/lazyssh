@@ -237,8 +237,9 @@ func TestRootCmd_FilterParsing(t *testing.T) {
 
 type mockDirectConnectService struct {
 	ports.ServerService
-	servers   []domain.Server
-	sshCalled string
+	servers    []domain.Server
+	sshCalled  string
+	defaultKey string
 }
 
 func (m *mockDirectConnectService) ListServers(query string) ([]domain.Server, error) {
@@ -253,6 +254,15 @@ func (m *mockDirectConnectService) ListServers(query string) ([]domain.Server, e
 
 func (m *mockDirectConnectService) SSH(alias string) error {
 	m.sshCalled = alias
+	return nil
+}
+
+func (m *mockDirectConnectService) GetDefaultIdentityKey() (string, error) {
+	return m.defaultKey, nil
+}
+
+func (m *mockDirectConnectService) SaveDefaultIdentityKey(key string) error {
+	m.defaultKey = key
 	return nil
 }
 
@@ -605,6 +615,43 @@ func TestHandleSCPFlag(t *testing.T) {
 	}
 }
 
+func TestRootCmd_SSHFSFlag(t *testing.T) {
+	sshfsFlag = ""
+	cmd := newRootCmd()
+	err := cmd.ParseFlags([]string{"--sshfs", "myserver"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if sshfsFlag != "myserver" {
+		t.Errorf("expected sshfsFlag=%q, got %q", "myserver", sshfsFlag)
+	}
+}
+
+func TestHandleSSHFSFlag(t *testing.T) {
+	svc := &mockDirectConnectService{
+		servers: []domain.Server{
+			{
+				Alias: "web-prod",
+				Host:  "10.0.0.1",
+				User:  "ubuntu",
+				Port:  2202,
+			},
+		},
+	}
+
+	// Test found
+	err := handleSSHFSFlag(svc, "web-prod")
+	if err != nil {
+		t.Errorf("expected no error for valid server alias, got %v", err)
+	}
+
+	// Test not found
+	err = handleSSHFSFlag(svc, "nonexistent")
+	if err == nil || !strings.Contains(err.Error(), "not found") {
+		t.Errorf("expected not found error, got %v", err)
+	}
+}
+
 func TestRootCmd_PreConnectFlag(t *testing.T) {
 	preConnectFlag = ""
 	cmd := newRootCmd()
@@ -614,5 +661,82 @@ func TestRootCmd_PreConnectFlag(t *testing.T) {
 	}
 	if preConnectFlag != "vpn-up.sh %h" {
 		t.Errorf("expected preConnectFlag=%q, got %q", "vpn-up.sh %h", preConnectFlag)
+	}
+}
+
+func TestRootCmd_DefaultKeyFlag(t *testing.T) {
+	defaultKeyFlag = ""
+	cmd := newRootCmd()
+	err := cmd.ParseFlags([]string{"--default-key", "~/.ssh/id_ed25519"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if defaultKeyFlag != "~/.ssh/id_ed25519" {
+		t.Errorf("expected defaultKeyFlag=%q, got %q", "~/.ssh/id_ed25519", defaultKeyFlag)
+	}
+}
+
+func TestHandleDefaultKeyFlag(t *testing.T) {
+	svc := &mockDirectConnectService{
+		defaultKey: "~/.ssh/id_rsa",
+	}
+
+	// 1. Flag not changed -> handled=false
+	cmd := newRootCmd()
+	handled, err := handleDefaultKeyFlag(cmd, svc, false, "")
+	if err != nil || handled {
+		t.Errorf("expected handled=false, got handled=%v, err=%v", handled, err)
+	}
+
+	// 2. Flag changed, empty key -> displays current key
+	cmd = newRootCmd()
+	_ = cmd.ParseFlags([]string{"--default-key", ""})
+	handled, err = handleDefaultKeyFlag(cmd, svc, false, "")
+	if err != nil || !handled {
+		t.Errorf("expected handled=true with nil error, got handled=%v, err=%v", handled, err)
+	}
+
+	// 3. Flag changed with key in read-only mode -> error
+	cmd = newRootCmd()
+	_ = cmd.ParseFlags([]string{"--default-key", "~/.ssh/new_key"})
+	handled, err = handleDefaultKeyFlag(cmd, svc, true, "~/.ssh/new_key")
+	if !handled || err == nil || !strings.Contains(err.Error(), "read-only mode") {
+		t.Errorf("expected read-only error, got handled=%v, err=%v", handled, err)
+	}
+
+	// 4. Flag changed with key in normal mode -> saves key
+	cmd = newRootCmd()
+	_ = cmd.ParseFlags([]string{"--default-key", "~/.ssh/new_key"})
+	handled, err = handleDefaultKeyFlag(cmd, svc, false, "~/.ssh/new_key")
+	if err != nil || !handled {
+		t.Fatalf("expected handled=true and nil err, got handled=%v, err=%v", handled, err)
+	}
+	if svc.defaultKey != "~/.ssh/new_key" {
+		t.Errorf("expected defaultKey=%q, got %q", "~/.ssh/new_key", svc.defaultKey)
+	}
+}
+
+func TestRootCmd_PasswordFlag(t *testing.T) {
+	cmd := newRootCmd()
+	flag := cmd.PersistentFlags().Lookup("password")
+	if flag == nil {
+		t.Fatal("expected persistent flag --password to exist")
+	}
+	if flag.Shorthand != "P" {
+		t.Errorf("expected shorthand 'P', got %q", flag.Shorthand)
+	}
+
+	opts := parseRootOptions(cmd, []string{})
+	if opts.password != "" {
+		t.Errorf("expected empty password by default, got %q", opts.password)
+	}
+
+	cmd = newRootCmd()
+	if err := cmd.ParseFlags([]string{"-P", "secret123"}); err != nil {
+		t.Fatalf("failed to parse flags: %v", err)
+	}
+	opts = parseRootOptions(cmd, []string{})
+	if opts.password != "secret123" {
+		t.Errorf("expected password 'secret123', got %q", opts.password)
 	}
 }
