@@ -75,3 +75,17 @@ jobs:
         with:
           version: 2.9.0
           args: check
+
+      - name: Validate Release Distribution Targets (Release PRs only)
+        if: startsWith(github.head_ref, 'release-please')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 .github/scripts/verify-release-targets.py
+
+      - name: Dry-run Packaging & Manifests (Release PRs only)
+        if: startsWith(github.head_ref, 'release-please')
+        uses: goreleaser/goreleaser-action@v5
+        with:
+          version: 2.9.0
+          args: release --snapshot --clean --skip=publish
+
