@@ -549,10 +549,11 @@ func (gs *gitService) parseKeyFile(path string, agentKeys map[string]agentKeyInf
 	}
 
 	key := &domain.SSHKey{
-		Path:    path,
-		Name:    filepath.Base(path),
-		ModTime: info.ModTime(),
-		Source:  "config",
+		Path:       path,
+		Name:       filepath.Base(path),
+		ModTime:    info.ModTime(),
+		Source:     "config",
+		FileExists: true,
 	}
 
 	gs.detectKeyTypeAndEncryption(key, contentStr)
@@ -600,6 +601,10 @@ func (gs *gitService) populatePublicKeyInfo(key *domain.SSHKey, agentKeys map[st
 	if pubContent, err := os.ReadFile(pubPath); err == nil {
 		pubKeyLine := strings.TrimSpace(string(pubContent))
 		parts := strings.Fields(pubKeyLine)
+		if len(parts) >= 2 {
+			// Detect key type and FIDO2 from authoritative public key header
+			gs.detectKeyTypeFromPubHeader(key, parts[0])
+		}
 		if len(parts) >= 3 {
 			key.Comment = strings.Join(parts[2:], " ")
 		}
@@ -624,6 +629,27 @@ func (gs *gitService) populatePublicKeyInfo(key *domain.SSHKey, agentKeys map[st
 				}
 			}
 		}
+	}
+}
+
+// detectKeyTypeFromPubHeader sets the key type and FIDO2 flag from the public key algorithm header.
+// This is authoritative — it overrides any filename-based heuristic.
+func (gs *gitService) detectKeyTypeFromPubHeader(key *domain.SSHKey, header string) {
+	switch header {
+	case "sk-ssh-ed25519@openssh.com":
+		key.Type = keyTypeEd25519
+		key.IsFIDO2 = true
+	case "sk-ecdsa-sha2-nistp256@openssh.com":
+		key.Type = keyTypeECDSA
+		key.IsFIDO2 = true
+	case "ssh-ed25519":
+		key.Type = keyTypeEd25519
+	case "ssh-rsa":
+		key.Type = keyTypeRSA
+	case "ecdsa-sha2-nistp256", "ecdsa-sha2-nistp384", "ecdsa-sha2-nistp521":
+		key.Type = keyTypeECDSA
+	case "ssh-dss":
+		key.Type = keyTypeDSA
 	}
 }
 
@@ -664,18 +690,28 @@ func (gs *gitService) parseAgentKeyLine(line string) *domain.SSHKey {
 		Source:        "agent",
 	}
 
-	keyType := strings.TrimPrefix(parts[0], "ssh-")
-	switch keyType {
-	case "rsa":
-		key.Type = keyTypeRSA
-	case "ed25519":
+	// Detect FIDO2/security-key types first, then standard types
+	switch parts[0] {
+	case "sk-ssh-ed25519@openssh.com":
 		key.Type = keyTypeEd25519
-	case "ecdsa-sha2-nistp256", "ecdsa-sha2-nistp384", "ecdsa-sha2-nistp521":
+		key.IsFIDO2 = true
+	case "sk-ecdsa-sha2-nistp256@openssh.com":
 		key.Type = keyTypeECDSA
-	case "dss":
-		key.Type = keyTypeDSA
+		key.IsFIDO2 = true
 	default:
-		key.Type = keyType
+		keyType := strings.TrimPrefix(parts[0], "ssh-")
+		switch keyType {
+		case "rsa":
+			key.Type = keyTypeRSA
+		case "ed25519":
+			key.Type = keyTypeEd25519
+		case "ecdsa-sha2-nistp256", "ecdsa-sha2-nistp384", "ecdsa-sha2-nistp521":
+			key.Type = keyTypeECDSA
+		case "dss":
+			key.Type = keyTypeDSA
+		default:
+			key.Type = keyType
+		}
 	}
 
 	if len(parts) >= 3 {
