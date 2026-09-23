@@ -52,71 +52,50 @@ func commandKey(event *tcell.EventKey) rune {
 	return normalizeGlobalHotkey(event.Rune())
 }
 
+// hotkeyMap maps each rune to its normalized command rune.
+// Keys that must be case-sensitive have separate entries; keys that fold
+// to lowercase share one target. This replaces a large switch so that
+// the cyclomatic complexity stays within the gocyclo budget.
+var hotkeyMap = map[rune]rune{
+	'q': 'q', 'Q': 'q',
+	'/': '/',
+	'a': 'a', 'A': 'a',
+	'e': 'e', 'E': 'e',
+	'd': 'd', 'D': 'd',
+	'p': 'p',
+	'P': 'P',
+	'l': 'l', 'L': 'l',
+	'u': 'u', 'U': 'u',
+	's': 's',
+	'S': 'S',
+	'c': 'c',
+	'C': 'C',
+	'o': 'o', 'O': 'o',
+	'v': 'v', 'V': 'v',
+	'y': 'y', 'Y': 'y',
+	'h': 'h',
+	'H': 'H',
+	'm': 'm',
+	'M': 'M',
+	'g': 'g',
+	'G': 'G',
+	'r': 'r', 'R': 'r',
+	't': 't',
+	'T': 'T',
+	'f': 'f', 'F': 'f',
+	'x': 'x', 'X': 'x',
+	'j': 'j', 'J': 'j',
+	'k': 'k',
+	'K': 'K',
+}
+
 // normalizeGlobalHotkey preserves command semantics for ASCII keys while
 // keeping all other runes untouched.
 func normalizeGlobalHotkey(key rune) rune {
-	switch key {
-	case 'q', 'Q':
-		return 'q'
-	case '/':
-		return '/'
-	case 'a', 'A':
-		return 'a'
-	case 'e', 'E':
-		return 'e'
-	case 'd', 'D':
-		return 'd'
-	case 'p':
-		return 'p'
-	case 'P':
-		return 'P'
-	case 'l', 'L':
-		return 'l'
-	case 'u', 'U':
-		return 'u'
-	case 's':
-		return 's'
-	case 'S':
-		return 'S'
-	case 'c':
-		return 'c'
-	case 'C':
-		return 'C'
-	case 'o', 'O':
-		return 'o'
-	case 'v', 'V':
-		return 'v'
-	case 'y', 'Y':
-		return 'y'
-	case 'h':
-		return 'h'
-	case 'H':
-		return 'H'
-	case 'm', 'M':
-		return 'm'
-	case 'g':
-		return 'g'
-	case 'G':
-		return 'G'
-	case 'r', 'R':
-		return 'r'
-	case 't':
-		return 't'
-	case 'T':
-		return 'T'
-	case 'f', 'F':
-		return 'f'
-	case 'x', 'X':
-		return 'x'
-	case 'j', 'J':
-		return 'j'
-	case 'k':
-		return 'k'
-	case 'K':
-		return 'K'
-	default:
-		return key
+	if mapped, ok := hotkeyMap[key]; ok {
+		return mapped
 	}
+	return key
 }
 
 func (t *tui) handleNavigationKey(key tcell.Key) bool {
