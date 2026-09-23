@@ -29,9 +29,11 @@ type settingsManager struct {
 }
 
 type uiSettings struct {
-	SortMode           SortMode `json:"sort_mode,omitempty"`
-	Theme              string   `json:"theme,omitempty"`
-	DefaultIdentityKey string   `json:"default_identity_key,omitempty"`
+	SortMode                SortMode `json:"sort_mode,omitempty"`
+	Theme                   string   `json:"theme,omitempty"`
+	DefaultIdentityKey      string   `json:"default_identity_key,omitempty"`
+	AutoPingEnabled         bool     `json:"auto_ping_enabled,omitempty"`
+	AutoPingIntervalSeconds int      `json:"auto_ping_interval_seconds,omitempty"`
 }
 
 func newSettingsManager(logger *zap.SugaredLogger) *settingsManager {
@@ -152,6 +154,41 @@ func (m *settingsManager) SaveDefaultIdentityKey(key string) error {
 	}
 
 	settings.DefaultIdentityKey = key
+	return m.save(settings)
+}
+
+func (m *settingsManager) LoadAutoPing() (bool, int, error) {
+	if m == nil {
+		return false, 60, errors.New("nil settings manager")
+	}
+
+	settings, err := m.load()
+	if err != nil {
+		return false, 60, err
+	}
+
+	interval := settings.AutoPingIntervalSeconds
+	if interval <= 0 {
+		interval = 60
+	}
+
+	return settings.AutoPingEnabled, interval, nil
+}
+
+func (m *settingsManager) SaveAutoPing(enabled bool, intervalSeconds int) error {
+	if m == nil {
+		return errors.New("nil settings manager")
+	}
+
+	settings, err := m.load()
+	if err != nil {
+		return err
+	}
+
+	settings.AutoPingEnabled = enabled
+	if intervalSeconds > 0 {
+		settings.AutoPingIntervalSeconds = intervalSeconds
+	}
 	return m.save(settings)
 }
 

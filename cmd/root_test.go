@@ -979,3 +979,39 @@ func TestRootCmd_FlagCompletions(t *testing.T) {
 		t.Error("expected non-nil completion function for sshfs")
 	}
 }
+
+func TestRootCmd_PingWatchFlags(t *testing.T) {
+	cmd := newRootCmd()
+	watchFlag := cmd.PersistentFlags().Lookup("ping-watch")
+	if watchFlag == nil {
+		t.Fatal("expected persistent flag --ping-watch to exist")
+	}
+
+	intervalFlag := cmd.PersistentFlags().Lookup("ping-interval")
+	if intervalFlag == nil {
+		t.Fatal("expected persistent flag --ping-interval to exist")
+	}
+
+	opts := parseRootOptions(cmd, []string{})
+	if opts.isPingWatch {
+		t.Errorf("expected isPingWatch=false by default")
+	}
+	if opts.pingIntervalSec != 0 {
+		t.Errorf("expected pingIntervalSec=0 by default, got %d", opts.pingIntervalSec)
+	}
+
+	cmd = newRootCmd()
+	if err := cmd.ParseFlags([]string{"--ping-watch", "--ping-interval", "45"}); err != nil {
+		t.Fatalf("failed to parse flags: %v", err)
+	}
+	opts = parseRootOptions(cmd, []string{})
+	if !opts.isPingWatch {
+		t.Errorf("expected isPingWatch=true")
+	}
+	if !opts.isPingWatchSet {
+		t.Errorf("expected isPingWatchSet=true")
+	}
+	if opts.pingIntervalSec != 45 {
+		t.Errorf("expected pingIntervalSec=45, got %d", opts.pingIntervalSec)
+	}
+}

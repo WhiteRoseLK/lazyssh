@@ -55,19 +55,24 @@ var (
 	preConnectFlag    string
 	defaultKeyFlag    string
 	passwordFlag      string
+	pingWatchFlag     bool
+	pingIntervalFlag  int
 
 	rootCmd = newRootCmd()
 )
 
 type rootOptions struct {
-	isReadonly bool
-	filter     string
-	isConnect  bool
-	isImportKH bool
-	theme      string
-	lang       string
-	defKey     string
-	password   string
+	isReadonly      bool
+	filter          string
+	isConnect       bool
+	isImportKH      bool
+	theme           string
+	lang            string
+	defKey          string
+	password        string
+	isPingWatch     bool
+	isPingWatchSet  bool
+	pingIntervalSec int
 }
 
 func parseRootOptions(cmd *cobra.Command, args []string) rootOptions {
@@ -120,15 +125,29 @@ func parseRootOptions(cmd *cobra.Command, args []string) rootOptions {
 		password = p
 	}
 
+	isPingWatch := pingWatchFlag
+	isPingWatchSet := cmd.Flags().Changed("ping-watch")
+	if pw, err := cmd.Flags().GetBool("ping-watch"); err == nil && pw {
+		isPingWatch = true
+	}
+
+	pingIntervalSec := pingIntervalFlag
+	if pi, err := cmd.Flags().GetInt("ping-interval"); err == nil && pi > 0 {
+		pingIntervalSec = pi
+	}
+
 	return rootOptions{
-		isReadonly: isReadonly,
-		filter:     filter,
-		isConnect:  isConnect,
-		isImportKH: isImportKH,
-		theme:      theme,
-		lang:       lang,
-		defKey:     defKey,
-		password:   password,
+		isReadonly:      isReadonly,
+		filter:          filter,
+		isConnect:       isConnect,
+		isImportKH:      isImportKH,
+		theme:           theme,
+		lang:            lang,
+		defKey:          defKey,
+		password:        password,
+		isPingWatch:     isPingWatch,
+		isPingWatchSet:  isPingWatchSet,
+		pingIntervalSec: pingIntervalSec,
 	}
 }
 
@@ -225,6 +244,9 @@ func newRootCmd() *cobra.Command {
 				Theme:              opts.theme,
 				Language:           opts.lang,
 				DefaultIdentityKey: opts.defKey,
+				AutoPing:           opts.isPingWatch,
+				AutoPingSet:        opts.isPingWatchSet,
+				AutoPingInterval:   opts.pingIntervalSec,
 				ServerRepo:         serverRepo,
 				GitService:         gitService,
 			})
@@ -286,6 +308,13 @@ func newRootCmd() *cobra.Command {
 	)
 	cmd.PersistentFlags().StringVarP(
 		&passwordFlag, "password", "P", "", "password for automated sshpass authentication",
+	)
+	cmd.PersistentFlags().BoolVar(
+		&pingWatchFlag, "ping-watch", false, "enable periodic background ping watch mode",
+	)
+	cmd.PersistentFlags().IntVar(
+		&pingIntervalFlag, "ping-interval", 0,
+		"interval in seconds for periodic background ping watch mode (default: 60)",
 	)
 
 	cmd.ValidArgsFunction = func(
