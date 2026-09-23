@@ -68,6 +68,7 @@ If you are coming from **lazyssh**, here is a concrete summary of everything **n
 | **Focus Borders & UI Navigation** | Distinct focus borders highlight the currently active panel (Search, Servers, Active Sessions, Details), with smooth <kbd>Tab</kbd> / <kbd>Shift+Tab</kbd> cycling across panels and form fields, active field highlights, and robust destructive confirmation dialogs. | <kbd>Tab</kbd> / <kbd>Shift+Tab</kbd> |
 | **In-Memory Server State & Fast Search** | Server configuration hierarchy is preloaded and managed reactively in-memory with write-through persistence. Search-as-you-type and async background pings run instantaneously with 0 redundant disk I/O or parser allocations. | *Core Performance* |
 | **Advanced Search Filters** | Token-based search syntax in the search bar: filter by `tag:`, `user:`, `host:`, `port:`, `status:`, and `group:` with negative exclusions (e.g. `-tag:staging`). | `/` or <kbd>0</kbd> |
+| **Shell Autocompletion** | Full autocompletion for Bash, Zsh, Fish, and PowerShell with dynamic server alias completion (`neossh <TAB>`, `neossh -c <TAB>`, `--scp <TAB>`, `--sshfs <TAB>`), flags, themes, and language codes. | `neossh completion` |
 | **Quick Panel Jump** | Instant focus switching between Search, Servers, Active Sessions, and Details panels using numeric keys. | <kbd>0</kbd> / <kbd>1</kbd> / <kbd>2</kbd> / <kbd>3</kbd> |
 | **Modern Toolchain & Deps** | Fully upgraded to latest upstream packages (`tview v0.42`, `tcell/v2 v2.13`, `cobra v1.10`, `zap v1.28`, `go-runewidth v0.0.30`), with Go race detection and `golangci-lint` v2. | *Core* |
 
@@ -377,6 +378,72 @@ neossh -x
 # Load a dedicated work or staging SSH config file in read-only mode:
 neossh --sshconfig ~/.ssh/config_work -r
 ```
+
+### 🐚 Shell Autocompletion
+
+`neossh` provides built-in shell autocompletion for **Bash**, **Zsh**, **Fish**, and **PowerShell**, complete with dynamic server alias suggestions directly parsed from your SSH configuration.
+
+- **Dynamic Server Alias Completion**: Press <kbd>Tab</kbd> after `neossh`, `neossh -c`, `neossh --scp`, or `neossh --sshfs` to view matching host aliases alongside their `user@host:port` descriptions.
+- **Flag & Option Completion**: Flags like `--theme` suggest available themes (`dark`, `light`, `system`), `--lang` suggests supported locales (`en`, `fr`, `zh-CN`), and `--sshconfig` / `--known-hosts` trigger path completions.
+
+#### Installation Instructions
+
+<details>
+<summary><b>Bash</b></summary>
+
+```bash
+# To load completions for the current session:
+source <(neossh completion bash)
+
+# To load completions automatically for each session:
+# Linux:
+neossh completion bash | sudo tee /etc/bash_completion.d/neossh > /dev/null
+
+# macOS (Homebrew bash-completion):
+neossh completion bash > $(brew --prefix)/etc/bash_completion.d/neossh
+```
+</details>
+
+<details>
+<summary><b>Zsh</b></summary>
+
+```bash
+# If shell completion is not already enabled in your environment, add to ~/.zshrc:
+echo "autoload -U compinit; compinit" >> ~/.zshrc
+
+# Generate and save completions to your zsh completion folder:
+neossh completion zsh > "${fpath[1]}/_neossh"
+
+# Restart your zsh shell or reload completions:
+exec zsh
+```
+</details>
+
+<details>
+<summary><b>Fish</b></summary>
+
+```fish
+# To load completions for the current session:
+neossh completion fish | source
+
+# To install completions permanently:
+mkdir -p ~/.config/fish/completions
+neossh completion fish > ~/.config/fish/completions/neossh.fish
+```
+</details>
+
+<details>
+<summary><b>PowerShell</b></summary>
+
+```powershell
+# To load completions for the current session:
+neossh completion powershell | Out-String | Invoke-Expression
+
+# To load completions automatically in your profile:
+neossh completion powershell > "$HOME\Documents\PowerShell\neossh.ps1"
+# And add ". $HOME\Documents\PowerShell\neossh.ps1" to your $PROFILE
+```
+</details>
 
 ---
 

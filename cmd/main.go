@@ -28,9 +28,11 @@ import (
 	"github.com/WhiteRoseLK/neossh/internal/core/domain"
 	"github.com/WhiteRoseLK/neossh/internal/core/ports"
 	"github.com/WhiteRoseLK/neossh/internal/core/services"
+	"github.com/WhiteRoseLK/neossh/internal/i18n"
 	"github.com/WhiteRoseLK/neossh/internal/logger"
 	"github.com/atotto/clipboard"
 	"github.com/spf13/cobra"
+	"go.uber.org/zap"
 )
 
 var (
@@ -286,8 +288,182 @@ func newRootCmd() *cobra.Command {
 		&passwordFlag, "password", "P", "", "password for automated sshpass authentication",
 	)
 
+	cmd.ValidArgsFunction = func(
+		cmd *cobra.Command, args []string, toComplete string,
+	) ([]string, cobra.ShellCompDirective) {
+		if len(args) > 0 {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		return getSSHHostAliasesForCompletion(cmd, toComplete), cobra.ShellCompDirectiveNoFileComp
+	}
+
+	_ = cmd.RegisterFlagCompletionFunc("theme", func(
+		_ *cobra.Command, _ []string, _ string,
+	) ([]string, cobra.ShellCompDirective) {
+		return ui.GetThemeNames(), cobra.ShellCompDirectiveNoFileComp
+	})
+	_ = cmd.RegisterFlagCompletionFunc("lang", func(
+		_ *cobra.Command, _ []string, _ string,
+	) ([]string, cobra.ShellCompDirective) {
+		return i18n.SupportedLanguages(), cobra.ShellCompDirectiveNoFileComp
+	})
+	_ = cmd.RegisterFlagCompletionFunc("sshconfig", func(
+		_ *cobra.Command, _ []string, _ string,
+	) ([]string, cobra.ShellCompDirective) {
+		return nil, cobra.ShellCompDirectiveDefault
+	})
+	_ = cmd.RegisterFlagCompletionFunc("known-hosts", func(
+		_ *cobra.Command, _ []string, _ string,
+	) ([]string, cobra.ShellCompDirective) {
+		return nil, cobra.ShellCompDirectiveDefault
+	})
+	_ = cmd.RegisterFlagCompletionFunc("filter", func(
+		cmd *cobra.Command, _ []string, toComplete string,
+	) ([]string, cobra.ShellCompDirective) {
+		return getSSHHostAliasesForCompletion(cmd, toComplete), cobra.ShellCompDirectiveNoFileComp
+	})
+	_ = cmd.RegisterFlagCompletionFunc("scp", func(
+		cmd *cobra.Command, _ []string, toComplete string,
+	) ([]string, cobra.ShellCompDirective) {
+		return getSSHHostAliasesForCompletion(cmd, toComplete), cobra.ShellCompDirectiveNoFileComp
+	})
+	_ = cmd.RegisterFlagCompletionFunc("sshfs", func(
+		cmd *cobra.Command, _ []string, toComplete string,
+	) ([]string, cobra.ShellCompDirective) {
+		return getSSHHostAliasesForCompletion(cmd, toComplete), cobra.ShellCompDirectiveNoFileComp
+	})
+
+	cmd.AddCommand(newCompletionCmd())
+
 	cmd.SilenceUsage = true
 	return cmd
+}
+
+func newCompletionCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "completion [bash|zsh|fish|powershell]",
+		Short: "Generate shell completion script",
+		Long: fmt.Sprintf(`To load completions:
+
+Bash:
+
+  $ source <(%[1]s completion bash)
+
+  # To load completions for each session, execute once:
+  # Linux:
+  $ %[1]s completion bash > /etc/bash_completion.d/%[1]s
+  # macOS:
+  $ %[1]s completion bash > $(brew --prefix)/etc/bash_completion.d/%[1]s
+
+Zsh:
+
+  # If shell completion is not already enabled in your environment,
+  # you will need to enable it. You can execute the following once:
+
+  $ echo "autoload -U compinit; compinit" >> ~/.zshrc
+
+  # To load completions for each session, execute once:
+  $ %[1]s completion zsh > "${fpath[1]}/_%[1]s"
+
+  # You will need to start a new shell for this setup to take effect.
+
+Fish:
+
+  $ %[1]s completion fish | source
+
+  # To load completions for each session, execute once:
+  $ %[1]s completion fish > ~/.config/fish/completions/%[1]s.fish
+
+PowerShell:
+
+  PS> %[1]s completion powershell | Out-String | Invoke-Expression
+
+  # To load completions for every new session, run:
+  PS> %[1]s completion powershell > %[1]s.ps1
+  # and source this file from your PowerShell profile.
+`, ui.AppName),
+		DisableFlagsInUseLine: true,
+		ValidArgs:             []string{"bash", "zsh", "fish", "powershell"},
+		Args:                  cobra.MatchAll(cobra.ExactArgs(1), cobra.OnlyValidArgs),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			switch args[0] {
+			case "bash":
+				return cmd.Root().GenBashCompletion(cmd.OutOrStdout())
+			case "zsh":
+				return cmd.Root().GenZshCompletion(cmd.OutOrStdout())
+			case "fish":
+				return cmd.Root().GenFishCompletion(cmd.OutOrStdout(), true)
+			case "powershell":
+				return cmd.Root().GenPowerShellCompletionWithDesc(cmd.OutOrStdout())
+			default:
+				return fmt.Errorf("unsupported shell type: %s", args[0])
+			}
+		},
+	}
+}
+
+func getSSHHostAliasesForCompletion(cmd *cobra.Command, toComplete string) []string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return nil
+	}
+
+	customConfig, _ := cmd.Flags().GetString("sshconfig")
+	resolvedConfig, cleanup, err := resolveSSHConfigFile(home, customConfig)
+	if err != nil {
+		return nil
+	}
+	defer cleanup()
+
+	silentLog := zap.NewNop().Sugar()
+	repo := ssh_config_file.NewRepository(silentLog, resolvedConfig, "")
+	servers, err := repo.ListServers("")
+	if err != nil {
+		return nil
+	}
+
+	var completions []string
+	seen := make(map[string]bool)
+
+	for _, s := range servers {
+		if s.IsWildcard || s.IsWildcardServer() {
+			continue
+		}
+
+		var descParts []string
+		if s.User != "" && s.Host != "" {
+			descParts = append(descParts, fmt.Sprintf("%s@%s", s.User, s.Host))
+		} else if s.Host != "" {
+			descParts = append(descParts, s.Host)
+		}
+		if s.Port != 0 && s.Port != 22 {
+			if len(descParts) > 0 {
+				descParts[0] = fmt.Sprintf("%s:%d", descParts[0], s.Port)
+			} else {
+				descParts = append(descParts, fmt.Sprintf(":%d", s.Port))
+			}
+		}
+		desc := strings.Join(descParts, " ")
+
+		allAliases := append([]string{s.Alias}, s.Aliases...)
+		for _, alias := range allAliases {
+			if alias == "" || seen[alias] {
+				continue
+			}
+			seen[alias] = true
+
+			if toComplete != "" && !strings.HasPrefix(strings.ToLower(alias), strings.ToLower(toComplete)) {
+				continue
+			}
+
+			if desc != "" {
+				completions = append(completions, fmt.Sprintf("%s\t%s", alias, desc))
+			} else {
+				completions = append(completions, alias)
+			}
+		}
+	}
+	return completions
 }
 
 func resolveSSHConfigFile(home, customPath string) (string, func(), error) {
