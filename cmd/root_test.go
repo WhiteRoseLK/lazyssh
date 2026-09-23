@@ -15,13 +15,18 @@
 package main
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
+	"github.com/WhiteRoseLK/neossh/internal/adapters/ui"
 	"github.com/WhiteRoseLK/neossh/internal/core/domain"
 	"github.com/WhiteRoseLK/neossh/internal/core/ports"
+	"github.com/WhiteRoseLK/neossh/internal/i18n"
+	"github.com/spf13/cobra"
 )
 
 func TestRootCmd_ExitOnDisconnectFlags(t *testing.T) {
@@ -738,5 +743,239 @@ func TestRootCmd_PasswordFlag(t *testing.T) {
 	opts = parseRootOptions(cmd, []string{})
 	if opts.password != "secret123" {
 		t.Errorf("expected password 'secret123', got %q", opts.password)
+	}
+}
+
+func TestCompletionCmd_ShellGenerators(t *testing.T) {
+	shells := []struct {
+		shell       string
+		expectedStr string
+	}{
+		{"bash", "bash completion for " + ui.AppName},
+		{"zsh", "#compdef " + ui.AppName},
+		{"fish", "complete -c " + ui.AppName},
+		{"powershell", "Register-ArgumentCompleter"},
+	}
+
+	for _, tt := range shells {
+		t.Run(tt.shell, func(t *testing.T) {
+			cmd := newRootCmd()
+			var buf bytes.Buffer
+			cmd.SetOut(&buf)
+			cmd.SetArgs([]string{"completion", tt.shell})
+
+			err := cmd.Execute()
+			if err != nil {
+				t.Fatalf("unexpected error running 'completion %s': %v", tt.shell, err)
+			}
+
+			output := buf.String()
+			if !strings.Contains(output, tt.expectedStr) {
+				t.Errorf("expected completion script for %s to contain %q, got length %d",
+					tt.shell, tt.expectedStr, len(output))
+			}
+		})
+	}
+}
+
+func TestCompletionCmd_InvalidShell(t *testing.T) {
+	cmd := newRootCmd()
+	var buf bytes.Buffer
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+	cmd.SetArgs([]string{"completion", "unsupported-shell"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error executing 'completion unsupported-shell', got nil")
+	}
+}
+
+func TestCompletionCmd_NoArgs(t *testing.T) {
+	cmd := newRootCmd()
+	var buf bytes.Buffer
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+	cmd.SetArgs([]string{"completion"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error executing 'completion' with no args, got nil")
+	}
+}
+
+func TestGetSSHHostAliasesForCompletion(t *testing.T) {
+	tmpDir := t.TempDir()
+	cfgPath := filepath.Join(tmpDir, "config")
+	cfgContent := `Host web-prod prod-1
+    HostName 192.168.1.50
+    User admin
+    Port 2222
+
+Host db-backup
+    HostName 10.0.0.99
+
+Host *.corp
+    HostName %h.internal
+`
+	if err := os.WriteFile(cfgPath, []byte(cfgContent), 0o600); err != nil {
+		t.Fatalf("failed to write test ssh config: %v", err)
+	}
+
+	cmd := newRootCmd()
+	if err := cmd.ParseFlags([]string{"--sshconfig", cfgPath}); err != nil {
+		t.Fatalf("failed to parse flags: %v", err)
+	}
+
+	// 1. Complete with empty toComplete (all valid hosts)
+	completions := getSSHHostAliasesForCompletion(cmd, "")
+	if len(completions) != 3 { // web-prod, prod-1, db-backup (*.corp wildcard excluded)
+		t.Fatalf("expected 3 completions, got %d: %v", len(completions), completions)
+	}
+
+	// Check that descriptions are present
+	hasWebProd := slices.ContainsFunc(completions, func(c string) bool {
+		return strings.HasPrefix(c, "web-prod\tadmin@192.168.1.50:2222")
+	})
+	if !hasWebProd {
+		t.Errorf("expected completions to contain 'web-prod' with desc, got: %v", completions)
+	}
+
+	hasProd1 := slices.ContainsFunc(completions, func(c string) bool {
+		return strings.HasPrefix(c, "prod-1\tadmin@192.168.1.50:2222")
+	})
+	if !hasProd1 {
+		t.Errorf("expected completions to contain 'prod-1' with desc, got: %v", completions)
+	}
+
+	hasDbBackup := slices.ContainsFunc(completions, func(c string) bool {
+		return strings.HasPrefix(c, "db-backup\t10.0.0.99")
+	})
+	if !hasDbBackup {
+		t.Errorf("expected completions to contain 'db-backup' with desc, got: %v", completions)
+	}
+
+	// 2. Filter by prefix "web"
+	webCompletions := getSSHHostAliasesForCompletion(cmd, "web")
+	if len(webCompletions) != 1 || !strings.HasPrefix(webCompletions[0], "web-prod") {
+		t.Errorf("expected 1 completion starting with 'web-prod', got: %v", webCompletions)
+	}
+
+	// 3. Filter with no match
+	noMatches := getSSHHostAliasesForCompletion(cmd, "nonexistent")
+	if len(noMatches) != 0 {
+		t.Errorf("expected 0 completions for 'nonexistent', got: %v", noMatches)
+	}
+}
+
+func TestRootCmd_ValidArgsFunction(t *testing.T) {
+	tmpDir := t.TempDir()
+	cfgPath := filepath.Join(tmpDir, "config")
+	if err := os.WriteFile(cfgPath, []byte("Host myhost\n    HostName 10.0.0.1\n"), 0o600); err != nil {
+		t.Fatalf("failed to write test config: %v", err)
+	}
+
+	cmd := newRootCmd()
+	_ = cmd.ParseFlags([]string{"--sshconfig", cfgPath})
+
+	// With args empty -> should complete aliases
+	comps, directive := cmd.ValidArgsFunction(cmd, []string{}, "")
+	if directive != cobra.ShellCompDirectiveNoFileComp {
+		t.Errorf("expected ShellCompDirectiveNoFileComp, got %v", directive)
+	}
+	if len(comps) != 1 || !strings.HasPrefix(comps[0], "myhost") {
+		t.Errorf("expected completion 'myhost', got %v", comps)
+	}
+
+	// With args non-empty (argument already provided) -> should return nil, no file comp
+	comps, directive = cmd.ValidArgsFunction(cmd, []string{"first-arg"}, "")
+	if directive != cobra.ShellCompDirectiveNoFileComp {
+		t.Errorf("expected ShellCompDirectiveNoFileComp, got %v", directive)
+	}
+	if comps != nil {
+		t.Errorf("expected nil completions when arg already provided, got %v", comps)
+	}
+}
+
+func TestRootCmd_FlagCompletions(t *testing.T) {
+	cmd := newRootCmd()
+
+	// Theme completion
+	themeCompFn, found := cmd.GetFlagCompletionFunc("theme")
+	if !found {
+		t.Fatal("expected flag completion for 'theme' to be registered")
+	}
+	comps, dir := themeCompFn(cmd, nil, "")
+	if dir != cobra.ShellCompDirectiveNoFileComp {
+		t.Errorf("expected NoFileComp for theme, got %v", dir)
+	}
+	if len(comps) != len(ui.GetThemeNames()) {
+		t.Errorf("expected %d theme options, got %d", len(ui.GetThemeNames()), len(comps))
+	}
+
+	// Lang completion
+	langCompFn, found := cmd.GetFlagCompletionFunc("lang")
+	if !found {
+		t.Fatal("expected flag completion for 'lang' to be registered")
+	}
+	comps, dir = langCompFn(cmd, nil, "")
+	if dir != cobra.ShellCompDirectiveNoFileComp {
+		t.Errorf("expected NoFileComp for lang, got %v", dir)
+	}
+	if len(comps) != len(i18n.SupportedLanguages()) {
+		t.Errorf("expected %d lang options, got %d", len(i18n.SupportedLanguages()), len(comps))
+	}
+
+	// sshconfig file completion directive
+	sshCompFn, found := cmd.GetFlagCompletionFunc("sshconfig")
+	if !found {
+		t.Fatal("expected flag completion for 'sshconfig' to be registered")
+	}
+	comps, dir = sshCompFn(cmd, nil, "")
+	if dir != cobra.ShellCompDirectiveDefault {
+		t.Errorf("expected ShellCompDirectiveDefault for sshconfig, got %v", dir)
+	}
+	if len(comps) != 0 {
+		t.Errorf("expected empty comps for default directive, got %v", comps)
+	}
+
+	// known-hosts file completion directive
+	khCompFn, found := cmd.GetFlagCompletionFunc("known-hosts")
+	if !found {
+		t.Fatal("expected flag completion for 'known-hosts' to be registered")
+	}
+	comps, dir = khCompFn(cmd, nil, "")
+	if dir != cobra.ShellCompDirectiveDefault {
+		t.Errorf("expected ShellCompDirectiveDefault for known-hosts, got %v", dir)
+	}
+	if len(comps) != 0 {
+		t.Errorf("expected empty comps for default directive, got %v", comps)
+	}
+
+	// filter flag completion
+	filterCompFn, found := cmd.GetFlagCompletionFunc("filter")
+	if !found {
+		t.Fatal("expected flag completion for 'filter' to be registered")
+	}
+	if filterCompFn == nil {
+		t.Error("expected non-nil completion function for filter")
+	}
+
+	// scp flag completion
+	scpCompFn, found := cmd.GetFlagCompletionFunc("scp")
+	if !found {
+		t.Fatal("expected flag completion for 'scp' to be registered")
+	}
+	if scpCompFn == nil {
+		t.Error("expected non-nil completion function for scp")
+	}
+
+	// sshfs flag completion
+	sshfsCompFn, found := cmd.GetFlagCompletionFunc("sshfs")
+	if !found {
+		t.Fatal("expected flag completion for 'sshfs' to be registered")
+	}
+	if sshfsCompFn == nil {
+		t.Error("expected non-nil completion function for sshfs")
 	}
 }
