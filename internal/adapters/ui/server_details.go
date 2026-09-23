@@ -343,9 +343,23 @@ func (sd *ServerDetails) UpdateServer(server domain.Server) {
 	// Commands list
 	cmdHeader := i18n.T("details.label.commands")
 	if sd.readonly {
-		text += fmt.Sprintf("\n[::b]%s[-]\n  Enter: SSH connect\n  f: Port forward\n  x: Stop forwarding\n  c: Copy SSH command\n  h: Copy Host\n  g: Ping server\n  G: Ping all servers\n  P: Git SSH profile\n  r: Refresh list\n  p: Pin/Unpin\n  [#888888]Modifications disabled (readonly mode)[-]", cmdHeader)
+		text += fmt.Sprintf(
+			"\n[::b]%s[-]\n  Enter: SSH connect\n  f: Port forward\n  x: Stop forwarding\n"+
+				"  c: Copy SSH command\n  h: Copy Host\n  g: Ping server\n  G: Ping all servers\n"+
+				"  W: Ping watch mode\n  P: Git SSH profile\n  r: Refresh list\n  p: Pin/Unpin\n"+
+				"  [#888888]Modifications disabled (readonly mode)[-]",
+			cmdHeader,
+		)
 	} else {
-		text += fmt.Sprintf("\n[::b]%s[-]\n  Enter: SSH connect\n  f: Port forward\n  x: Stop forwarding\n  c: Copy SSH command\n  v: Paste SSH command\n  y: Clone server\n  h: Copy Host\n  g: Ping server\n  G: Ping all servers\n  P: Git SSH profile\n  C: Edit Key Comment\n  l/u: Load/Unload agent key\n  K: Install SSH Key\n  r: Refresh list\n  a: Add new server\n  e: Edit entry\n  t: Edit tags\n  d: Delete entry\n  p: Pin/Unpin", cmdHeader)
+		text += fmt.Sprintf(
+			"\n[::b]%s[-]\n  Enter: SSH connect\n  f: Port forward\n  x: Stop forwarding\n"+
+				"  c: Copy SSH command\n  v: Paste SSH command\n  y: Clone server\n  h: Copy Host\n"+
+				"  g: Ping server\n  G: Ping all servers\n  W: Ping watch mode\n  P: Git SSH profile\n"+
+				"  C: Edit Key Comment\n  l/u: Load/Unload agent key\n  K: Install SSH Key\n"+
+				"  r: Refresh list\n  a: Add new server\n  e: Edit entry\n  t: Edit tags\n"+
+				"  d: Delete entry\n  p: Pin/Unpin",
+			cmdHeader,
+		)
 	}
 
 	sd.TextView.SetText(text)

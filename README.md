@@ -69,6 +69,7 @@ If you are coming from **lazyssh**, here is a concrete summary of everything **n
 | **In-Memory Server State & Fast Search** | Server configuration hierarchy is preloaded and managed reactively in-memory with write-through persistence. Search-as-you-type and async background pings run instantaneously with 0 redundant disk I/O or parser allocations. | *Core Performance* |
 | **Advanced Search Filters** | Token-based search syntax in the search bar: filter by `tag:`, `user:`, `host:`, `port:`, `status:`, and `group:` with negative exclusions (e.g. `-tag:staging`). | `/` or <kbd>0</kbd> |
 | **Shell Autocompletion** | Full autocompletion for Bash, Zsh, Fish, and PowerShell with dynamic server alias completion (`neossh <TAB>`, `neossh -c <TAB>`, `--scp <TAB>`, `--sshfs <TAB>`), flags, themes, and language codes. | `neossh completion` |
+| **Periodic Ping Watch Mode** | Continuous background health checks for all servers at configurable intervals (default: 60s), with real-time latency badges and a live countdown timer in the status bar. | <kbd>W</kbd> / <kbd>Ctrl+P</kbd> / `--ping-watch` |
 | **Quick Panel Jump** | Instant focus switching between Search, Servers, Active Sessions, and Details panels using numeric keys. | <kbd>0</kbd> / <kbd>1</kbd> / <kbd>2</kbd> / <kbd>3</kbd> |
 | **Modern Toolchain & Deps** | Fully upgraded to latest upstream packages (`tview v0.42`, `tcell/v2 v2.13`, `cobra v1.10`, `zap v1.28`, `go-runewidth v0.0.30`), with Go race detection and `golangci-lint` v2. | *Core* |
 
@@ -306,6 +307,8 @@ neossh [filter] [flags]
 | `--pre-connect <cmd>` | | Run local hook command before SSH connect (supports `%h`, `%p`, `%r`, `%n`) | `""` |
 | `--default-key <path>` | | Get or set default SSH identity key prefilled for new server entries | `""` |
 | `--password <pwd>` | `-P` | Password for automated `sshpass` authentication | `""` |
+| `--ping-watch` | | Enable periodic background ping watch mode | `false` |
+| `--ping-interval <sec>` | | Interval in seconds for periodic background ping watch mode | `60` |
 | `--sshconfig <path>` | | Specify custom path to SSH config file | `~/.ssh/config` |
 | `--readonly`, `--ssh-config-readonly` | `-r` | Run in read-only / viewer mode (prevents writing or modifying SSH configuration) | `false` |
 | `--exit-on-disconnect`, `--auto-exit` | `-x` | Exit `neossh` immediately after SSH session terminates (one-shot launcher) | `false` |
@@ -315,6 +318,9 @@ neossh [filter] [flags]
 ```bash
 # Launch normal interactive TUI:
 neossh
+
+# Launch with continuous background ping watch every 30 seconds:
+neossh --ping-watch --ping-interval 30
 
 # Set default SSH identity key for new servers:
 neossh --default-key ~/.ssh/id_ed25519
@@ -477,6 +483,7 @@ neossh completion powershell > "$HOME\Documents\PowerShell\neossh.ps1"
 | `s` | Toggle sort mode (alias, last SSH, reverse) |
 | `g` | Ping selected server |
 | `G` | Ping all servers (parallel check with latency badges) |
+| `W` / `Ctrl+P` | Toggle periodic background ping watch mode (default: 60s) |
 | `Tab` / `Shift+Tab` | Cycle focus between Search, Servers, Active Sessions, and Details panels |
 | `0` / `1` / `2` / `3` | Focus Search (`0`) / Servers (`1`) / Active Sessions (`2`) / Details (`3`) |
 | `j` / `k` or `↓` / `↑` | Navigate server / active session list |

@@ -170,6 +170,11 @@ func (t *tui) handleGlobalKeys(event *tcell.EventKey) *tcell.EventKey {
 		return nil
 	}
 
+	if event.Key() == tcell.KeyCtrlP || event.Key() == tcell.KeyCtrlW {
+		t.handleToggleAutoPing()
+		return nil
+	}
+
 	cmd := commandKey(event)
 	if t.readonly {
 		switch cmd {
@@ -266,6 +271,9 @@ func (t *tui) handleActionKeys(cmd rune) bool {
 	case 'G':
 		t.handlePingAll()
 		return true
+	case 'W', 'w':
+		t.handleToggleAutoPing()
+		return true
 	case 'r':
 		t.handleRefreshBackground()
 		return true
@@ -303,6 +311,7 @@ func (t *tui) handleActionKeys(cmd rune) bool {
 }
 
 func (t *tui) handleQuit() {
+	t.stopAutoPing()
 	t.app.Stop()
 }
 
@@ -1656,7 +1665,22 @@ func (t *tui) showStatusTemp(msg string) {
 }
 
 func (t *tui) defaultStatusText() string {
-	return StatusText(t.readonly)
+	t.autoPingMu.Lock()
+	defer t.autoPingMu.Unlock()
+	return t.defaultStatusTextLocked()
+}
+
+func (t *tui) defaultStatusTextLocked() string {
+	base := StatusText(t.readonly)
+	if t.autoPingEnabled {
+		return base + fmt.Sprintf(" • [dodgerblue::b][WATCH %ds][-]", t.autoPingSecondsRemaining)
+	}
+	return base
+}
+
+func (t *tui) defaultStatusTextWithCountdown(rem int) string {
+	base := StatusText(t.readonly)
+	return base + fmt.Sprintf(" • [dodgerblue::b][WATCH %ds][-]", rem)
 }
 
 // showStatusTempColor displays a temporary colored message in the status bar and restores default text after 2s.
@@ -1664,16 +1688,158 @@ func (t *tui) showStatusTempColor(msg string, color string) {
 	if t.statusBar == nil {
 		return
 	}
+	t.isShowingTempStatus = true
 	t.statusBar.SetText("[" + color + "]" + msg + "[-]")
 	time.AfterFunc(2*time.Second, func() {
 		if t.app != nil {
 			t.app.QueueUpdateDraw(func() {
+				t.isShowingTempStatus = false
 				if t.statusBar != nil {
 					t.statusBar.SetText(t.defaultStatusText())
 				}
 			})
 		}
 	})
+}
+
+func (t *tui) startAutoPing() {
+	t.autoPingMu.Lock()
+	defer t.autoPingMu.Unlock()
+	t.startAutoPingLocked()
+}
+
+func (t *tui) stopAutoPing() {
+	t.autoPingMu.Lock()
+	defer t.autoPingMu.Unlock()
+	t.stopAutoPingLocked()
+}
+
+func (t *tui) startAutoPingLocked() {
+	if t.autoPingStop != nil {
+		return
+	}
+	t.autoPingEnabled = true
+	if t.autoPingInterval <= 0 {
+		t.autoPingInterval = 60 * time.Second
+	}
+	t.autoPingSecondsRemaining = int(t.autoPingInterval.Seconds())
+	stopCh := make(chan struct{})
+	t.autoPingStop = stopCh
+
+	if t.statusBar != nil {
+		t.statusBar.SetText(t.defaultStatusTextLocked())
+	}
+
+	go t.executeBackgroundPingSweep()
+
+	intervalSec := int(t.autoPingInterval.Seconds())
+	go func() {
+		ticker := time.NewTicker(1 * time.Second)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-stopCh:
+				return
+			case <-ticker.C:
+				t.autoPingMu.Lock()
+				if !t.autoPingEnabled {
+					t.autoPingMu.Unlock()
+					return
+				}
+				t.autoPingSecondsRemaining--
+				trigger := false
+				if t.autoPingSecondsRemaining <= 0 {
+					t.autoPingSecondsRemaining = intervalSec
+					trigger = true
+				}
+				rem := t.autoPingSecondsRemaining
+				t.autoPingMu.Unlock()
+
+				if trigger {
+					go t.executeBackgroundPingSweep()
+				}
+
+				if t.app != nil {
+					t.app.QueueUpdateDraw(func() {
+						t.autoPingMu.Lock()
+						enabled := t.autoPingEnabled
+						t.autoPingMu.Unlock()
+						if enabled && t.statusBar != nil && !t.isShowingTempStatus {
+							t.statusBar.SetText(t.defaultStatusTextWithCountdown(rem))
+						}
+					})
+				}
+			}
+		}
+	}()
+}
+
+func (t *tui) stopAutoPingLocked() {
+	t.autoPingEnabled = false
+	if t.autoPingStop != nil {
+		close(t.autoPingStop)
+		t.autoPingStop = nil
+	}
+	if t.statusBar != nil {
+		t.statusBar.SetText(t.defaultStatusTextLocked())
+	}
+}
+
+func (t *tui) handleToggleAutoPing() {
+	t.autoPingMu.Lock()
+	defer t.autoPingMu.Unlock()
+
+	if t.autoPingEnabled {
+		t.stopAutoPingLocked()
+		if t.settings != nil {
+			_ = t.settings.SaveAutoPing(false, int(t.autoPingInterval.Seconds()))
+		}
+		t.showStatusTemp("Ping Watch Mode: OFF")
+	} else {
+		t.startAutoPingLocked()
+		if t.settings != nil {
+			_ = t.settings.SaveAutoPing(true, int(t.autoPingInterval.Seconds()))
+		}
+		t.showStatusTemp(fmt.Sprintf("Ping Watch Mode: ON (every %ds)", int(t.autoPingInterval.Seconds())))
+	}
+}
+
+func (t *tui) executeBackgroundPingSweep() {
+	if t.serverList == nil || t.serverService == nil {
+		return
+	}
+	servers := t.serverList.GetServers()
+	if len(servers) == 0 {
+		return
+	}
+
+	for _, server := range servers {
+		if server.IsWildcardServer() {
+			continue
+		}
+		go func(srv domain.Server) {
+			up, dur, err := t.serverService.Ping(srv)
+			if t.app != nil {
+				t.app.QueueUpdateDraw(func() {
+					if t.pingStatuses == nil {
+						t.pingStatuses = make(map[string]domain.Server)
+					}
+					ps := srv
+					if err != nil || !up {
+						ps.PingStatus = StatusDown
+						ps.PingLatency = 0
+					} else {
+						ps.PingStatus = StatusUp
+						ps.PingLatency = dur
+					}
+					t.pingStatuses[srv.Alias] = ps
+					t.serverService.UpdateServerPing(srv.Alias, ps.PingStatus, ps.PingLatency)
+					t.updateServerListWithPingStatus()
+				})
+			}
+		}(server)
+	}
 }
 
 // Stop any active port forwarding for the selected server.

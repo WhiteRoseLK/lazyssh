@@ -17,6 +17,8 @@ package ui
 import (
 	"fmt"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/gdamore/tcell/v2"
 	"go.uber.org/zap"
@@ -41,6 +43,9 @@ type Config struct {
 	Theme              string
 	Language           string
 	DefaultIdentityKey string
+	AutoPing           bool
+	AutoPingSet        bool
+	AutoPingInterval   int
 	ServerRepo         ports.ServerRepository
 	GitService         ports.GitService
 }
@@ -69,15 +74,22 @@ type tui struct {
 	left    *tview.Flex
 	content *tview.Flex
 
-	sortMode           SortMode
-	themeWatcher       *ThemeWatcher
-	pingStatuses       map[string]domain.Server
-	exitOnDisconnect   bool
-	initialFilter      string
-	showHidden         bool
-	themeFlag          string
-	language           string
-	defaultIdentityKey string
+	sortMode                 SortMode
+	themeWatcher             *ThemeWatcher
+	pingStatuses             map[string]domain.Server
+	autoPingEnabled          bool
+	autoPingInterval         time.Duration
+	autoPingSecondsRemaining int
+	autoPingStop             chan struct{}
+	autoPingMu               sync.Mutex
+	autoPingFlagProvided     bool
+	isShowingTempStatus      bool
+	exitOnDisconnect         bool
+	initialFilter            string
+	showHidden               bool
+	themeFlag                string
+	language                 string
+	defaultIdentityKey       string
 }
 
 func NewTUI(logger *zap.SugaredLogger, ss ports.ServerService, version, commit string, cfg ...Config) App {
@@ -88,6 +100,9 @@ func NewTUI(logger *zap.SugaredLogger, ss ports.ServerService, version, commit s
 	var themeFlag string
 	var language string
 	var defaultIdentityKey string
+	var autoPing bool
+	var autoPingSet bool
+	var autoPingInterval int
 	var serverRepo ports.ServerRepository
 	var gitService ports.GitService
 	if len(cfg) > 0 {
@@ -98,26 +113,39 @@ func NewTUI(logger *zap.SugaredLogger, ss ports.ServerService, version, commit s
 		themeFlag = cfg[0].Theme
 		language = cfg[0].Language
 		defaultIdentityKey = cfg[0].DefaultIdentityKey
+		autoPing = cfg[0].AutoPing
+		autoPingSet = cfg[0].AutoPingSet
+		autoPingInterval = cfg[0].AutoPingInterval
 		serverRepo = cfg[0].ServerRepo
 		gitService = cfg[0].GitService
 	}
+
+	interval := time.Duration(autoPingInterval) * time.Second
+	if interval <= 0 {
+		interval = 60 * time.Second
+	}
+
 	return &tui{
-		logger:             logger,
-		app:                tview.NewApplication(),
-		serverService:      ss,
-		serverRepo:         serverRepo,
-		gitService:         gitService,
-		version:            version,
-		commit:             commit,
-		readonly:           readonly,
-		settings:           newSettingsManager(logger),
-		pingStatuses:       make(map[string]domain.Server),
-		exitOnDisconnect:   exitOnDisconnect,
-		initialFilter:      initialFilter,
-		showHidden:         showHidden,
-		themeFlag:          themeFlag,
-		language:           language,
-		defaultIdentityKey: defaultIdentityKey,
+		logger:                   logger,
+		app:                      tview.NewApplication(),
+		serverService:            ss,
+		serverRepo:               serverRepo,
+		gitService:               gitService,
+		version:                  version,
+		commit:                   commit,
+		readonly:                 readonly,
+		settings:                 newSettingsManager(logger),
+		pingStatuses:             make(map[string]domain.Server),
+		autoPingEnabled:          autoPing,
+		autoPingFlagProvided:     autoPingSet,
+		autoPingInterval:         interval,
+		autoPingSecondsRemaining: int(interval.Seconds()),
+		exitOnDisconnect:         exitOnDisconnect,
+		initialFilter:            initialFilter,
+		showHidden:               showHidden,
+		themeFlag:                themeFlag,
+		language:                 language,
+		defaultIdentityKey:       defaultIdentityKey,
 	}
 }
 
@@ -176,6 +204,7 @@ func (t *tui) Run() error {
 	}()
 	services.SetTerminalTitle("neossh")
 	defer services.RestoreTerminalTitle()
+	defer t.stopAutoPing()
 	t.app.EnableMouse(true)
 	t.initializeI18n()
 	t.initializeTheme()
@@ -306,6 +335,22 @@ func (t *tui) loadPreferences() {
 		t.sortMode = mode
 	} else {
 		t.logger.Warnw("failed to load sort mode preference", "error", err)
+	}
+
+	if !t.autoPingFlagProvided {
+		if enabled, intervalSec, err := t.settings.LoadAutoPing(); err == nil {
+			t.autoPingEnabled = enabled
+			if t.autoPingInterval <= 0 {
+				t.autoPingInterval = time.Duration(intervalSec) * time.Second
+			}
+		}
+	}
+	if t.autoPingInterval <= 0 {
+		t.autoPingInterval = 60 * time.Second
+	}
+	t.autoPingSecondsRemaining = int(t.autoPingInterval.Seconds())
+	if t.autoPingEnabled {
+		t.startAutoPing()
 	}
 }
 
