@@ -70,6 +70,7 @@ If you are coming from **lazyssh**, here is a concrete summary of everything **n
 | **Advanced Search Filters** | Token-based search syntax in the search bar: filter by `tag:`, `user:`, `host:`, `port:`, `status:`, and `group:` with negative exclusions (e.g. `-tag:staging`). | `/` or <kbd>0</kbd> |
 | **Shell Autocompletion** | Full autocompletion for Bash, Zsh, Fish, and PowerShell with dynamic server alias completion (`neossh <TAB>`, `neossh -c <TAB>`, `--scp <TAB>`, `--sshfs <TAB>`), flags, themes, and language codes. | `neossh completion` |
 | **Periodic Ping Watch Mode** | Continuous background health checks for all servers at configurable intervals (default: 60s), with real-time latency badges and a live countdown timer in the status bar. | <kbd>W</kbd> / <kbd>Ctrl+P</kbd> / `--ping-watch` |
+| **SSH Key Type Badges & FIDO2** | Visual badges in server details showing key algorithm (`[ED25519]`, `[RSA-4096]`, `[ECDSA]`), FIDO2/security key indicator (`[FIDO2]` for YubiKey, SoloKey), file existence check (✓ found / ⚠ missing), detected from public key headers. | *Automatic* |
 | **Quick Panel Jump** | Instant focus switching between Search, Servers, Active Sessions, and Details panels using numeric keys. | <kbd>0</kbd> / <kbd>1</kbd> / <kbd>2</kbd> / <kbd>3</kbd> |
 | **Modern Toolchain & Deps** | Fully upgraded to latest upstream packages (`tview v0.42`, `tcell/v2 v2.13`, `cobra v1.10`, `zap v1.28`, `go-runewidth v0.0.30`), with Go race detection and `golangci-lint` v2. | *Core* |
 
@@ -160,6 +161,7 @@ If you are coming from **lazyssh**, here is a concrete summary of everything **n
 - 💬 **SSH key comment editor** (<kbd>C</kbd>): inspect and directly edit public/private key comments.
 - ⚡ **SSH Agent integration** (<kbd>l</kbd> / <kbd>u</kbd>): load or unload server identity keys directly into/from `ssh-agent`.
 - 🗝️ **Configurable Default Identity Key**: designate a default SSH private key (via CLI `--default-key <path>`, Git & SSH Keys Setup dialog, or `NEOSSH_DEFAULT_KEY`), automatically prefilling new servers.
+- 🏷️ **SSH Key Type Badges & FIDO2 Indicator**: visual badges displaying the key algorithm (`[ED25519]`, `[RSA-4096]`, `[ECDSA]`), FIDO2/security key detection (`[FIDO2]` for YubiKey, SoloKey), and file existence status (✓ found / ⚠ missing) in server details.
 
 ### Remote Filesystem Mounts (SSHFS)
 - 📂 **SSHFS Remote Mounts** (<kbd>M</kbd>): mount remote server filesystems locally with full SSH configuration (ports, identity files, jump proxies, auto-reconnect, and read-only flags) and copy ready-to-run mount/unmount commands.

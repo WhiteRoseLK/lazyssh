@@ -110,16 +110,7 @@ func (sd *ServerDetails) getSSHKeyForServer(server domain.Server) *domain.SSHKey
 	if len(server.IdentityFiles) == 0 {
 		return nil
 	}
-	identityFile := server.IdentityFiles[0]
-	if strings.HasPrefix(identityFile, "~/") {
-		if homeDir, err := os.UserHomeDir(); err == nil {
-			identityFile = filepath.Join(homeDir, identityFile[2:])
-		}
-	} else if identityFile == "~" {
-		if homeDir, err := os.UserHomeDir(); err == nil {
-			identityFile = homeDir
-		}
-	}
+	identityFile := expandIdentityFile(server.IdentityFiles[0])
 
 	allKeys, err := sd.gitService.ListAllSSHKeys(sd.serverRepo)
 	if err != nil {
@@ -133,12 +124,80 @@ func (sd *ServerDetails) getSSHKeyForServer(server domain.Server) *domain.SSHKey
 	return nil
 }
 
+// expandIdentityFile resolves ~ prefixes in identity file paths.
+func expandIdentityFile(identityFile string) string {
+	if strings.HasPrefix(identityFile, "~/") {
+		if homeDir, err := os.UserHomeDir(); err == nil {
+			return filepath.Join(homeDir, identityFile[2:])
+		}
+	} else if identityFile == "~" {
+		if homeDir, err := os.UserHomeDir(); err == nil {
+			return homeDir
+		}
+	}
+	return identityFile
+}
+
+// renderKeyWithBadges renders the Key: line in basic info with type badges and file status.
+func (sd *ServerDetails) renderKeyWithBadges(server domain.Server) string {
+	if len(server.IdentityFiles) == 0 {
+		return "[dim]-[-]"
+	}
+
+	keyPath := strings.Join(server.IdentityFiles, ", ")
+	sshKey := sd.getSSHKeyForServer(server)
+	if sshKey == nil {
+		// No key info available — check if file exists on disk
+		expandedPath := expandIdentityFile(server.IdentityFiles[0])
+		if _, err := os.Stat(expandedPath); err != nil {
+			return fmt.Sprintf("[white]%s[-] [red][⚠ missing][-]", keyPath)
+		}
+		return fmt.Sprintf("[white]%s[-]", keyPath)
+	}
+
+	// Build badges
+	var badges []string
+
+	// Key type badge
+	typeLabel := strings.ToUpper(sshKey.Type)
+	if sshKey.Size > 0 {
+		typeLabel = fmt.Sprintf("%s-%d", typeLabel, sshKey.Size)
+	}
+	badges = append(badges, fmt.Sprintf("[black:#61AFEF] %s [-:-:-]", typeLabel))
+
+	// FIDO2 badge
+	if sshKey.IsFIDO2 {
+		badges = append(badges, "[black:#E06C75] FIDO2 [-:-:-]")
+	}
+
+	// File status badge
+	if !sshKey.FileExists {
+		badges = append(badges, "[red][⚠ missing][-]")
+	}
+
+	return fmt.Sprintf("[white]%s[-] %s", keyPath, strings.Join(badges, " "))
+}
+
+// formatKeyTypeBadge returns a colored badge string for the SSH key type in the details section.
+func (sd *ServerDetails) formatKeyTypeBadge(sshKey *domain.SSHKey) string {
+	typeLabel := strings.ToUpper(sshKey.Type)
+	if sshKey.Size > 0 {
+		typeLabel = fmt.Sprintf("%s-%d", typeLabel, sshKey.Size)
+	}
+
+	badge := fmt.Sprintf("[black:#61AFEF] %s [-:-:-]", typeLabel)
+	if sshKey.IsFIDO2 {
+		badge += " [black:#E06C75] FIDO2/Security Key [-:-:-]"
+	}
+	return badge
+}
+
 func (sd *ServerDetails) UpdateServer(server domain.Server) {
 	lastSeen := server.LastSeen.Format("2006-01-02 15:04:05")
 	if server.LastSeen.IsZero() {
 		lastSeen = i18n.T("details.never")
 	}
-	serverKey := strings.Join(server.IdentityFiles, ", ")
+	serverKey := sd.renderKeyWithBadges(server)
 
 	pinnedStr := "true"
 	if server.PinnedAt.IsZero() {
@@ -183,7 +242,10 @@ func (sd *ServerDetails) UpdateServer(server domain.Server) {
 	}
 
 	text := fmt.Sprintf(
-		"[::b]%s[-]\n\n[::b]%s[-]\n  Host: [white]%s[-]\n  User: [white]%s[-]\n  Port: [white]%s[-]\n  Key:  [white]%s[-]\n  Group: [white]%s[-]\n  Tags: %s\n  Pinned: [white]%s[-]\n  Hidden: [white]%s[-]\n  Last SSH: %s\n  SSH Count: [white]%d[-]\n",
+		"[::b]%s[-]\n\n[::b]%s[-]\n  Host: [white]%s[-]\n  User: [white]%s[-]\n"+
+			"  Port: [white]%s[-]\n  Key:  %s\n  Group: [white]%s[-]\n"+
+			"  Tags: %s\n  Pinned: [white]%s[-]\n  Hidden: [white]%s[-]\n"+
+			"  Last SSH: %s\n  SSH Count: [white]%d[-]\n",
 		aliasText, i18n.T("details.label.basic"), hostText, userText, portText,
 		serverKey, groupText, tagsText, pinnedStr, hiddenStr,
 		lastSeen, server.SSHCount)
@@ -192,10 +254,22 @@ func (sd *ServerDetails) UpdateServer(server domain.Server) {
 	if sshKey := sd.getSSHKeyForServer(server); sshKey != nil {
 		text += fmt.Sprintf("\n[::b]%s[-]\n", i18n.T("details.label.sshkey"))
 		text += fmt.Sprintf("  Path: [white]%s[-]\n", sshKey.Path)
-		text += fmt.Sprintf("  Type: [white]%s[-]\n", sshKey.Type)
+
+		// Type badge with FIDO2 indicator
+		typeBadge := sd.formatKeyTypeBadge(sshKey)
+		text += fmt.Sprintf("  Type: %s\n", typeBadge)
+
 		if sshKey.Size > 0 {
 			text += fmt.Sprintf("  Size: [white]%d bits[-]\n", sshKey.Size)
 		}
+
+		// File existence indicator
+		if sshKey.FileExists {
+			text += "  File: [green]✓ Found on disk[-]\n"
+		} else {
+			text += "  File: [red]⚠ Missing on disk[-]\n"
+		}
+
 		if sshKey.Fingerprint != "" {
 			text += fmt.Sprintf("  Fingerprint: [white]%s[-]\n", sshKey.Fingerprint)
 		}

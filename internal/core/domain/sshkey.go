@@ -42,8 +42,14 @@ type SSHKey struct {
 	// IsEncrypted indicates if the private key is encrypted with a passphrase
 	IsEncrypted bool
 
+	// IsFIDO2 indicates the key is a FIDO2/security-key type (sk-ssh-ed25519, sk-ecdsa)
+	IsFIDO2 bool
+
 	// HasPublicKey indicates if a corresponding .pub file exists
 	HasPublicKey bool
+
+	// FileExists indicates if the private key file exists on disk
+	FileExists bool
 
 	// ModTime is the last modification time of the private key file
 	ModTime time.Time
